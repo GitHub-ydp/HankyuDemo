@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+
+# Environment
+.env
+*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Node
+node_modules/
+frontend/node_modules/
+
+# Build
+frontend/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.db.bak*
+*.sqlite.bak*
+*.db-journal
+*.sqlite3-journal
+*.backup
+
+# Logs
+*.log
+
+# Data files (keep directory structure)
+data/tariffs/*.xlsx
+data/tariffs/*.csv
+data/tariffs/*.xls
+
+# Workspace (PPT extracted files)
+workspace/
+
+# Docker
+postgres_data/
+.omx/
+.codex/*
+!.codex/agents/
+!.codex/agents/**
+!.codex/skills/
+!.codex/skills/**
+.codex/skills/.system/**
+!.codex/prompts/
+!.codex/prompts/**
+
+# Sensitive — do not push
+资料/
+邮件/
+uploads/
+screenshots/
+server-operations.md
+toyota_steel_quality_report.html

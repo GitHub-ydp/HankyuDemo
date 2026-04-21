@@ -1,0 +1,634 @@
+<mxfile host="Electron" agent="draw.io" version="29.6.1" pages="4">
+  <diagram name="1. 运价获取现行流程（AS-IS）" id="tariff-asis">
+    <mxGraphModel dx="1400" dy="860" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- 标题 -->
+        <mxCell id="t1" parent="1" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=18;fontStyle=1;" value="&lt;font color=&quot;#333&quot;&gt;运价获取现行流程（AS-IS）&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:12px;font-weight:normal;&quot; color=&quot;#999&quot;&gt;购买部门从约15~20家供应商获取运价，手动录入Excel — 约每2周更新一次&lt;/font&gt;" vertex="1">
+          <mxGeometry x="300" y="15" width="1000" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 供应商区域（左侧）====== -->
+        <mxCell id="supplier_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=2;dashed=1;verticalAlign=top;fontSize=13;fontStyle=1;arcSize=8;" value="供应商（约15~20家）" vertex="1">
+          <mxGeometry x="40" y="80" width="280" height="520" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CE93D8;strokeColor=#7B1FA2;fontSize=11;fontColor=#fff;" value="&lt;b&gt;船司（船运公司）&lt;/b&gt;&lt;br&gt;ONE, KMTC, Evergreen&lt;br&gt;OOCL, EMC 等" vertex="1">
+          <mxGeometry x="70" y="130" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CE93D8;strokeColor=#7B1FA2;fontSize=11;fontColor=#fff;" value="&lt;b&gt;联运商（Co-loader）&lt;/b&gt;" vertex="1">
+          <mxGeometry x="70" y="220" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CE93D8;strokeColor=#7B1FA2;fontSize=11;fontColor=#fff;" value="&lt;b&gt;代理店&lt;/b&gt;&lt;br&gt;Agent" vertex="1">
+          <mxGeometry x="70" y="300" width="220" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- 渠道标签 -->
+        <mxCell id="ch_title" parent="1" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=12;fontStyle=1;fontColor=#666;" value="获取渠道多样" vertex="1">
+          <mxGeometry x="70" y="380" width="220" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ch1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=10;" value="📧 邮件 Email&lt;br&gt;（Excel/PDF 附件）" vertex="1">
+          <mxGeometry x="70" y="415" width="100" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="ch2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=10;" value="💬 WeChat / QQ&lt;br&gt;（文字/截图）" vertex="1">
+          <mxGeometry x="190" y="415" width="100" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="ch3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=10;" value="📄 邮件正文&lt;br&gt;（纯文字报价）" vertex="1">
+          <mxGeometry x="70" y="475" width="100" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="ch4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=10;" value="📋 PDF 合约&lt;br&gt;（如ONE 372页）" vertex="1">
+          <mxGeometry x="190" y="475" width="100" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 购买部门（中间）====== -->
+        <mxCell id="proc_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;strokeWidth=2;dashed=1;verticalAlign=top;fontSize=13;fontStyle=1;arcSize=8;" value="购买部门（Procurement）" vertex="1">
+          <mxGeometry x="420" y="80" width="440" height="520" as="geometry" />
+        </mxCell>
+
+        <!-- 箭头：供应商 → 购买部门 -->
+        <mxCell id="e_s_p" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#9C27B0;strokeWidth=3;exitX=1;exitY=0.5;entryX=0;entryY=0.3;" edge="1" source="supplier_box" target="proc_box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_s_p_label" parent="e_s_p" style="edgeLabel;html=1;align=center;verticalAlign=middle;fontSize=10;fontColor=#9C27B0;fontStyle=1;" value="多渠道发送运价&lt;br&gt;邮件/WeChat/QQ等" vertex="1" connectable="0">
+          <mxGeometry x="-0.1" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 购买部门内部步骤 -->
+        <mxCell id="p1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=11;arcSize=15;" value="&lt;b&gt;① 接收运价&lt;/b&gt;&lt;br&gt;从邮件/WeChat/QQ&lt;br&gt;收集各供应商报价" vertex="1">
+          <mxGeometry x="450" y="140" width="170" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="p2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=11;arcSize=15;" value="&lt;b&gt;② 人工阅读&lt;/b&gt;&lt;br&gt;逐条阅读各格式的&lt;br&gt;运价信息" vertex="1">
+          <mxGeometry x="450" y="230" width="170" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="p3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF8A65;strokeColor=#BF360C;fontSize=11;arcSize=15;fontColor=#fff;" value="&lt;b&gt;③ 手动录入 Excel ⚠️&lt;/b&gt;&lt;br&gt;逐条手打输入到&lt;br&gt;运价管理表&lt;br&gt;（最大痛点）" vertex="1">
+          <mxGeometry x="450" y="320" width="170" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="p4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=11;arcSize=15;" value="&lt;b&gt;④ 核对检查&lt;/b&gt;&lt;br&gt;确认录入数据&lt;br&gt;的准确性" vertex="1">
+          <mxGeometry x="450" y="420" width="170" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- 步骤间箭头 -->
+        <mxCell id="ep12" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;" edge="1" source="p1" target="p2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ep23" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;" edge="1" source="p2" target="p3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ep34" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;" edge="1" source="p3" target="p4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Excel 运价表 -->
+        <mxCell id="excel_master" parent="1" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=12;fontStyle=1;" value="运价管理表&lt;br&gt;（Excel）" vertex="1">
+          <mxGeometry x="670" y="240" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ep3x" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E65100;strokeWidth=2;dashed=1;" edge="1" source="p3" target="excel_master">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 更新周期标注 -->
+        <mxCell id="cycle_note" parent="1" style="shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;size=15;position=0.5;base=20;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=10;rounded=1;" value="&lt;b&gt;约2周更新一次&lt;/b&gt;&lt;br&gt;每次需重新录入" vertex="1">
+          <mxGeometry x="670" y="340" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- 痛点标注 -->
+        <mxCell id="pain1" parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;size=15;fillColor=#FFCDD2;strokeColor=#C62828;fontSize=10;fontColor=#C62828;" value="&lt;b&gt;痛点&lt;/b&gt;：耗时" vertex="1">
+          <mxGeometry x="660" y="140" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="pain2" parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;size=15;fillColor=#FFCDD2;strokeColor=#C62828;fontSize=10;fontColor=#C62828;" value="&lt;b&gt;痛点&lt;/b&gt;：易出错" vertex="1">
+          <mxGeometry x="770" y="140" width="100" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 营业部门（右侧）====== -->
+        <mxCell id="sales_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;dashed=1;verticalAlign=top;fontSize=13;fontStyle=1;arcSize=8;" value="营业部门（销售）" vertex="1">
+          <mxGeometry x="960" y="80" width="310" height="520" as="geometry" />
+        </mxCell>
+
+        <mxCell id="sa1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=11;arcSize=15;" value="&lt;b&gt;① 收到客户投标包&lt;/b&gt;&lt;br&gt;(PKG)" vertex="1">
+          <mxGeometry x="995" y="140" width="240" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="sa2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=11;arcSize=15;" value="&lt;b&gt;② 向购买部门请求报价&lt;/b&gt;&lt;br&gt;向各地购买担当发邮件请求报价" vertex="1">
+          <mxGeometry x="995" y="220" width="240" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="sa3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=11;arcSize=15;" value="&lt;b&gt;③ 收到购买部门回复&lt;/b&gt;&lt;br&gt;购买部门通过邮件回复运价" vertex="1">
+          <mxGeometry x="995" y="300" width="240" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="sa4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#90CAF9;strokeColor=#0D47A1;fontSize=11;arcSize=15;fontColor=#0D47A1;" value="&lt;b&gt;④ 手动填写投标包 ⚠️&lt;/b&gt;&lt;br&gt;按客户指定格式填入&lt;br&gt;逐航线填入费率" vertex="1">
+          <mxGeometry x="995" y="380" width="240" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="sa5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=11;arcSize=15;" value="&lt;b&gt;⑤ 提交投标&lt;/b&gt;" vertex="1">
+          <mxGeometry x="995" y="470" width="240" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- 营业步骤间箭头 -->
+        <mxCell id="esa12" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;" edge="1" source="sa1" target="sa2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="esa23" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;" edge="1" source="sa2" target="sa3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="esa34" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;" edge="1" source="sa3" target="sa4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="esa45" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;" edge="1" source="sa4" target="sa5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 购买→营业 交互箭头 -->
+        <mxCell id="e_proc_sales" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#FF6F00;strokeWidth=2;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="excel_master" target="sa3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_proc_sales_label" parent="e_proc_sales" style="edgeLabel;html=1;align=center;verticalAlign=middle;fontSize=9;fontColor=#FF6F00;" value="邮件回复费率" vertex="1" connectable="0">
+          <mxGeometry x="-0.2" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 客户 -->
+        <mxCell id="customer" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#E3F2FD;strokeColor=#1565C0;fontSize=11;" value="&lt;b&gt;客户&lt;/b&gt;" vertex="1">
+          <mxGeometry x="1380" y="130" width="40" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e_cust_sa" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#1565C0;strokeWidth=2;" edge="1" source="customer" target="sa1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sa_cust" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=2;exitX=1;exitY=0.5;entryX=1;entryY=1;" edge="1" source="sa5" target="customer">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1430" y="493" />
+              <mxPoint x="1430" y="190" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_sa_cust_label" parent="e_sa_cust" style="edgeLabel;html=1;align=center;verticalAlign=middle;fontSize=10;fontColor=#2E7D32;fontStyle=1;" value="提交投标" vertex="1" connectable="0">
+          <mxGeometry x="-0.3" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 底部痛点总结 -->
+        <mxCell id="summary" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCDD2;strokeColor=#C62828;fontSize=11;arcSize=10;fontColor=#B71C1C;align=left;spacingLeft=15;" value="&lt;b&gt;现行流程痛点总结：&lt;/b&gt;&lt;br&gt;• 供应商 15~20 社 × 多渠道（邮件/WeChat/QQ）× 多格式（Excel/PDF/文本/截图）→ 信息碎片化&lt;br&gt;• 购买部门手动录入 Excel → 耗时大、更新慢（2周/次）、易出错&lt;br&gt;• 营业部门手动填写 PKG → 逐航线逐条填入，重复劳动&lt;br&gt;• 投标成功率仅 0%~10% → 投入产出比极低" vertex="1">
+          <mxGeometry x="40" y="640" width="1230" height="90" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram name="2. AI自动化运价管理（TO-BE）" id="tariff-tobe">
+    <mxGraphModel dx="1400" dy="860" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- 标题 -->
+        <mxCell id="t2" parent="1" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=18;fontStyle=1;" value="&lt;font color=&quot;#333&quot;&gt;AI自动化运价管理流程（TO-BE）&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:12px;font-weight:normal;&quot; color=&quot;#999&quot;&gt;AI从邮件、WeChat、PDF、Excel自动读取运价 → 存入数据库 → 自动填写投标包&lt;/font&gt;" vertex="1">
+          <mxGeometry x="250" y="15" width="1100" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 第1列：数据来源 ====== -->
+        <mxCell id="src_title" parent="1" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#6A1B9A;" value="数据来源" vertex="1">
+          <mxGeometry x="40" y="75" width="200" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="src1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=11;" value="&lt;b&gt;Excel 费率表&lt;/b&gt;&lt;br&gt;KMTC运价表、NVO FAK等" vertex="1">
+          <mxGeometry x="40" y="115" width="200" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="src2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=11;" value="&lt;b&gt;PDF 合约&lt;/b&gt;&lt;br&gt;ONE Service Contract 等" vertex="1">
+          <mxGeometry x="40" y="185" width="200" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="src3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=11;" value="&lt;b&gt;邮件纯文本&lt;/b&gt;&lt;br&gt;长荣等代理商报价邮件" vertex="1">
+          <mxGeometry x="40" y="255" width="200" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="src4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#7B1FA2;fontSize=11;" value="&lt;b&gt;WeChat/QQ 截图&lt;/b&gt;&lt;br&gt;聊天中的运价截图" vertex="1">
+          <mxGeometry x="40" y="325" width="200" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 第2列：上传入口 ====== -->
+        <mxCell id="upload" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2E7D32;fontSize=12;fontStyle=1;arcSize=15;strokeWidth=2;" value="统一上传入口&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal;&quot;&gt;购买人员上传文件&lt;br&gt;（Excel / PDF / 图片 / 文本）&lt;/font&gt;" vertex="1">
+          <mxGeometry x="320" y="170" width="180" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- 来源→上传 箭头 -->
+        <mxCell id="es1u" parent="1" style="rounded=1;strokeColor=#7B1FA2;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.2;" edge="1" source="src1" target="upload">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="es2u" parent="1" style="rounded=1;strokeColor=#7B1FA2;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.4;" edge="1" source="src2" target="upload">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="es3u" parent="1" style="rounded=1;strokeColor=#7B1FA2;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.6;" edge="1" source="src3" target="upload">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="es4u" parent="1" style="rounded=1;strokeColor=#7B1FA2;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.8;" edge="1" source="src4" target="upload">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 第3列：AI 解析引擎 ====== -->
+        <mxCell id="ai_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;dashed=1;verticalAlign=top;fontSize=13;fontStyle=1;arcSize=8;" value="AI 解析引擎（OpenClaw）" vertex="1">
+          <mxGeometry x="580" y="80" width="340" height="370" as="geometry" />
+        </mxCell>
+
+        <mxCell id="eu_ai" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=3;" edge="1" source="upload" target="ai_box">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="560" y="220" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="ai1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;arcSize=12;" value="&lt;b&gt;parse_excel_tariff&lt;/b&gt;&lt;br&gt;pandas + openpyxl&lt;br&gt;自动识别列结构" vertex="1">
+          <mxGeometry x="600" y="125" width="145" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ai2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;arcSize=12;" value="&lt;b&gt;parse_pdf_contract&lt;/b&gt;&lt;br&gt;pdfplumber + Claude&lt;br&gt;提取费率表区域" vertex="1">
+          <mxGeometry x="600" y="200" width="145" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ai3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;arcSize=12;" value="&lt;b&gt;parse_email_text&lt;/b&gt;&lt;br&gt;Claude NLP&lt;br&gt;实体提取（航线+费率）" vertex="1">
+          <mxGeometry x="600" y="275" width="145" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ai4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;arcSize=12;" value="&lt;b&gt;parse_wechat_image&lt;/b&gt;&lt;br&gt;Claude Vision&lt;br&gt;OCR + 结构化提取" vertex="1">
+          <mxGeometry x="600" y="350" width="145" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- 标准化输出 -->
+        <mxCell id="normalize" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#64B5F6;strokeColor=#0D47A1;fontSize=11;fontColor=#fff;fontStyle=1;arcSize=15;" value="标准化&lt;br&gt;统一 Schema&lt;br&gt;&lt;font style=&quot;font-size:9px;font-weight:normal;&quot;&gt;origin / destination / carrier&lt;br&gt;20GP / 40GP / 40HQ / BAF / LSS&lt;br&gt;valid_from / valid_to / remarks&lt;/font&gt;" vertex="1">
+          <mxGeometry x="770" y="150" width="135" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="eai1n" parent="1" style="rounded=1;strokeColor=#1565C0;strokeWidth=1;exitX=1;exitY=0.5;entryX=0;entryY=0.2;" edge="1" source="ai1" target="normalize">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eai2n" parent="1" style="rounded=1;strokeColor=#1565C0;strokeWidth=1;exitX=1;exitY=0.5;entryX=0;entryY=0.4;" edge="1" source="ai2" target="normalize">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eai3n" parent="1" style="rounded=1;strokeColor=#1565C0;strokeWidth=1;exitX=1;exitY=0.5;entryX=0;entryY=0.6;" edge="1" source="ai3" target="normalize">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eai4n" parent="1" style="rounded=1;strokeColor=#1565C0;strokeWidth=1;exitX=1;exitY=0.5;entryX=0;entryY=0.9;" edge="1" source="ai4" target="normalize">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- validate_rate -->
+        <mxCell id="validate" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=10;fontStyle=1;" value="validate_rate&lt;br&gt;费率校验" vertex="1">
+          <mxGeometry x="780" y="310" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="en_v" parent="1" style="rounded=1;strokeColor=#1565C0;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="normalize" target="validate">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 第4列：数据库 ====== -->
+        <mxCell id="db" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#C8E6C9;strokeColor=#2E7D32;fontSize=12;fontStyle=1;strokeWidth=2;" value="PostgreSQL&lt;br&gt;费率数据库" vertex="1">
+          <mxGeometry x="1020" y="155" width="150" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ev_db" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#2E7D32;strokeWidth=3;exitX=1;exitY=0;entryX=0;entryY=0.5;" edge="1" source="validate" target="db">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="960" y="330" />
+              <mxPoint x="960" y="205" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ev_db_label" parent="ev_db" style="edgeLabel;html=1;align=center;verticalAlign=middle;fontSize=10;fontColor=#2E7D32;fontStyle=1;" value="校验通过 → 入库" vertex="1" connectable="0">
+          <mxGeometry x="-0.3" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 人工审核分支 -->
+        <mxCell id="review_note" parent="1" style="shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;size=15;position=0.5;base=20;fillColor=#FFECB3;strokeColor=#FF8F00;fontSize=10;rounded=1;" value="&lt;b&gt;校验异常时&lt;/b&gt;&lt;br&gt;通知购买人员&lt;br&gt;人工确认" vertex="1">
+          <mxGeometry x="770" y="420" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ev_review" parent="1" style="rounded=1;strokeColor=#FF8F00;strokeWidth=1;dashed=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="validate" target="review_note">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 第5列：应用层 ====== -->
+        <mxCell id="app_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;strokeWidth=2;dashed=1;verticalAlign=top;fontSize=13;fontStyle=1;arcSize=8;" value="业务应用" vertex="1">
+          <mxGeometry x="1020" y="310" width="330" height="240" as="geometry" />
+        </mxCell>
+
+        <mxCell id="app1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=11;arcSize=12;" value="&lt;b&gt;费率查询 API&lt;/b&gt;&lt;br&gt;query_rate&lt;br&gt;按航线/柜型/船司查询" vertex="1">
+          <mxGeometry x="1040" y="350" width="140" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="app2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=11;arcSize=12;" value="&lt;b&gt;PKG 自动填写&lt;/b&gt;&lt;br&gt;fill_pkg&lt;br&gt;AI匹配费率→填入模板" vertex="1">
+          <mxGeometry x="1195" y="350" width="140" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="app3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=11;arcSize=12;" value="&lt;b&gt;React 管理界面&lt;/b&gt;&lt;br&gt;费率浏览/搜索/导出&lt;br&gt;中日英三语" vertex="1">
+          <mxGeometry x="1040" y="435" width="140" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="app4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=11;arcSize=12;" value="&lt;b&gt;通知 &amp; 审核&lt;/b&gt;&lt;br&gt;notify&lt;br&gt;填写完成→通知营业审核" vertex="1">
+          <mxGeometry x="1195" y="435" width="140" height="65" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edb_app1" parent="1" style="rounded=1;strokeColor=#2E7D32;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="db" target="app1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edb_app2" parent="1" style="rounded=1;strokeColor=#2E7D32;strokeWidth=2;exitX=1;exitY=1;entryX=0.5;entryY=0;" edge="1" source="db" target="app2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 营业担当 -->
+        <mxCell id="sales2" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#E3F2FD;strokeColor=#1565C0;fontSize=11;" value="&lt;b&gt;营业人员&lt;/b&gt;" vertex="1">
+          <mxGeometry x="1430" y="370" width="40" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="eapp4_sales" parent="1" style="rounded=1;strokeColor=#E65100;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="app4" target="sales2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 效果标注 -->
+        <mxCell id="effect_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontSize=11;arcSize=10;fontColor=#1B5E20;align=left;spacingLeft=15;" value="&lt;b&gt;AI 导入效果：&lt;/b&gt;&lt;br&gt;✅ 4种格式自动解析，无需手动录入 → 省去购买部门最大痛点&lt;br&gt;✅ 统一数据库管理，实时查询 → 营业部门秒级获取费率&lt;br&gt;✅ PKG 自动填写 + 人工审核 → 投标效率从数小时→分钟级&lt;br&gt;✅ 费率校验防错 → 准确率接近 100%" vertex="1">
+          <mxGeometry x="40" y="520" width="600" height="90" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram name="3. 数据源格式与AI解析策略" id="data-source-analysis">
+    <mxGraphModel dx="1400" dy="860" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- 标题 -->
+        <mxCell id="t3" parent="1" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=18;fontStyle=1;" value="&lt;font color=&quot;#333&quot;&gt;数据源格式与 AI 解析策略&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:12px;font-weight:normal;&quot; color=&quot;#999&quot;&gt;基于福山提供的实际数据分析 — 4种数据源统一转换为标准化格式&lt;/font&gt;" vertex="1">
+          <mxGeometry x="300" y="15" width="1000" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 数据源1: Excel ====== -->
+        <mxCell id="ds1_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EAF6;strokeColor=#283593;strokeWidth=2;verticalAlign=top;fontSize=12;fontStyle=1;arcSize=6;" value="数据源 ①：结构化 Excel 费率表" vertex="1">
+          <mxGeometry x="40" y="80" width="350" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="ds1_f1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#C5CAE9;strokeColor=#283593;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;KMTC 运价表 0319.xlsx&lt;/b&gt;&lt;br&gt;126行 × 15列 | 韩国/东南亚/南亚航线&lt;br&gt;含 O/F、BAF、LSS、有效日、备注" vertex="1">
+          <mxGeometry x="55" y="120" width="320" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="ds1_f2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#C5CAE9;strokeColor=#283593;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;NVO FAK 2026 (Mar 20-31).xlsx&lt;/b&gt;&lt;br&gt;4 Sheet（TPE/WPE/Hawaii/Arbitrary）~4000+行&lt;br&gt;亚洲→美国运价 | 含 20ft/40ft/HC/45ft" vertex="1">
+          <mxGeometry x="55" y="185" width="320" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- 解析方法1 -->
+        <mxCell id="parse1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4FC3F7;strokeColor=#0277BD;fontSize=11;fontColor=#fff;fontStyle=1;arcSize=15;" value="parse_excel_tariff&lt;br&gt;&lt;font style=&quot;font-weight:normal;font-size:10px;&quot;&gt;pandas + openpyxl&lt;br&gt;列名自动映射&lt;br&gt;公式求值&lt;/font&gt;" vertex="1">
+          <mxGeometry x="460" y="110" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="eds1_p1" parent="1" style="rounded=1;strokeColor=#283593;strokeWidth=2;exitX=1;exitY=0.3;entryX=0;entryY=0.5;" edge="1" source="ds1_box" target="parse1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 难点标注 -->
+        <mxCell id="ds1_note" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=12;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=9;align=left;spacingLeft=5;" value="&lt;b&gt;难点：&lt;/b&gt;&lt;br&gt;• 不同供应商列结构不同&lt;br&gt;• Excel含公式引用（=F6）&lt;br&gt;• 中文编码问题" vertex="1">
+          <mxGeometry x="460" y="200" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 数据源2: PDF ====== -->
+        <mxCell id="ds2_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#880E4F;strokeWidth=2;verticalAlign=top;fontSize=12;fontStyle=1;arcSize=6;" value="数据源 ②：PDF 运输合约" vertex="1">
+          <mxGeometry x="40" y="310" width="350" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="ds2_f1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F8BBD0;strokeColor=#880E4F;fontSize=10;align=left;spacingLeft=8;" value="&lt;b&gt;ONE Service Contract LAX0751N25v93&lt;/b&gt;&lt;br&gt;&lt;b&gt;372页&lt;/b&gt; | 合约条款 + 详细费率表&lt;br&gt;按 Origin×Destination×Container 列出运价" vertex="1">
+          <mxGeometry x="55" y="350" width="320" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="parse2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4FC3F7;strokeColor=#0277BD;fontSize=11;fontColor=#fff;fontStyle=1;arcSize=15;" value="parse_pdf_contract&lt;br&gt;&lt;font style=&quot;font-weight:normal;font-size:10px;&quot;&gt;pdfplumber 文本提取&lt;br&gt;+ Claude 结构化识别&lt;br&gt;定位费率表区域&lt;/font&gt;" vertex="1">
+          <mxGeometry x="460" y="325" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="eds2_p2" parent="1" style="rounded=1;strokeColor=#880E4F;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="ds2_box" target="parse2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ds2_note" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=12;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=9;align=left;spacingLeft=5;" value="&lt;b&gt;难点：&lt;/b&gt;&lt;br&gt;• 372页需定位费率页&lt;br&gt;• 表格跨页&lt;br&gt;• 条款区域需跳过" vertex="1">
+          <mxGeometry x="460" y="415" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 数据源3: 邮件文本 ====== -->
+        <mxCell id="ds3_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#1B5E20;strokeWidth=2;verticalAlign=top;fontSize=12;fontStyle=1;arcSize=6;" value="数据源 ③：邮件纯文本报价" vertex="1">
+          <mxGeometry x="40" y="470" width="350" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="ds3_f1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#1B5E20;fontSize=9;align=left;spacingLeft=8;" value="&lt;b&gt;长荣(Evergreen)第12周报价&lt;/b&gt;&lt;br&gt;&quot;胡志明卡莱：375/750，胡志明VICT/盖美600/1100；&lt;br&gt;香港 225/450；泰国CTX0346:林查班550/1100...&quot;" vertex="1">
+          <mxGeometry x="55" y="510" width="320" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="parse3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4FC3F7;strokeColor=#0277BD;fontSize=11;fontColor=#fff;fontStyle=1;arcSize=15;" value="parse_email_text&lt;br&gt;&lt;font style=&quot;font-weight:normal;font-size:10px;&quot;&gt;Claude NLP&lt;br&gt;实体识别&lt;br&gt;航线代码 + 港口 + 费率&lt;/font&gt;" vertex="1">
+          <mxGeometry x="460" y="500" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="eds3_p3" parent="1" style="rounded=1;strokeColor=#1B5E20;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="ds3_box" target="parse3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ds3_note" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=12;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=9;align=left;spacingLeft=5;" value="&lt;b&gt;难点：&lt;/b&gt;&lt;br&gt;• 非结构化中文文本&lt;br&gt;• 费率格式不固定(375/750)&lt;br&gt;• 港口名缩写/别名" vertex="1">
+          <mxGeometry x="460" y="590" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 数据源4: 截图 ====== -->
+        <mxCell id="ds4_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;strokeWidth=2;verticalAlign=top;fontSize=12;fontStyle=1;arcSize=6;" value="数据源 ④：WeChat/QQ 聊天截图" vertex="1">
+          <mxGeometry x="40" y="630" width="350" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="ds4_f1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=9;align=left;spacingLeft=8;" value="&lt;b&gt;截图1：KMTC 印度航线&lt;/b&gt;&lt;br&gt;POL:Shanghai → POD:ICD Ahmedabad&lt;br&gt;NHAVA SHEVA中转 | USD 1650/1700" vertex="1">
+          <mxGeometry x="55" y="670" width="155" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="ds4_f2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=9;align=left;spacingLeft=8;" value="&lt;b&gt;截图2：OOCL 纽约航线&lt;/b&gt;&lt;br&gt;V/V: OOCL TULIP/003E&lt;br&gt;USD 3150/40HQ | 有效到3/31" vertex="1">
+          <mxGeometry x="220" y="670" width="155" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="ds4_f3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=9;align=left;spacingLeft=8;" value="&lt;b&gt;特点：&lt;/b&gt;图片格式，含中文口语表达，信息零散但含关键费率" vertex="1">
+          <mxGeometry x="55" y="745" width="320" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="parse4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4FC3F7;strokeColor=#0277BD;fontSize=11;fontColor=#fff;fontStyle=1;arcSize=15;" value="parse_wechat_image&lt;br&gt;&lt;font style=&quot;font-weight:normal;font-size:10px;&quot;&gt;Claude Vision&lt;br&gt;多模态识别&lt;br&gt;OCR + 语义理解&lt;/font&gt;" vertex="1">
+          <mxGeometry x="460" y="680" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="eds4_p4" parent="1" style="rounded=1;strokeColor=#E65100;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="ds4_box" target="parse4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ds4_note" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=12;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=9;align=left;spacingLeft=5;" value="&lt;b&gt;难点：&lt;/b&gt;&lt;br&gt;• 图片质量参差&lt;br&gt;• 对话格式非表格&lt;br&gt;• 数字识别精度要求高" vertex="1">
+          <mxGeometry x="460" y="770" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 统一输出 ====== -->
+        <mxCell id="unified_schema" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1565C0;strokeColor=#0D47A1;strokeWidth=2;fontSize=12;fontColor=#fff;fontStyle=1;arcSize=10;" value="统一标准化 Schema" vertex="1">
+          <mxGeometry x="700" y="80" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- 解析→统一schema 箭头 -->
+        <mxCell id="ep1s" parent="1" style="rounded=1;strokeColor=#0277BD;strokeWidth=2;exitX=1;exitY=0.3;entryX=0;entryY=0.5;" edge="1" source="parse1" target="unified_schema">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ep2s" parent="1" style="rounded=1;strokeColor=#0277BD;strokeWidth=2;exitX=1;exitY=0;entryX=0.3;entryY=1;" edge="1" source="parse2" target="unified_schema">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ep3s" parent="1" style="rounded=1;strokeColor=#0277BD;strokeWidth=2;exitX=1;exitY=0;entryX=0.5;entryY=1;" edge="1" source="parse3" target="unified_schema">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="680" y="500" />
+              <mxPoint x="680" y="180" />
+              <mxPoint x="790" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ep4s" parent="1" style="rounded=1;strokeColor=#0277BD;strokeWidth=2;exitX=1;exitY=0;entryX=0.7;entryY=1;" edge="1" source="parse4" target="unified_schema">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="660" y="680" />
+              <mxPoint x="660" y="190" />
+              <mxPoint x="826" y="190" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Schema 字段展示 -->
+        <mxCell id="schema_detail" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;fontSize=9;align=left;spacingLeft=10;verticalAlign=top;spacingTop=5;" value="&lt;b style=&quot;font-size:11px;&quot;&gt;freight_rate 标准字段&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;table style=&quot;font-size:9px;border-collapse:collapse;&quot;&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;carrier&lt;/b&gt;&lt;/td&gt;&lt;td&gt;船司名&lt;/td&gt;&lt;td&gt;KMTC, ONE, EMC&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;origin&lt;/b&gt;&lt;/td&gt;&lt;td&gt;起运港&lt;/td&gt;&lt;td&gt;CNSHA, CNNGB&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;destination&lt;/b&gt;&lt;/td&gt;&lt;td&gt;目的港&lt;/td&gt;&lt;td&gt;KRPUS, USLAX&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;20GP/40GP/40HQ&lt;/b&gt;&lt;/td&gt;&lt;td&gt;运费&lt;/td&gt;&lt;td&gt;USD&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;BAF/LSS&lt;/b&gt;&lt;/td&gt;&lt;td&gt;附加费&lt;/td&gt;&lt;td&gt;USD&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;valid_from/to&lt;/b&gt;&lt;/td&gt;&lt;td&gt;有效期&lt;/td&gt;&lt;td&gt;日期&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;transit_days&lt;/b&gt;&lt;/td&gt;&lt;td&gt;时效&lt;/td&gt;&lt;td&gt;天数&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;service_code&lt;/b&gt;&lt;/td&gt;&lt;td&gt;航线代码&lt;/td&gt;&lt;td&gt;KTX, CHT&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;remarks&lt;/b&gt;&lt;/td&gt;&lt;td&gt;备注&lt;/td&gt;&lt;td&gt;直达/中转&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;" vertex="1">
+          <mxGeometry x="920" y="80" width="250" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="eus_sd" parent="1" style="rounded=1;strokeColor=#1565C0;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.2;" edge="1" source="unified_schema" target="schema_detail">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 数据库 -->
+        <mxCell id="db2" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#C8E6C9;strokeColor=#2E7D32;fontSize=12;fontStyle=1;strokeWidth=2;" value="PostgreSQL&lt;br&gt;freight_rates" vertex="1">
+          <mxGeometry x="970" y="360" width="150" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="esd_db" parent="1" style="rounded=1;strokeColor=#2E7D32;strokeWidth=3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="schema_detail" target="db2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="esd_db_label" parent="esd_db" style="edgeLabel;html=1;align=center;verticalAlign=middle;fontSize=10;fontColor=#2E7D32;fontStyle=1;" value="validate → 入库" vertex="1" connectable="0">
+          <mxGeometry x="0.2" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 数据量汇总 -->
+        <mxCell id="data_summary" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#6A1B9A;fontSize=11;arcSize=10;align=left;spacingLeft=15;verticalAlign=top;spacingTop=8;" value="&lt;b&gt;数据规模汇总（福山提供的实际样本）&lt;/b&gt;&lt;br&gt;&lt;br&gt;• Excel 费率表：~4,200 行（KMTC 126 + NVO FAK ~4,000+）&lt;br&gt;• PDF 合约：372 页（ONE Service Contract）&lt;br&gt;• 邮件纯文本：~20 条航线报价（长荣1封邮件）&lt;br&gt;• WeChat 截图：2 张（各含1条报价）&lt;br&gt;&lt;br&gt;实际运营中，购买部门管理约 &lt;b&gt;15~20 家供应商&lt;/b&gt;的运价，数据量将是样本的 &lt;b&gt;5~10 倍&lt;/b&gt;" vertex="1">
+          <mxGeometry x="700" y="500" width="500" height="160" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram name="4. Demo系统数据流" id="demo-dataflow">
+    <mxGraphModel dx="1400" dy="860" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- 标题 -->
+        <mxCell id="t4" parent="1" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=18;fontStyle=1;" value="&lt;font color=&quot;#333&quot;&gt;Demo 系统数据流&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:12px;font-weight:normal;&quot; color=&quot;#999&quot;&gt;面向4月中旬演示的系统架构 — 使用福山提供的真实数据&lt;/font&gt;" vertex="1">
+          <mxGeometry x="400" y="15" width="800" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 前端层 ====== -->
+        <mxCell id="fe_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;dashed=1;verticalAlign=top;fontSize=14;fontStyle=1;arcSize=6;" value="Frontend — React + TypeScript + i18n（中/日/英）" vertex="1">
+          <mxGeometry x="40" y="80" width="1520" height="180" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fe1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=11;arcSize=12;" value="&lt;b&gt;运价文件上传&lt;/b&gt;&lt;br&gt;文件上传&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;支持 Excel/PDF/图片/文本&lt;br&gt;拖拽上传 + 格式自动识别&lt;/font&gt;" vertex="1">
+          <mxGeometry x="70" y="120" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="fe2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=11;arcSize=12;" value="&lt;b&gt;AI 解析结果预览&lt;/b&gt;&lt;br&gt;解析结果预览&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;解析后的费率数据表格&lt;br&gt;高亮异常值 + 人工确认&lt;/font&gt;" vertex="1">
+          <mxGeometry x="310" y="120" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="fe3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=11;arcSize=12;" value="&lt;b&gt;费率数据库管理&lt;/b&gt;&lt;br&gt;运价数据管理&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;浏览/搜索/筛选/导出&lt;br&gt;按航线、船司、有效期筛选&lt;/font&gt;" vertex="1">
+          <mxGeometry x="550" y="120" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="fe4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=11;arcSize=12;" value="&lt;b&gt;PKG 投标包填写&lt;/b&gt;&lt;br&gt;投标包自动填写&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;上传客户PKG模板&lt;br&gt;AI自动匹配费率+填入&lt;/font&gt;" vertex="1">
+          <mxGeometry x="790" y="120" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="fe5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=11;arcSize=12;" value="&lt;b&gt;数据看板&lt;/b&gt;&lt;br&gt;数据仪表盘&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;导入统计、数据覆盖率&lt;br&gt;供应商/航线分布&lt;/font&gt;" vertex="1">
+          <mxGeometry x="1030" y="120" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="fe6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=11;arcSize=12;" value="&lt;b&gt;操作日志&lt;/b&gt;&lt;br&gt;操作日志记录&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;谁、什么时候、导入了什么&lt;br&gt;完整审计追踪&lt;/font&gt;" vertex="1">
+          <mxGeometry x="1270" y="120" width="200" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 后端 API 层 ====== -->
+        <mxCell id="be_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;strokeWidth=2;dashed=1;verticalAlign=top;fontSize=14;fontStyle=1;arcSize=6;" value="Backend — FastAPI + Celery（异步任务）" vertex="1">
+          <mxGeometry x="40" y="310" width="1520" height="200" as="geometry" />
+        </mxCell>
+
+        <mxCell id="api1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=10;arcSize=12;" value="&lt;b&gt;POST /upload&lt;/b&gt;&lt;br&gt;文件上传接口&lt;br&gt;自动识别格式&lt;br&gt;分发到对应解析器" vertex="1">
+          <mxGeometry x="70" y="355" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="api2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=10;arcSize=12;" value="&lt;b&gt;AI 解析引擎&lt;/b&gt;&lt;br&gt;parse_excel_tariff&lt;br&gt;parse_pdf_contract&lt;br&gt;parse_email_text&lt;br&gt;parse_wechat_image" vertex="1">
+          <mxGeometry x="280" y="345" width="170" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="api3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=10;arcSize=12;" value="&lt;b&gt;validate_rate&lt;/b&gt;&lt;br&gt;费率校验&lt;br&gt;范围检查 + 历史比对&lt;br&gt;异常标记" vertex="1">
+          <mxGeometry x="500" y="355" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="api4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=10;arcSize=12;" value="&lt;b&gt;GET /rates&lt;/b&gt;&lt;br&gt;费率查询 API&lt;br&gt;按航线/船司/有效期&lt;br&gt;分页 + 排序" vertex="1">
+          <mxGeometry x="710" y="355" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="api5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=10;arcSize=12;" value="&lt;b&gt;POST /fill-pkg&lt;/b&gt;&lt;br&gt;PKG 自动填写&lt;br&gt;解析模板 → 匹配费率&lt;br&gt;→ 生成填写后文件" vertex="1">
+          <mxGeometry x="920" y="355" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="api6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=10;arcSize=12;" value="&lt;b&gt;Claude API&lt;/b&gt;&lt;br&gt;NLP 文本解析&lt;br&gt;Vision 图片识别&lt;br&gt;多语言翻译" vertex="1">
+          <mxGeometry x="1130" y="355" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="api7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=10;arcSize=12;" value="&lt;b&gt;Celery Worker&lt;/b&gt;&lt;br&gt;异步任务&lt;br&gt;大文件(PDF 372页)&lt;br&gt;批量导入处理" vertex="1">
+          <mxGeometry x="1340" y="355" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- 前端→后端 箭头 -->
+        <mxCell id="efe_be" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="fe_box" target="be_box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="efe_be_label" parent="efe_be" style="edgeLabel;html=1;align=center;verticalAlign=middle;fontSize=10;fontStyle=1;" value="REST API" vertex="1" connectable="0">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- API 内部流程箭头 -->
+        <mxCell id="ea12" parent="1" style="rounded=1;strokeColor=#E65100;strokeWidth=2;" edge="1" source="api1" target="api2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ea23" parent="1" style="rounded=1;strokeColor=#E65100;strokeWidth=2;" edge="1" source="api2" target="api3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ea2c" parent="1" style="rounded=1;strokeColor=#E65100;strokeWidth=1;dashed=1;" edge="1" source="api2" target="api6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ====== 数据层 ====== -->
+        <mxCell id="data_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2E7D32;strokeWidth=2;dashed=1;verticalAlign=top;fontSize=14;fontStyle=1;arcSize=6;" value="Data Layer — PostgreSQL + Redis + File Storage" vertex="1">
+          <mxGeometry x="40" y="560" width="1520" height="170" as="geometry" />
+        </mxCell>
+
+        <mxCell id="pg" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#A5D6A7;strokeColor=#2E7D32;fontSize=11;fontStyle=1;strokeWidth=2;" value="&lt;b&gt;PostgreSQL&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;font-weight:normal;&quot;&gt;freight_rates&lt;br&gt;carriers&lt;br&gt;ports&lt;br&gt;upload_logs&lt;/font&gt;" vertex="1">
+          <mxGeometry x="200" y="600" width="160" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="redis" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#A5D6A7;strokeColor=#2E7D32;fontSize=11;fontStyle=1;strokeWidth=2;" value="&lt;b&gt;Redis&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;font-weight:normal;&quot;&gt;热门航线缓存&lt;br&gt;Celery 消息队列&lt;/font&gt;" vertex="1">
+          <mxGeometry x="520" y="610" width="140" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="files" parent="1" style="shape=folder;fontStyle=1;tabWidth=80;tabHeight=20;tabPosition=left;html=1;whiteSpace=wrap;fillColor=#A5D6A7;strokeColor=#2E7D32;fontSize=11;" value="&lt;b&gt;File Storage&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;font-weight:normal;&quot;&gt;上传的原始文件&lt;br&gt;Excel/PDF/图片&lt;br&gt;生成的PKG文件&lt;/font&gt;" vertex="1">
+          <mxGeometry x="810" y="605" width="160" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- 后端→数据 箭头 -->
+        <mxCell id="ebe_data" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="be_box" target="data_box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ====== Demo 演示场景 ====== -->
+        <mxCell id="demo_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#6A1B9A;strokeWidth=2;verticalAlign=top;fontSize=14;fontStyle=1;arcSize=6;" value="Demo 演示场景（使用福山提供的真实数据）" vertex="1">
+          <mxGeometry x="40" y="780" width="1520" height="180" as="geometry" />
+        </mxCell>
+
+        <mxCell id="demo1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CE93D8;strokeColor=#6A1B9A;fontSize=10;fontColor=#fff;arcSize=12;" value="&lt;b&gt;场景1：Excel 导入&lt;/b&gt;&lt;br&gt;&lt;br&gt;上传 KMTC 运价表&lt;br&gt;→ 自动解析126条费率&lt;br&gt;→ 入库 → 查询验证" vertex="1">
+          <mxGeometry x="70" y="820" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="demo2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CE93D8;strokeColor=#6A1B9A;fontSize=10;fontColor=#fff;arcSize=12;" value="&lt;b&gt;场景2：邮件文本解析&lt;/b&gt;&lt;br&gt;&lt;br&gt;粘贴长荣报价邮件正文&lt;br&gt;→ AI 提取20+条航线费率&lt;br&gt;→ 结构化展示 → 确认入库" vertex="1">
+          <mxGeometry x="330" y="820" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="demo3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CE93D8;strokeColor=#6A1B9A;fontSize=10;fontColor=#fff;arcSize=12;" value="&lt;b&gt;场景3：截图识别&lt;/b&gt;&lt;br&gt;&lt;br&gt;上传 WeChat 截图&lt;br&gt;→ AI Vision 识别运价&lt;br&gt;→ 提取 NHAVA SHEVA 1650/1700" vertex="1">
+          <mxGeometry x="590" y="820" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="demo4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CE93D8;strokeColor=#6A1B9A;fontSize=10;fontColor=#fff;arcSize=12;" value="&lt;b&gt;场景4：PDF合约解析&lt;/b&gt;&lt;br&gt;&lt;br&gt;上传 ONE 合约(372页)&lt;br&gt;→ AI 定位费率表页面&lt;br&gt;→ 批量提取运价数据" vertex="1">
+          <mxGeometry x="850" y="820" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="demo5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CE93D8;strokeColor=#6A1B9A;fontSize=10;fontColor=#fff;arcSize=12;" value="&lt;b&gt;场景5：费率查询&lt;/b&gt;&lt;br&gt;&lt;br&gt;输入 Shanghai→Busan&lt;br&gt;→ 展示所有供应商报价&lt;br&gt;→ 比价 → 选择最优" vertex="1">
+          <mxGeometry x="1110" y="820" width="220" height="100" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
