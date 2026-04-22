@@ -14,7 +14,8 @@
     "carriers": "船司与供应商",
     "domesticRates": "国内运价",
     "emailSearch": "邮件搜索与AI分析",
-    "pkg": "投标包自动填表"
+    "pkg": "投标包自动填表",
+    "batches": "运价批次"
   },
   "common": {
     "create": "新增",
@@ -53,7 +54,7 @@
     "resetFailed": "清空失败："
   },
   "dashboard": {
-    "title": "运价管理看板",
+    "title": "仪表盘",
     "quickActions": "快捷操作",
     "totalRates": "总运价数",
     "activeRates": "有效运价",
@@ -65,7 +66,165 @@
     "browseRates": "浏览运价数据",
     "browseRatesDesc": "查询、筛选、管理所有运价",
     "compareRates": "航线比价",
-    "compareRatesDesc": "对比同航线的多家供应商报价"
+    "compareRatesDesc": "对比同航线的多家供应商报价",
+    "refresh": "刷新",
+    "newRate": "新建运价",
+    "statusTitle": "状态分布",
+    "otherStatus": "其他",
+    "recentTitle": "最近更新运价",
+    "viewAll": "查看全部",
+    "statsLoadFailed": "统计数据暂时无法加载",
+    "statsLoadFailedHint": "后端 /rates/stats 未响应，稍后可点击右上角「刷新」重试"
+  },
+  "auth": {
+    "brand": {
+      "zh": "阪急阪神运价中台",
+      "en": "Hankyu Hanshin · Rate Hub"
+    },
+    "hero": {
+      "titleLead": "统一运价",
+      "titleAccent": "指挥台",
+      "titleTail": "驱动每一次报价与决策",
+      "ledeLead": "集中管理来自邮件、Excel、API 的多源运价数据，自动匹配投标包，辅以人工复核，让报价响应时间从",
+      "slow": "数小时",
+      "ledeBridge": "缩短到",
+      "fast": "数分钟",
+      "ledeTail": "。"
+    },
+    "stats": {
+      "rates": "实时运价",
+      "carriers": "承运商对接",
+      "accuracy": "解析准确率"
+    },
+    "features": {
+      "parse": {
+        "title": "多源导入",
+        "desc": "邮件 / Excel / 图片一键解析"
+      },
+      "pkg": {
+        "title": "自动填表",
+        "desc": "PKG 投标包即时匹配"
+      },
+      "mail": {
+        "title": "邮件分析",
+        "desc": "时间线智能汇总"
+      }
+    },
+    "field": {
+      "email": "企业邮箱 / Email",
+      "password": "密码 / Password",
+      "name": "姓名 / Name",
+      "confirm": "确认密码 / Confirm",
+      "namePlaceholder": "请输入姓名"
+    },
+    "login": {
+      "title": "欢迎回来",
+      "subtitle": "Sign in to continue · 使用企业账号登录",
+      "remember": "保持登录 7 天",
+      "toRegister": "没有账号? 去注册",
+      "submit": "登录控制塔 · Enter Control Tower",
+      "submitting": "登录中...",
+      "dividerSso": "或使用 SSO"
+    },
+    "register": {
+      "title": "创建账号",
+      "subtitle": "Create account · 加入运价控制塔",
+      "heroLead": "加入控制塔，",
+      "heroAccent": "重塑报价效率",
+      "heroLede": "只需一个企业邮箱即可加入团队，统一管理多源运价数据。",
+      "submit": "创建账号 · Create Account",
+      "submitting": "创建中...",
+      "hasAccount": "已有账号?",
+      "toLogin": "直接登录"
+    },
+    "logout": "退出登录"
+  },
+  "nav": {
+    "operations": "业务 Operations",
+    "data": "数据 Data"
+  },
+  "topbar": {
+    "searchPlaceholder": "搜索运价 / 航线 / 承运商...",
+    "help": "帮助",
+    "notifications": "通知"
+  },
+  "breadcrumb": {
+    "dashboard": "仪表盘",
+    "rateGroup": "运价管理",
+    "rates": "运价总览",
+    "batches": "运价批次",
+    "upload": "运价导入",
+    "compare": "运价对比",
+    "pkg": "PKG 自动填充",
+    "emails": "邮件分析",
+    "dataGroup": "基础数据",
+    "carriers": "承运商管理"
+  },
+  "batches": {
+    "title": "运价批次",
+    "uploadTitle": "新建批次",
+    "parserHint": "解析器选择",
+    "parserHintDesc": "Air = 空运周报+Surcharges；Ocean / Ocean NGB = 海运标准模板。不确定时选自动识别。",
+    "uploading": "正在解析...",
+    "dropText": "拖拽或点击上传 Excel 文件",
+    "dropHint": "支持 .xlsx / .xls / .csv，单文件 ≤ 50MB",
+    "uploadSuccess": "解析完成 · {{rows}} 行 · 解析器 {{parser}}",
+    "uploadFailed": "上传失败",
+    "listTitle": "草稿批次列表",
+    "empty": "还没有批次，先在上面上传一个 Excel 试试",
+    "openDetail": "查看",
+    "detailFailed": "批次详情加载失败",
+    "totalRows": "总行数",
+    "previewCount": "预览行",
+    "sheets": "工作表数",
+    "warnings": "警告",
+    "tabPreview": "预览",
+    "tabDiff": "差异",
+    "tabActivate": "激活",
+    "previewTruncated": "已截断 · 共 {{total}} 行 · 显示前 {{shown}} 行",
+    "diffEmpty": "尚未生成差异，请点击下方「运行 diff」",
+    "runDiff": "运行 diff",
+    "diffing": "差异计算中...",
+    "diffFailed": "差异计算失败",
+    "diffNew": "新增",
+    "diffChanged": "变更",
+    "diffUnchanged": "未变",
+    "diffUnmatched": "未匹配",
+    "diffStatus": {
+      "new": "新增",
+      "changed": "变更",
+      "unchanged": "未变",
+      "unmatched": "未匹配"
+    },
+    "activateNotYet": "尚未运行激活",
+    "activateHint": "Step1 阶段先用 Dry-Run 演练；正式入库激活会在 Step2 接通后开放。",
+    "activateDryRun": "Dry-Run 演练",
+    "activateReal": "正式激活",
+    "activateRealHint": "目前是 stub，不会真正写库",
+    "activateOk": "激活请求已完成",
+    "activateFailed": "激活失败",
+    "activatedFlag": "已激活",
+    "importedRows": "导入行数",
+    "skippedRows": "跳过行数",
+    "selectedRows": "选中 {{n}} 行",
+    "generatedAt": "生成时间",
+    "download": "下载原格式",
+    "col": {
+      "batchId": "批次 ID",
+      "fileName": "文件名",
+      "parser": "解析器",
+      "carrier": "承运商",
+      "rows": "行数",
+      "status": "状态",
+      "warnings": "警告",
+      "createdAt": "创建时间",
+      "origin": "起运",
+      "destination": "目的",
+      "transit": "航程",
+      "valid": "有效期",
+      "diffStatus": "差异状态",
+      "changedFields": "变更字段"
+    }
   },
   "carrier": {
     "title": "船司与供应商管理",
@@ -89,7 +248,8 @@
     }
   },
   "rates": {
-    "title": "运价管理",
+    "title": "运价总览",
+    "advancedFilter": "高级筛选",
     "originPort": "起运港",
     "destinationPort": "目的港",
     "shippingLine": "船司",

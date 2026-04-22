@@ -150,6 +150,29 @@ export const adminApi = {
     api.post<unknown, ApiResponse>('/admin/reset-rates'),
 };
 
+// --- Step1 Rate Batches（Air / Ocean / Ocean_NGB 标准模板批次） ---
+export const rateBatchApi = {
+  upload: (file: File, parserHint?: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (parserHint) formData.append('parser_hint', parserHint);
+    return api.post<unknown, ApiResponse>('/rate-batches/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
+    });
+  },
+  list: (params?: { page?: number; page_size?: number; batch_status?: string }) =>
+    api.get<unknown, ApiResponse>('/rate-batches', { params }),
+  detail: (batchId: string) =>
+    api.get<unknown, ApiResponse>(`/rate-batches/${batchId}`),
+  diff: (batchId: string) =>
+    api.get<unknown, ApiResponse>(`/rate-batches/${batchId}/diff`),
+  activate: (batchId: string, body: { dry_run: boolean; force?: boolean; selected_row_indices?: number[] | null }) =>
+    api.post<unknown, ApiResponse>(`/rate-batches/${batchId}/activate`, body),
+  downloadUrl: (batchId: string) =>
+    `${api.defaults.baseURL}/rate-batches/${batchId}/download`,
+};
+
 // --- PKG 入札包 ---
 export const pkgApi = {
   upload: (file: File) => {

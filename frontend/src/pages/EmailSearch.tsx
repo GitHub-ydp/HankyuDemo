@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, Space, Typography, message } from 'antd';
+import { message } from 'antd';
 import EmailAnalysis from '../components/EmailAnalysis';
 import EmailConnection from '../components/EmailConnection';
 import EmailResults from '../components/EmailResults';
@@ -58,30 +58,28 @@ export default function EmailSearch() {
   };
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Card>
-        <Typography.Title level={3} style={{ marginTop: 0 }}>
-          {t('email.title')}
-        </Typography.Title>
-        <Typography.Paragraph style={{ marginBottom: 0 }}>
+    <div className="page">
+      <div className="page-head">
+        <h1>{t('email.title')}</h1>
+        <div className="sub">EMAIL ANALYSIS</div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-body" style={{ fontSize: 13, color: 'var(--ink-700)', lineHeight: 1.65 }}>
           {t('email.description')}
-        </Typography.Paragraph>
-      </Card>
+        </div>
+      </div>
 
       <EmailConnection onIndexComplete={handleIndexComplete} />
 
-      <Card>
-        <EmailSearchInput
-          onSearch={handleSearch}
-          onAnalyze={handleAnalyze}
-          loading={loading}
-          disabled={indexCount === null || indexCount === 0}
-        />
-      </Card>
+      <EmailSearchInput
+        onSearch={handleSearch}
+        onAnalyze={handleAnalyze}
+        loading={loading}
+        disabled={indexCount === null || indexCount === 0}
+      />
 
-      {mode === 'search' && (
-        <EmailResults results={searchResults} loading={loading} />
-      )}
+      {mode === 'search' && <EmailResults results={searchResults} loading={loading} />}
 
       {mode === 'analyze' && analyzeResult && (
         <EmailAnalysis
@@ -91,6 +89,6 @@ export default function EmailSearch() {
           query={currentQuery}
         />
       )}
-    </Space>
+    </div>
   );
 }

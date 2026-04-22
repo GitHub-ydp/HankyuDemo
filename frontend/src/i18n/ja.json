@@ -14,7 +14,8 @@
     "carriers": "船社・サプライヤー",
     "domesticRates": "国内運賃",
     "emailSearch": "メール検索・AI分析",
-    "pkg": "入札パッケージ自動入力"
+    "pkg": "入札パッケージ自動入力",
+    "batches": "運賃バッチ"
   },
   "common": {
     "create": "新規作成",
@@ -53,7 +54,7 @@
     "resetFailed": "削除失敗："
   },
   "dashboard": {
-    "title": "運賃管理ダッシュボード",
+    "title": "ダッシュボード",
     "quickActions": "クイック操作",
     "totalRates": "総運賃数",
     "activeRates": "有効運賃",
@@ -65,7 +66,165 @@
     "browseRates": "運賃データを確認",
     "browseRatesDesc": "全運賃を検索、絞り込み、管理します",
     "compareRates": "レーン比較",
-    "compareRatesDesc": "同一レーンの複数サプライヤー見積を比較します"
+    "compareRatesDesc": "同一レーンの複数サプライヤー見積を比較します",
+    "refresh": "更新",
+    "newRate": "運賃を新規作成",
+    "statusTitle": "ステータス分布",
+    "otherStatus": "その他",
+    "recentTitle": "最近更新された運賃",
+    "viewAll": "すべて表示",
+    "statsLoadFailed": "統計データを読み込めません",
+    "statsLoadFailedHint": "バックエンド /rates/stats が応答しません。右上の「更新」で再試行してください。"
+  },
+  "auth": {
+    "brand": {
+      "zh": "阪急阪神 レートハブ",
+      "en": "Hankyu Hanshin · Rate Hub"
+    },
+    "hero": {
+      "titleLead": "運賃を束ねる",
+      "titleAccent": "コントロールタワー",
+      "titleTail": "すべての見積と意思決定を加速",
+      "ledeLead": "メール・Excel・API からの運賃データを一元管理し、入札パッケージを自動マッチング。人による確認と組み合わせ、見積の応答時間を",
+      "slow": "数時間",
+      "ledeBridge": "から",
+      "fast": "数分",
+      "ledeTail": "へ短縮します。"
+    },
+    "stats": {
+      "rates": "リアルタイム運賃",
+      "carriers": "船社連携",
+      "accuracy": "解析精度"
+    },
+    "features": {
+      "parse": {
+        "title": "マルチソース解析",
+        "desc": "メール / Excel / 画像を一括解析"
+      },
+      "pkg": {
+        "title": "PKG 自動入力",
+        "desc": "入札テンプレートを即マッチ"
+      },
+      "mail": {
+        "title": "メール時系列分析",
+        "desc": "AI による要約"
+      }
+    },
+    "field": {
+      "email": "企業メール / Email",
+      "password": "パスワード / Password",
+      "name": "氏名 / Name",
+      "confirm": "パスワード確認",
+      "namePlaceholder": "お名前を入力してください"
+    },
+    "login": {
+      "title": "おかえりなさい",
+      "subtitle": "Sign in to continue · 企業アカウントでログイン",
+      "remember": "7 日間ログインを保持",
+      "toRegister": "アカウントがない? 新規登録",
+      "submit": "コントロールタワーへ",
+      "submitting": "ログイン中...",
+      "dividerSso": "または SSO を使用"
+    },
+    "register": {
+      "title": "アカウントを作成",
+      "subtitle": "Create account · コントロールタワーに参加",
+      "heroLead": "コントロールタワーへ、",
+      "heroAccent": "見積スピードを刷新。",
+      "heroLede": "企業メール 1 つでチームに参加し、マルチソースの運賃データを一元管理できます。",
+      "submit": "アカウント作成",
+      "submitting": "作成中...",
+      "hasAccount": "アカウントをお持ちですか?",
+      "toLogin": "ログイン"
+    },
+    "logout": "ログアウト"
+  },
+  "nav": {
+    "operations": "業務 Operations",
+    "data": "データ Data"
+  },
+  "topbar": {
+    "searchPlaceholder": "運賃 / レーン / 船社 を検索...",
+    "help": "ヘルプ",
+    "notifications": "通知"
+  },
+  "breadcrumb": {
+    "dashboard": "ダッシュボード",
+    "rateGroup": "運賃管理",
+    "rates": "運賃一覧",
+    "batches": "運賃バッチ",
+    "upload": "運賃取込",
+    "compare": "運賃比較",
+    "pkg": "PKG 自動入力",
+    "emails": "メール分析",
+    "dataGroup": "基礎データ",
+    "carriers": "船社管理"
+  },
+  "batches": {
+    "title": "運賃バッチ",
+    "uploadTitle": "新規バッチ",
+    "parserHint": "パーサー",
+    "parserHintDesc": "Air = 空運週次レート + Surcharges、Ocean / Ocean NGB = 海運標準テンプレート。不明の場合は自動判定を選択。",
+    "uploading": "解析中...",
+    "dropText": "Excel ファイルをドラッグまたはクリックでアップロード",
+    "dropHint": ".xlsx / .xls / .csv 対応、50MB まで",
+    "uploadSuccess": "解析完了 · {{rows}} 行 · パーサー {{parser}}",
+    "uploadFailed": "アップロード失敗",
+    "listTitle": "下書きバッチ一覧",
+    "empty": "バッチがまだありません。上の領域から Excel をアップロードしてください。",
+    "openDetail": "詳細",
+    "detailFailed": "バッチ詳細の取得に失敗しました",
+    "totalRows": "総行数",
+    "previewCount": "プレビュー",
+    "sheets": "シート数",
+    "warnings": "警告",
+    "tabPreview": "プレビュー",
+    "tabDiff": "差分",
+    "tabActivate": "有効化",
+    "previewTruncated": "切り詰め済み · 全 {{total}} 行 · 先頭 {{shown}} 行を表示",
+    "diffEmpty": "差分は未生成です。下の「差分を実行」をクリックしてください。",
+    "runDiff": "差分を実行",
+    "diffing": "差分計算中...",
+    "diffFailed": "差分計算に失敗しました",
+    "diffNew": "新規",
+    "diffChanged": "変更",
+    "diffUnchanged": "変化なし",
+    "diffUnmatched": "未マッチ",
+    "diffStatus": {
+      "new": "新規",
+      "changed": "変更",
+      "unchanged": "変化なし",
+      "unmatched": "未マッチ"
+    },
+    "activateNotYet": "まだ有効化されていません",
+    "activateHint": "Step1 では Dry-Run のみ対応。本番有効化は Step2 のパイプライン接続後にリリースされます。",
+    "activateDryRun": "Dry-Run",
+    "activateReal": "本有効化",
+    "activateRealHint": "現状はスタブ実装で、DB に書き込みません",
+    "activateOk": "有効化リクエストが完了しました",
+    "activateFailed": "有効化失敗",
+    "activatedFlag": "有効化済み",
+    "importedRows": "取込行数",
+    "skippedRows": "スキップ行数",
+    "selectedRows": "{{n}} 行選択",
+    "generatedAt": "生成時刻",
+    "download": "元フォーマットをダウンロード",
+    "col": {
+      "batchId": "バッチ",
+      "fileName": "ファイル名",
+      "parser": "パーサー",
+      "carrier": "船社",
+      "rows": "行数",
+      "status": "ステータス",
+      "warnings": "警告",
+      "createdAt": "作成時刻",
+      "origin": "起運地",
+      "destination": "仕向地",
+      "transit": "輸送日数",
+      "valid": "有効期間",
+      "diffStatus": "差分",
+      "changedFields": "変更フィールド"
+    }
   },
   "carrier": {
     "title": "船社・サプライヤー管理",
@@ -89,7 +248,8 @@
     }
   },
   "rates": {
-    "title": "運賃管理",
+    "title": "運賃一覧",
+    "advancedFilter": "高度な絞り込み",
     "originPort": "積地",
     "destinationPort": "仕向地",
     "shippingLine": "船社",

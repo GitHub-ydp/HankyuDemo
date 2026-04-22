@@ -14,7 +14,8 @@
     "carriers": "Carriers & Suppliers",
     "domesticRates": "Domestic Rates",
     "emailSearch": "Email Search & AI Analysis",
-    "pkg": "Bid Package Auto Fill"
+    "pkg": "Bid Package Auto Fill",
+    "batches": "Rate Batches"
   },
   "common": {
     "create": "Create",
@@ -53,7 +54,7 @@
     "resetFailed": "Reset failed: "
   },
   "dashboard": {
-    "title": "Rate Management Dashboard",
+    "title": "Dashboard",
     "quickActions": "Quick Actions",
     "totalRates": "Total Rates",
     "activeRates": "Active Rates",
@@ -65,7 +66,165 @@
     "browseRates": "Browse Rate Data",
     "browseRatesDesc": "Search, filter, and manage all rate records",
     "compareRates": "Lane Comparison",
-    "compareRatesDesc": "Compare quotes from multiple suppliers on the same lane"
+    "compareRatesDesc": "Compare quotes from multiple suppliers on the same lane",
+    "refresh": "Refresh",
+    "newRate": "New Rate",
+    "statusTitle": "Status Distribution",
+    "otherStatus": "Other",
+    "recentTitle": "Recently Updated",
+    "viewAll": "View all",
+    "statsLoadFailed": "Stats are unavailable right now",
+    "statsLoadFailedHint": "Backend /rates/stats did not respond. Click Refresh above to retry."
+  },
+  "auth": {
+    "brand": {
+      "zh": "Hankyu Hanshin Rate Hub",
+      "en": "Hankyu Hanshin · Rate Hub"
+    },
+    "hero": {
+      "titleLead": "One ",
+      "titleAccent": "Control Tower",
+      "titleTail": "for every quote & decision",
+      "ledeLead": "Consolidate rates from email, Excel and API, auto-match tender packages, keep a human in the loop — and bring quote turnaround from ",
+      "slow": "hours",
+      "ledeBridge": " down to ",
+      "fast": "minutes",
+      "ledeTail": "."
+    },
+    "stats": {
+      "rates": "Live Rates",
+      "carriers": "Carriers",
+      "accuracy": "Parse Accuracy"
+    },
+    "features": {
+      "parse": {
+        "title": "Multi-source Parsing",
+        "desc": "Email / Excel / images in one click"
+      },
+      "pkg": {
+        "title": "Auto PKG Fill",
+        "desc": "Match tender templates instantly"
+      },
+      "mail": {
+        "title": "Email Timeline",
+        "desc": "AI-powered summaries"
+      }
+    },
+    "field": {
+      "email": "Corporate Email",
+      "password": "Password",
+      "name": "Full Name",
+      "confirm": "Confirm Password",
+      "namePlaceholder": "Enter your full name"
+    },
+    "login": {
+      "title": "Welcome back",
+      "subtitle": "Sign in to continue",
+      "remember": "Stay signed in for 7 days",
+      "toRegister": "No account? Register",
+      "submit": "Enter Control Tower",
+      "submitting": "Signing in...",
+      "dividerSso": "Or use SSO"
+    },
+    "register": {
+      "title": "Create account",
+      "subtitle": "Join the Rate Control Tower",
+      "heroLead": "Join the tower,",
+      "heroAccent": "reshape quote speed.",
+      "heroLede": "A single corporate email is all you need to join the team and manage multi-source rate data.",
+      "submit": "Create Account",
+      "submitting": "Creating...",
+      "hasAccount": "Already have an account?",
+      "toLogin": "Sign in"
+    },
+    "logout": "Sign out"
+  },
+  "nav": {
+    "operations": "Operations",
+    "data": "Data"
+  },
+  "topbar": {
+    "searchPlaceholder": "Search rates / lanes / carriers...",
+    "help": "Help",
+    "notifications": "Notifications"
+  },
+  "breadcrumb": {
+    "dashboard": "Dashboard",
+    "rateGroup": "Rates",
+    "rates": "All Rates",
+    "batches": "Rate Batches",
+    "upload": "Import",
+    "compare": "Compare",
+    "pkg": "PKG Auto Fill",
+    "emails": "Email Analysis",
+    "dataGroup": "Data",
+    "carriers": "Carriers"
+  },
+  "batches": {
+    "title": "Rate Batches",
+    "uploadTitle": "New Batch",
+    "parserHint": "Parser",
+    "parserHintDesc": "Air = weekly market price + Surcharges; Ocean / Ocean NGB = standard ocean templates. Use Auto detect when unsure.",
+    "uploading": "Parsing...",
+    "dropText": "Drag or click to upload Excel",
+    "dropHint": "Accepts .xlsx / .xls / .csv up to 50MB",
+    "uploadSuccess": "Parsed {{rows}} rows · adapter {{parser}}",
+    "uploadFailed": "Upload failed",
+    "listTitle": "Draft batches",
+    "empty": "No batches yet — upload an Excel above",
+    "openDetail": "Open",
+    "detailFailed": "Failed to load batch detail",
+    "totalRows": "Total rows",
+    "previewCount": "Preview",
+    "sheets": "Sheets",
+    "warnings": "Warnings",
+    "tabPreview": "Preview",
+    "tabDiff": "Diff",
+    "tabActivate": "Activate",
+    "previewTruncated": "Truncated · {{total}} rows total · showing first {{shown}}",
+    "diffEmpty": "No diff yet — click \"Run diff\" below",
+    "runDiff": "Run diff",
+    "diffing": "Diffing...",
+    "diffFailed": "Diff failed",
+    "diffNew": "New",
+    "diffChanged": "Changed",
+    "diffUnchanged": "Unchanged",
+    "diffUnmatched": "Unmatched",
+    "diffStatus": {
+      "new": "New",
+      "changed": "Changed",
+      "unchanged": "Unchanged",
+      "unmatched": "Unmatched"
+    },
+    "activateNotYet": "Not activated yet",
+    "activateHint": "Step1 only supports dry-run. Real DB writes will land when Step2 wires the activation pipeline.",
+    "activateDryRun": "Dry-run",
+    "activateReal": "Activate",
+    "activateRealHint": "Currently a stub — no DB rows are written",
+    "activateOk": "Activate request completed",
+    "activateFailed": "Activate failed",
+    "activatedFlag": "Activated",
+    "importedRows": "Imported rows",
+    "skippedRows": "Skipped rows",
+    "selectedRows": "{{n}} rows selected",
+    "generatedAt": "Generated at",
+    "download": "Download original format",
+    "col": {
+      "batchId": "Batch",
+      "fileName": "File name",
+      "parser": "Parser",
+      "carrier": "Carrier",
+      "rows": "Rows",
+      "status": "Status",
+      "warnings": "Warn",
+      "createdAt": "Created at",
+      "origin": "Origin",
+      "destination": "Destination",
+      "transit": "Transit",
+      "valid": "Valid",
+      "diffStatus": "Diff",
+      "changedFields": "Changed fields"
+    }
   },
   "carrier": {
     "title": "Carriers & Suppliers",
@@ -89,7 +248,8 @@
     }
   },
   "rates": {
-    "title": "Rate Management",
+    "title": "All Rates",
+    "advancedFilter": "Advanced Filter",
     "originPort": "Origin Port",
     "destinationPort": "Destination Port",
     "shippingLine": "Shipping Line",

@@ -154,3 +154,102 @@ export interface CompareResult {
   rates: CompareRateItem[];
   total: number;
 }
+
+// ============ Step1 Rate Batches ============
+
+export interface RateBatchSheetSummary {
+  name: string;
+  rows: number;
+}
+
+export interface RateBatchPreviewRow {
+  row_index: number;
+  carrier?: string | null;
+  origin_port?: string | null;
+  destination_port?: string | null;
+  service_code?: string | null;
+  currency?: string | null;
+  container_20gp?: string | null;
+  container_40gp?: string | null;
+  container_40hq?: string | null;
+  container_45?: string | null;
+  baf_20?: string | null;
+  baf_40?: string | null;
+  lss_20?: string | null;
+  lss_40?: string | null;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  transit_days?: number | null;
+  is_direct?: boolean | null;
+  remarks?: string | null;
+}
+
+export interface RateBatchSummary {
+  batch_id: string;
+  file_name: string;
+  source_type: string;
+  batch_status: string;
+  activation_status: string;
+  adapter_key?: string | null;
+  parser_hint?: string | null;
+  carrier_code?: string | null;
+  total_rows: number;
+  preview_count: number;
+  warnings: string[];
+  sheets: RateBatchSheetSummary[];
+  storage_mode: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RateBatchDetail extends RateBatchSummary {
+  preview_rows: RateBatchPreviewRow[];
+  preview_truncated: boolean;
+  available_actions: string[];
+}
+
+export interface RateBatchDiffSummary {
+  total_rows: number;
+  new_rows: number;
+  changed_rows: number;
+  unchanged_rows: number;
+  unmatched_rows: number;
+}
+
+export type RateBatchDiffStatus = 'new' | 'changed' | 'unchanged' | 'unmatched';
+
+export interface RateBatchDiffItem {
+  row_index: number;
+  status: RateBatchDiffStatus;
+  existing_rate_id?: number | null;
+  reason?: string | null;
+  changed_fields: string[];
+  preview: RateBatchPreviewRow;
+}
+
+export interface RateBatchDiffResponse {
+  batch_id: string;
+  batch_status: string;
+  diff_status: string;
+  generated_at: string;
+  summary: RateBatchDiffSummary;
+  items: RateBatchDiffItem[];
+  is_stub: boolean;
+  message?: string | null;
+}
+
+export interface RateBatchActivateResponse {
+  batch_id: string;
+  batch_status: string;
+  activation_status: string;
+  activated: boolean;
+  imported_rows: number;
+  skipped_rows: number;
+  generated_at: string;
+  selected_rows: number;
+  diff_summary: RateBatchDiffSummary;
+  is_stub: boolean;
+  message?: string | null;
+}
+
+export type ParserHint = 'air' | 'ocean' | 'ocean_ngb';

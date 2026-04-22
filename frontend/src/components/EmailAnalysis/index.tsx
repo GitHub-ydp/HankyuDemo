@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, Collapse, Flex, Space, Spin, Table, Typography, message } from 'antd';
-import { DownloadOutlined } from '@ant-design/icons';
+import { message } from 'antd';
 import ReactMarkdown from 'react-markdown';
-import type { ColumnsType } from 'antd/es/table';
+import Icon from '../Icon';
 import { emailApi } from '../../services/emailApi';
 import type { EmailItem } from '../../types/email';
 
@@ -15,7 +14,7 @@ interface EmailAnalysisProps {
 }
 
 function formatDate(value: string) {
-  return value ? value.slice(0, 10) : '-';
+  return value ? value.slice(0, 10) : '—';
 }
 
 export default function EmailAnalysis({
@@ -26,6 +25,7 @@ export default function EmailAnalysis({
 }: EmailAnalysisProps) {
   const { t } = useTranslation();
   const [exporting, setExporting] = useState(false);
+  const [showEmails, setShowEmails] = useState(false);
 
   const handleExportReport = async () => {
     if (!query) return;
@@ -34,39 +34,16 @@ export default function EmailAnalysis({
       const result = await emailApi.downloadReport(query);
       message.success(t('email.exportSuccess', { filename: result.filename }));
     } catch (error) {
-      message.error(
-        error instanceof Error ? error.message : t('email.exportFailed'),
-      );
+      message.error(error instanceof Error ? error.message : t('email.exportFailed'));
     } finally {
       setExporting(false);
     }
   };
 
-  const columns: ColumnsType<EmailItem> = [
-    {
-      title: t('email.date'),
-      dataIndex: 'date',
-      width: 120,
-      render: (value: string) => formatDate(value),
-    },
-    {
-      title: t('email.from'),
-      dataIndex: 'from_name',
-      width: 160,
-      render: (_value: string, record) => record.from_name || record.from,
-    },
-    {
-      title: t('email.subject'),
-      dataIndex: 'subject',
-      ellipsis: true,
-    },
-    {
-      title: t('email.relevance'),
-      dataIndex: 'score',
-      width: 100,
-      render: (value: number) => value.toFixed(2),
-    },
-  ];
+  const copy = async () => {
+    await navigator.clipboard.writeText(analysis);
+    message.success(t('email.copied'));
+  };
 
   const loadingText = [
     t('email.loadingSteps.searching'),
@@ -75,64 +52,96 @@ export default function EmailAnalysis({
   ];
 
   return (
-    <Flex vertical gap={16}>
-      <Card
-        title={`${t('email.analysisResult')} · ${query}`}
-        extra={(
-          <Space>
-            <Button
-              type="primary"
-              icon={<DownloadOutlined />}
-              loading={exporting}
-              disabled={loading || !analysis}
+    <>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-head">
+          <div>
+            <h3>{t('email.analysisResult')}</h3>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-500)', marginTop: 2 }}>· {query}</div>
+          </div>
+          <div className="right" style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary btn-sm" onClick={copy} disabled={loading || !analysis}>
+              <Icon name="download" size={12} /> {t('email.copy')}
+            </button>
+            <button
+              className="btn btn-primary btn-sm"
               onClick={handleExportReport}
+              disabled={loading || !analysis || exporting}
             >
-              {t('email.exportReport')}
-            </Button>
-            <Button
-              onClick={async () => {
-                await navigator.clipboard.writeText(analysis);
-                message.success(t('email.copied'));
-              }}
-            >
-              {t('email.copy')}
-            </Button>
-          </Space>
-        )}
-      >
-        {loading ? (
-          <Flex vertical gap={8}>
-            <Spin />
-            {loadingText.map((text) => (
-              <Typography.Text key={text} type="secondary">
-                {text}
-              </Typography.Text>
-            ))}
-          </Flex>
-        ) : (
-          <div style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}>
-            <ReactMarkdown>{analysis}</ReactMarkdown>
+              <Icon name="download" size={12} />
+              {exporting ? '...' : t('email.exportReport')}
+            </button>
+          </div>
+        </div>
+        <div className="card-body">
+          {loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {loadingText.map((txt) => (
+                <div key={txt} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--ink-500)' }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--teal-500)', animation: 'blink 1.4s infinite' }} />
+                  {txt}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="md-box">
+              <ReactMarkdown>{analysis}</ReactMarkdown>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head">
+          <h3>
+            {t('email.relatedEmails')} <span style={{ fontFamily: 'var(--font-en)', color: 'var(--ink-500)' }}>({emails.length})</span>
+          </h3>
+          <button
+            className="btn btn-ghost btn-sm"
+            style={{ marginLeft: 'auto' }}
+            onClick={() => setShowEmails((v) => !v)}
+          >
+            <Icon name={showEmails ? 'arrow-up' : 'arrow-down'} size={12} />
+          </button>
+        </div>
+        {showEmails && (
+          <div className="table-scroll">
+            <table className="rtable" style={{ minWidth: 720 }}>
+              <thead>
+                <tr>
+                  <th style={{ width: 110 }}>{t('email.date')}</th>
+                  <th style={{ width: 180 }}>{t('email.from')}</th>
+                  <th>{t('email.subject')}</th>
+                  <th style={{ width: 100 }} className="c-right">
+                    {t('email.relevance')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {emails.map((email) => (
+                  <tr key={email.id}>
+                    <td className="num" style={{ color: 'var(--ink-500)' }}>{formatDate(email.date)}</td>
+                    <td style={{ fontSize: 12.5 }}>{email.from_name || email.from}</td>
+                    <td style={{ maxWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {email.subject || '—'}
+                    </td>
+                    <td className="c-right num" style={{ color: 'var(--ink-500)' }}>
+                      {email.score.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+                {emails.length === 0 && (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', padding: 32, color: 'var(--ink-500)' }}>
+                      {t('common.noData')}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         )}
-      </Card>
-
-      <Collapse
-        items={[
-          {
-            key: 'emails',
-            label: `${t('email.relatedEmails')} (${emails.length})`,
-            children: (
-              <Table
-                rowKey="id"
-                dataSource={emails}
-                columns={columns}
-                pagination={false}
-                scroll={{ x: 720 }}
-              />
-            ),
-          },
-        ]}
-      />
-    </Flex>
+      </div>
+    </>
   );
 }
