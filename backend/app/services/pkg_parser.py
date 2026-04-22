@@ -1,3 +1,6 @@
+# DEPRECATED: 判删于 2026-04-22 Step2 重构（架构任务单 T-B11）
+# 所有新使用方请迁到 backend/app/services/step2_bidding/customer_profiles/customer_a.py
+# 旧 /api/v1/pkg 路由继续依赖本文件兜底 Demo，待 T-B11 前端迁移后删除。
 """PKG（入札包）Excel 解析服务
 
 解析客户入札模板 Excel，识别：

@@ -1,3 +1,6 @@
+# DEPRECATED: 判删于 2026-04-22 Step2 重构（架构任务单 T-B11）
+# 所有新使用方请迁到 backend/app/services/step2_bidding/（fill 将在 T-B7 交付）。
+# 旧 /api/v1/pkg 路由继续依赖本文件兜底 Demo，待 T-B11 前端迁移后删除。
 """PKG 自动填入服务
 
 根据解析结果，从费率数据库查询匹配费率，自动填入 Excel。

@@ -1,3 +1,7 @@
+# DEPRECATED: 判删于 2026-04-22 Step2 重构（架构任务单 T-B11）
+# 本文件硬编码的销售价是 "AI 伪造数据" 的典型坑；Step2 费率来源切回 Step1 入库表。
+# 新使用方请走 backend/app/services/step2_bidding/rate_repository.py::Step1RateRepository。
+# 旧 /api/v1/pkg 路由继续依赖本文件兜底 Demo，待 T-B11 前端迁移后删除。
 """航空费率数据库（Demo 用内存数据库）
 
 基于 Customer A (ミマキエンジニアリング) 的真实报价数据构建。
