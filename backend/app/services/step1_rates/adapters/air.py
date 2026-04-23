@@ -53,6 +53,28 @@ class AirAdapter:
         records: list[ParsedRateRecord] = []
         weekly_meta: list[dict[str, Any]] = []
 
+        surcharges_sheet = self._find_surcharges_sheet(workbook)
+        if surcharges_sheet is None:
+            weekly_currency = self._DEFAULT_CURRENCY
+            weekly_currency_source = "fallback_no_surcharges"
+            weekly_currency_warning = (
+                "weekly currency falls back to CNY: Surcharges sheet missing"
+            )
+        else:
+            weekly_currency, surcharges_currency_source, _ = self._read_surcharges_currency(
+                workbook[surcharges_sheet]
+            )
+            if surcharges_currency_source == "F2":
+                weekly_currency_source = "from_surcharges_F2"
+                weekly_currency_warning = None
+            else:
+                weekly_currency = self._DEFAULT_CURRENCY
+                weekly_currency_source = "fallback_no_F2_declaration"
+                weekly_currency_warning = (
+                    "weekly currency falls back to CNY: "
+                    "Surcharges F2 has no CURRENCY declaration"
+                )
+
         weekly_sheet_names = self._detect_weekly_sheet_names(workbook)
         if not weekly_sheet_names:
             warnings.append("no weekly sheet matched pattern 'Mon dd to Mon dd'")
@@ -62,13 +84,15 @@ class AirAdapter:
             sheet_records, sheet_meta, sheet_warnings = self._parse_weekly_sheet(
                 worksheet,
                 source_file=path.name,
+                currency=weekly_currency,
+                currency_source=weekly_currency_source,
             )
             records.extend(sheet_records)
             warnings.extend(sheet_warnings)
             weekly_meta.append(sheet_meta)
 
-        if weekly_sheet_names:
-            warnings.append("weekly sheet currency not declared; inferred as CNY")
+        if weekly_sheet_names and weekly_currency_warning:
+            warnings.append(weekly_currency_warning)
 
         batch_effective_from: date | None = None
         batch_effective_to: date | None = None
@@ -92,7 +116,6 @@ class AirAdapter:
                     )
                 )
 
-        surcharges_sheet = self._find_surcharges_sheet(workbook)
         if surcharges_sheet is None:
             warnings.append("Surcharges sheet missing, skipped airline surcharge parsing")
         else:
@@ -143,6 +166,8 @@ class AirAdapter:
         worksheet,
         *,
         source_file: str,
+        currency: str,
+        currency_source: str,
     ) -> tuple[list[ParsedRateRecord], dict[str, Any], list[str]]:
         sheet_name = worksheet.title
         warnings: list[str] = []
@@ -225,7 +250,7 @@ class AirAdapter:
                 "must_go_value": must_go_value,
                 "is_case_by_case": "case by case" in remark_lower,
                 "price_day_missing": price_day_missing,
-                "currency_assumption": "inferred_CNY_no_header",
+                "currency_source": currency_source,
                 "origin_source": "default_air_PVG",
             }
             extras.update(price_raw_extras)
@@ -252,7 +277,7 @@ class AirAdapter:
                     effective_week_end=week_end,
                     valid_from=week_start,
                     valid_to=week_end,
-                    currency=self._DEFAULT_CURRENCY,
+                    currency=currency,
                     remarks=remark_text,
                     source_type="excel",
                     source_file=source_file,

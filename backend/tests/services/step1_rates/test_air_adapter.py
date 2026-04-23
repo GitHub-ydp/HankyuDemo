@@ -251,11 +251,11 @@ def test_v_a14_surcharges_currency_all_cny(surcharge_records) -> None:
 # ------------- V-A15 -------------
 
 def test_v_a15_weekly_currency_all_cny_with_assumption(weekly_records) -> None:
-    """V-A15：周表全部 currency=='CNY'，且每条 extras.currency_assumption='inferred_CNY_no_header'。"""
+    """V-A15：周表全部 currency=='CNY'（来源：Surcharges F2 声明），currency_source='from_surcharges_F2'。"""
     assert len(weekly_records) > 0
     for row in weekly_records:
         assert row.currency == "CNY"
-        assert row.extras.get("currency_assumption") == "inferred_CNY_no_header"
+        assert row.extras.get("currency_source") == "from_surcharges_F2"
         assert row.origin_port_name == "PVG"
         assert row.extras.get("origin_source") == "default_air_PVG"
 
@@ -265,15 +265,20 @@ def test_v_a15_weekly_currency_all_cny_with_assumption(weekly_records) -> None:
 def test_v_a16_warnings_include_weekly_count_and_currency_dedup(
     real_batch: ParsedRateBatch,
 ) -> None:
-    """V-A16：warnings 去重后包含 W-A02（≥2 张周表）与 W-A07（周表币种推断），各 1 次。"""
+    """V-A16：warnings 去重；命中 Surcharges F2 时不应再出现"未声明"警告；W-A02（≥2 张周表）唯一。"""
     warnings = real_batch.warnings
     # 去重后应为唯一
     assert len(warnings) == len(set(warnings))
 
+    # 真实文件 Surcharges F2 = 'CURRENCY : CNY'，命中后不该打"未声明"或"fallback"
     currency_warnings = [
-        w for w in warnings if "weekly sheet currency not declared" in w
+        w for w in warnings
+        if "weekly sheet currency not declared" in w
+        or "weekly currency falls back to CNY" in w
     ]
-    assert len(currency_warnings) == 1, f"W-A07 期望唯一，实际 {currency_warnings}"
+    assert currency_warnings == [], (
+        f"命中 Surcharges F2 不应有 weekly currency 警告，实际 {currency_warnings}"
+    )
 
     multi_week_warnings = [
         w for w in warnings if "workbook contains" in w and "weekly sheets" in w
@@ -342,3 +347,83 @@ def test_v_a20_no_uncaught_exception_on_full_workbook() -> None:
     for row in batch.records:
         _ = (row.record_kind, row.currency, row.origin_port_name,
              dict(row.extras))
+
+
+# ------------- V-A-CURR-01 -------------
+
+def _build_air_xlsx(tmp_path: Path, *, surcharges_f2: str | None) -> Path:
+    """构造一个最小可解析的 Air xlsx：1 张周表 + 可选 Surcharges sheet。"""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    weekly = wb.active
+    weekly.title = "Apr 20 to Apr 26"
+    # 周表 A1='Destinations'，C1 含年份让 _extract_year_from_header 能命中
+    weekly.cell(1, 1, "Destinations")
+    weekly.cell(1, 2, "Service")
+    weekly.cell(1, 3, "2026/04/20")
+    # 1 行价：BKK / CK direct / 7 个价格 / 备注列
+    weekly.cell(2, 1, "BKK")
+    weekly.cell(2, 2, "CK direct")
+    for col in range(3, 10):
+        weekly.cell(2, col, 15.5)
+    weekly.cell(2, 10, "")  # remark
+
+    if surcharges_f2 is not None:
+        sheet = wb.create_sheet("Surcharges")
+        sheet["F2"] = surcharges_f2
+        # 表头行 4：放最简表头（任务单不要求表头通过校验，只要能跑出 currency）
+        for col, header in enumerate(
+            ["AREA", "FROM", "AIRLINES", "Effective Date",
+             "MYC MIN", "MYC FEE/KG", "MSC MIN", "MSC FEE/KG",
+             "Destination", "Remarks"],
+            start=2,
+        ):
+            sheet.cell(4, col, header)
+        # 不放数据行，避免噪音
+
+    out = tmp_path / "air_test.xlsx"
+    wb.save(out)
+    return out
+
+
+def test_v_a_curr_01_weekly_inherits_surcharges_usd(tmp_path: Path) -> None:
+    """V-A-CURR-01：Surcharges F2='CURRENCY : USD' → weekly records currency=='USD'，无未声明警告。"""
+    path = _build_air_xlsx(tmp_path, surcharges_f2="CURRENCY : USD")
+    batch = AirAdapter().parse(path)
+    weekly = [r for r in batch.records if r.record_kind == "air_weekly"]
+    assert len(weekly) >= 1
+    for row in weekly:
+        assert row.currency == "USD", (
+            f"row {row.extras.get('row_index')} currency={row.currency}"
+        )
+        assert row.extras.get("currency_source") == "from_surcharges_F2"
+
+    bad = [
+        w for w in batch.warnings
+        if "weekly sheet currency not declared" in w
+        or "weekly currency falls back to CNY" in w
+    ]
+    assert bad == [], f"命中 Surcharges F2 不应有 weekly currency 警告，实际 {bad}"
+
+
+# ------------- V-A-CURR-02 -------------
+
+def test_v_a_curr_02_weekly_falls_back_when_no_surcharges(tmp_path: Path) -> None:
+    """V-A-CURR-02：无 Surcharges sheet → weekly currency=='CNY'，warnings 含 fallback 提示。"""
+    path = _build_air_xlsx(tmp_path, surcharges_f2=None)
+    batch = AirAdapter().parse(path)
+    weekly = [r for r in batch.records if r.record_kind == "air_weekly"]
+    assert len(weekly) >= 1
+    for row in weekly:
+        assert row.currency == "CNY"
+        assert row.extras.get("currency_source") == "fallback_no_surcharges"
+
+    fallback_warnings = [
+        w for w in batch.warnings
+        if "weekly currency falls back to CNY" in w
+    ]
+    assert len(fallback_warnings) == 1, (
+        f"应含 1 条 fallback 警告，实际 {fallback_warnings}"
+    )
+    assert "Surcharges sheet missing" in fallback_warnings[0]
