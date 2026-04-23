@@ -1,24 +1,33 @@
-"""Customer A（ミマキエンジニアリング）PKG 解析实现。
+"""Customer A（ミマキエンジニアリング）PKG 解析 + fill 实现。
 
 黄金样本：资料/2026.04.02/Customer A (Air)/Customer A (Air)/2-①.xlsx
-算法依据：架构任务单 §6.1-6.3。
-
-本轮（T-B4）仅交付 detect + parse；fill 留 T-B7。
+算法依据：架构任务单 §6.1-6.3（parse）、T-B7 架构任务单（fill）。
 """
 from __future__ import annotations
 
 import re
+import shutil
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from datetime import datetime
+from decimal import Decimal, InvalidOperation, ROUND_CEILING
 from pathlib import Path
+from typing import Callable
 
 from openpyxl import load_workbook
 
+from app.services.step1_rates.writers.base import (
+    is_formula_cell,
+    safe_set,
+    stamp_document_properties,
+)
 from app.services.step2_bidding.entities import (
     CostType,
+    FillReport,
     ParsedPkg,
+    PerRowReport,
     PkgRow,
     PkgSection,
+    RowStatus,
 )
 
 
@@ -74,6 +83,18 @@ _CURRENCY_PATTERNS: list[tuple[str, str]] = [
     ("JPY", "JPY"),
 ]
 
+# T-B7 常量
+_DEFAULT_MARKUP_RATIO = Decimal("1.15")
+_SR_FIXED_REMARK = "ALL-in"
+_T_B7_WRITER_VERSION = "step2-customer_a-fill-0.1.0"
+_SENTINEL_KEEP = object()
+_ALL_KEEP: tuple[object, object, object, object] = (
+    _SENTINEL_KEEP,
+    _SENTINEL_KEEP,
+    _SENTINEL_KEEP,
+    _SENTINEL_KEEP,
+)
+
 
 @dataclass(slots=True)
 class _HeaderLocation:
@@ -83,11 +104,15 @@ class _HeaderLocation:
 
 
 class CustomerAProfile:
-    """Customer A 规则法解析器（无 AI）。"""
+    """Customer A 规则法解析器 + fill 回写器（无 AI）。"""
 
     customer_code = "customer_a"
     display_name = "ミマキエンジニアリング"
     priority = 100
+
+    def __init__(self, markup_fn: Callable[[Decimal], Decimal] | None = None) -> None:
+        """markup_fn：cost→sell 纯函数；仅在 variant='sr' 时使用。默认用 default_markup_fn。"""
+        self._markup_fn: Callable[[Decimal], Decimal] = markup_fn or default_markup_fn
 
     # ---------- detect ----------
 
@@ -120,19 +145,179 @@ class CustomerAProfile:
         finally:
             wb.close()
 
-    # ---------- fill (T-B7 占位) ----------
+    # ---------- fill (T-B7) ----------
 
     def fill(
         self,
         source_path: Path,
         parsed: ParsedPkg,
-        row_reports: list,
+        row_reports: list[PerRowReport],
         variant: str,
         output_path: Path,
-    ) -> None:
-        # TODO(T-B7): Customer A fill 实现。本轮 (T-B4) 仅交付 parse。
-        raise NotImplementedError(
-            "CustomerAProfile.fill 将在 T-B7 交付；当前轮次仅支持 parse"
+    ) -> FillReport:
+        """回写 PVG 段 5 条 AIR_FREIGHT 行；产出独立 xlsx 文件。
+
+        参见 T-B7 架构任务单 §4 数据流 / §5 决策表。
+        一次调用产一个文件；variant∈{"cost","sr"}。
+        """
+        if variant not in ("cost", "sr"):
+            raise ValueError(f"variant 必须为 cost / sr；实际：{variant!r}")
+
+        shutil.copy2(source_path, output_path)
+
+        wb = load_workbook(output_path, data_only=False, keep_vba=False)
+        global_warnings: list[str] = []
+        try:
+            if _SHEET_NAME not in wb.sheetnames:
+                raise ValueError(
+                    f"Sheet {_SHEET_NAME!r} 缺失，无法回写"
+                )
+            ws = wb[_SHEET_NAME]
+
+            pvg_rows = self._pvg_rowset(parsed)
+            row_by_idx: dict[int, PkgRow] = {r.row_idx: r for r in parsed.rows}
+
+            for report in row_reports:
+                row = row_by_idx.get(report.row_idx)
+                if row is None:
+                    global_warnings.append(
+                        f"row_reports 中 row_idx={report.row_idx} 在 parsed.rows 中不存在"
+                    )
+                    continue
+                if report.row_idx not in pvg_rows:
+                    continue
+
+                targets = self._targets_for_status(
+                    status=report.status,
+                    variant=variant,
+                    report=report,
+                    row=row,
+                )
+                for col_idx, value in zip(
+                    (_COL_PRICE, _COL_LEAD_TIME, _COL_CARRIER, _COL_REMARK),
+                    targets,
+                ):
+                    if value is _SENTINEL_KEEP:
+                        continue
+                    cell = ws.cell(row.row_idx, col_idx)
+                    if is_formula_cell(cell):
+                        continue
+                    safe_set(cell, value)
+
+                if (
+                    report.status == RowStatus.FILLED
+                    and variant == "sr"
+                    and row.client_constraint_text
+                ):
+                    global_warnings.append(
+                        f"R{row.row_idx} 有客户约束文本 {row.client_constraint_text!r}，"
+                        f"v1.0 未并入 H 列 'ALL-in'；审核页请人工处理"
+                    )
+
+            stamp_document_properties(
+                wb, batch_id=f"{parsed.bid_id}:{variant}"
+            )
+            wb.save(output_path)
+        finally:
+            wb.close()
+
+        return self._build_fill_report(
+            parsed=parsed,
+            row_reports=row_reports,
+            variant=variant,
+            output_path=output_path,
+            warnings=global_warnings,
+        )
+
+    # ---------- T-B7 helpers ----------
+
+    @staticmethod
+    def _pvg_rowset(parsed: ParsedPkg) -> set[int]:
+        """PVG 段（is_local_section=True）所有 row.row_idx 集合。"""
+        local_section_indices = {
+            s.section_index for s in parsed.sections if s.is_local_section
+        }
+        return {
+            r.row_idx
+            for r in parsed.rows
+            if r.section_index in local_section_indices
+        }
+
+    def _targets_for_status(
+        self,
+        *,
+        status: RowStatus,
+        variant: str,
+        report: PerRowReport,
+        row: PkgRow,
+    ) -> tuple[object, object, object, object]:
+        """根据 RowStatus × variant 查决策表，返回 (E, F, G, H) 四元组。
+
+        _SENTINEL_KEEP = 保留 2-①.xlsx 原值。
+        决策表来源：T-B7 架构任务单 §5.2。
+        """
+        # 双保险：LOCAL_DELIVERY 行一律 KEEP（即便 status 误标）
+        if row.cost_type == CostType.LOCAL_DELIVERY:
+            return _ALL_KEEP
+
+        if status == RowStatus.NON_LOCAL_LEG:
+            return _ALL_KEEP
+        if status == RowStatus.EXAMPLE:
+            return _ALL_KEEP
+        if status == RowStatus.LOCAL_DELIVERY_MANUAL:
+            return _ALL_KEEP
+        if status == RowStatus.ALREADY_FILLED:
+            return _ALL_KEEP
+
+        if status == RowStatus.NO_RATE:
+            return ("", "", "", _SENTINEL_KEEP)
+
+        if status == RowStatus.CONSTRAINT_BLOCK:
+            constraint = report.remark_text or "; ".join(report.constraint_hits) or ""
+            return ("", "", "", constraint)
+
+        # FILLED 与 OVERRIDDEN（本轮按 FILLED 对待）
+        if status in (RowStatus.FILLED, RowStatus.OVERRIDDEN):
+            cost = report.cost_price
+            if cost is None:
+                return _ALL_KEEP
+            lead = report.lead_time_text
+            carrier = report.carrier_text
+            if variant == "cost":
+                return (cost, lead, carrier, _SENTINEL_KEEP)
+            # variant == "sr"
+            sell = self._markup_fn(cost)
+            return (sell, lead, carrier, _SR_FIXED_REMARK)
+
+        # 未知 status：保守不动
+        return _ALL_KEEP
+
+    def _build_fill_report(
+        self,
+        *,
+        parsed: ParsedPkg,
+        row_reports: list[PerRowReport],
+        variant: str,
+        output_path: Path,
+        warnings: list[str],
+    ) -> FillReport:
+        filled_count = sum(
+            1 for r in row_reports if r.status == RowStatus.FILLED
+        )
+        no_rate_count = sum(
+            1 for r in row_reports if r.status == RowStatus.NO_RATE
+        )
+        skipped_count = len(row_reports) - filled_count - no_rate_count
+        return FillReport(
+            bid_id=parsed.bid_id,
+            generated_at=datetime.utcnow(),
+            row_reports=list(row_reports),
+            filled_count=filled_count,
+            no_rate_count=no_rate_count,
+            skipped_count=skipped_count,
+            cost_file_path=str(output_path) if variant == "cost" else "",
+            sr_file_path=str(output_path) if variant == "sr" else "",
+            global_warnings=warnings,
         )
 
     # ---------- parse ----------
@@ -417,3 +602,13 @@ def _strip_example(text: str) -> str:
     if not text:
         return ""
     return _EXAMPLE_BLOCK_RE.sub("", text).strip()
+
+
+def _ceil_int(value: Decimal) -> Decimal:
+    """向上取整到整数。业务需求 §需求 7 V1：45×1.15=51.75 → 52。"""
+    return value.to_integral_value(rounding=ROUND_CEILING)
+
+
+def default_markup_fn(cost: Decimal) -> Decimal:
+    """T-B6 未到位时的兜底加价：cost × 1.15，向上取整到整数。"""
+    return _ceil_int(cost * _DEFAULT_MARKUP_RATIO)

@@ -109,23 +109,3 @@ def test_existing_price_parsed_as_decimal(parsed: ParsedPkg):
     # PVG 段首行 R13 为 0（未填）
     assert by_idx[13].existing_price == Decimal("0")
 
-
-def test_fill_not_implemented_in_this_round():
-    """T-B4 只交付 parse；fill 留 T-B7。调用 fill 必须抛 NotImplementedError。"""
-    profile = CustomerAProfile()
-    with pytest.raises(NotImplementedError):
-        profile.fill(
-            source_path=Path("/tmp/fake.xlsx"),
-            parsed=ParsedPkg(
-                bid_id="x",
-                customer_code="customer_a",
-                period="",
-                sheet_name="",
-                source_file="",
-                sections=[],
-                rows=[],
-            ),
-            row_reports=[],
-            variant="cost",
-            output_path=Path("/tmp/out.xlsx"),
-        )

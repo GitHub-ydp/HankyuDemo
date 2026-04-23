@@ -19,11 +19,16 @@ from app.services.step2_bidding.entities import (
 from app.services.step2_bidding.protocols import CustomerProfile, RateRepository
 from app.services.step2_bidding.rate_matcher import RateMatcher
 from app.services.step2_bidding.customer_identifier import IdentifierResult, identify
+from app.services.step2_bidding.customer_profiles.customer_a import (
+    CustomerAProfile,
+    default_markup_fn,
+)
 
 __all__ = [
     "BiddingRequest",
     "BiddingStatus",
     "CostType",
+    "CustomerAProfile",
     "CustomerProfile",
     "FillReport",
     "IdentifierResult",
@@ -35,5 +40,6 @@ __all__ = [
     "RateMatcher",
     "RateRepository",
     "RowStatus",
+    "default_markup_fn",
     "identify",
 ]
