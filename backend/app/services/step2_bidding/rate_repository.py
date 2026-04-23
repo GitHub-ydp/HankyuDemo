@@ -12,6 +12,7 @@ ocean/lcl 留 v2.0 占位。
 """
 from __future__ import annotations
 
+import re
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -139,6 +140,9 @@ class Step1RateRepository:
                 "step2_batch_status": batch.status.value
                 if hasattr(batch.status, "value")
                 else str(batch.status),
+                "airline_codes": _extract_airline_codes(rate.service_desc),
+                "has_must_go": "must go" in (rate.remark or "").lower(),
+                "is_case_by_case": "case by case" in (rate.remark or "").lower(),
             },
         )
 
@@ -167,6 +171,9 @@ class Step1RateRepository:
                 "step2_batch_status": batch.status.value
                 if hasattr(batch.status, "value")
                 else str(batch.status),
+                "all_fees_dash": _all_fees_dash(
+                    sur.myc_min, sur.myc_fee_per_kg, sur.msc_min, sur.msc_fee_per_kg
+                ),
             },
         )
 
@@ -177,3 +184,20 @@ def _as_decimal(value: Any) -> Decimal | None:
     if isinstance(value, Decimal):
         return value
     return Decimal(str(value))
+
+
+_AIRLINE_CODE_RE = re.compile(r"\b([A-Z0-9]{2})\b")
+
+
+def _extract_airline_codes(service_desc: str | None) -> list[str]:
+    if not service_desc:
+        return []
+    seen: list[str] = []
+    for match in _AIRLINE_CODE_RE.findall(service_desc):
+        if match not in seen:
+            seen.append(match)
+    return seen
+
+
+def _all_fees_dash(*values: Any) -> bool:
+    return all(v is None for v in values)

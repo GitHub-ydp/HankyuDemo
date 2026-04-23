@@ -17,6 +17,7 @@ from app.services.step2_bidding.entities import (
     RowStatus,
 )
 from app.services.step2_bidding.protocols import CustomerProfile, RateRepository
+from app.services.step2_bidding.rate_matcher import RateMatcher
 
 __all__ = [
     "BiddingRequest",
@@ -29,6 +30,7 @@ __all__ = [
     "PkgRow",
     "PkgSection",
     "QuoteCandidate",
+    "RateMatcher",
     "RateRepository",
     "RowStatus",
 ]
