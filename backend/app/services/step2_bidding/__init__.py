@@ -18,6 +18,7 @@ from app.services.step2_bidding.entities import (
 )
 from app.services.step2_bidding.protocols import CustomerProfile, RateRepository
 from app.services.step2_bidding.rate_matcher import RateMatcher
+from app.services.step2_bidding.customer_identifier import IdentifierResult, identify
 
 __all__ = [
     "BiddingRequest",
@@ -25,6 +26,7 @@ __all__ = [
     "CostType",
     "CustomerProfile",
     "FillReport",
+    "IdentifierResult",
     "ParsedPkg",
     "PerRowReport",
     "PkgRow",
@@ -33,4 +35,5 @@ __all__ = [
     "RateMatcher",
     "RateRepository",
     "RowStatus",
+    "identify",
 ]

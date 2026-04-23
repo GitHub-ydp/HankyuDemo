@@ -25,6 +25,7 @@ from app.services.step2_bidding.entities import (
 _SHEET_NAME = "見積りシート"
 _HEADER_ORIGIN_LABEL = "発地"
 _HEADER_DEST_LABEL = "着地"
+_HEADER_CARRIER_LABEL = "主要キャリアとルート"
 _MAX_SCAN_ROWS = 60  # 黄金样本 41 行；留余量
 
 # 列位置（Customer A 固定；不对其他客户复用，见 §6.3 说明）
@@ -108,7 +109,12 @@ class CustomerAProfile:
             for r in range(1, scan_limit + 1):
                 b_val = _norm_text(ws.cell(r, _COL_ORIGIN).value)
                 c_val = _norm_text(ws.cell(r, _COL_DESTINATION).value)
-                if b_val == _HEADER_ORIGIN_LABEL and _HEADER_DEST_LABEL in c_val:
+                g_val = _norm_text(ws.cell(r, _COL_CARRIER).value)
+                if (
+                    b_val == _HEADER_ORIGIN_LABEL
+                    and _HEADER_DEST_LABEL in c_val
+                    and g_val == _HEADER_CARRIER_LABEL
+                ):
                     header_count += 1
             return header_count >= 2
         finally:
