@@ -421,6 +421,9 @@
       "processing": "Processing",
       "done": "Done"
     },
+    "common": {
+      "technicalLog": "Technical diagnostics (raw log, untranslated)"
+    },
     "identify": {
       "title": "Customer Identification",
       "customerLabel": "Customer",

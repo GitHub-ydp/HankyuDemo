@@ -202,11 +202,14 @@ function IdentifyPanel({ identify }: { identify: IdentifyBlock }) {
               {t('bidding.identify.warningsToggle', { count: identify.warnings.length })}
             </button>
             {showWarnings && (
-              <ul style={{ marginTop: 8, paddingLeft: 20, color: 'var(--ink-700)', fontSize: 12 }}>
+              <div style={{ marginTop: 8, paddingLeft: 20 }}>
+                <div style={{ fontSize: 11, color: 'var(--ink-400, #999)', fontStyle: 'italic', marginBottom: 4 }}>{t('bidding.common.technicalLog')}</div>
+                <ul style={{ margin: 0, paddingLeft: 16, color: 'var(--ink-700)', fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace' }}>
                 {identify.warnings.map((w, i) => (
                   <li key={i}>{w}</li>
                 ))}
               </ul>
+              </div>
             )}
           </div>
         )}
@@ -273,11 +276,14 @@ function ParsePanel({ parse }: { parse: ParseBlock }) {
               {t('bidding.parse.warningsToggle', { count: parse.warnings.length })}
             </button>
             {showWarnings && (
-              <ul style={{ marginTop: 8, paddingLeft: 20, color: 'var(--ink-700)', fontSize: 12 }}>
+              <div style={{ marginTop: 8, paddingLeft: 20 }}>
+                <div style={{ fontSize: 11, color: 'var(--ink-400, #999)', fontStyle: 'italic', marginBottom: 4 }}>{t('bidding.common.technicalLog')}</div>
+                <ul style={{ margin: 0, paddingLeft: 16, color: 'var(--ink-700)', fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace' }}>
                 {parse.warnings.map((w, i) => (
                   <li key={i}>{w}</li>
                 ))}
               </ul>
+              </div>
             )}
           </div>
         )}
@@ -333,11 +339,14 @@ function FillPanel({ fill }: { fill: FillBlock }) {
               {t('bidding.fill.warningsToggle', { count: fill.global_warnings.length })}
             </button>
             {showWarnings && (
-              <ul style={{ marginTop: 8, paddingLeft: 20, color: 'var(--ink-700)', fontSize: 12 }}>
+              <div style={{ marginTop: 8, paddingLeft: 20 }}>
+                <div style={{ fontSize: 11, color: 'var(--ink-400, #999)', fontStyle: 'italic', marginBottom: 4 }}>{t('bidding.common.technicalLog')}</div>
+                <ul style={{ margin: 0, paddingLeft: 16, color: 'var(--ink-700)', fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace' }}>
                 {fill.global_warnings.map((w, i) => (
                   <li key={i}>{w}</li>
                 ))}
               </ul>
+              </div>
             )}
           </div>
         )}
@@ -477,8 +486,13 @@ function RejectedPanel({
         <div className="alert-title">{t('bidding.identify.rejected.title')}</div>
         {identify.unmatched_reason && (
           <div className="alert-desc" style={{ marginTop: 6 }}>
-            <span className="sub">{t('bidding.identify.rejected.reasonLabel')}:</span>{' '}
-            {identify.unmatched_reason}
+            <span className="sub">{t('bidding.identify.rejected.reasonLabel')}:</span>
+            <div style={{ marginTop: 4 }}>
+              <div style={{ fontSize: 11, color: 'var(--ink-400, #999)', fontStyle: 'italic', marginBottom: 4 }}>{t('bidding.common.technicalLog')}</div>
+              <div style={{ fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace', color: 'var(--ink-700)', background: 'var(--bg-subtle, #f5f5f5)', padding: 8, borderRadius: 4, wordBreak: 'break-word' }}>
+                {identify.unmatched_reason}
+              </div>
+            </div>
           </div>
         )}
         <div style={{ marginTop: 12 }}>
