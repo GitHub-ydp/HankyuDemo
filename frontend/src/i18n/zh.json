@@ -189,13 +189,14 @@
     "diffNew": "新增",
     "diffChanged": "变更",
     "diffUnchanged": "未变",
-    "diffUnmatched": "未匹配",
+    "diffUnmatched": "待人工对位",
     "diffStatus": {
       "new": "新增",
       "changed": "变更",
       "unchanged": "未变",
-      "unmatched": "未匹配"
+      "unmatched": "待人工对位"
     },
+    "unmatchedHint": "Parser 暂不关联 carriers/ports 主数据表，所有 draft 行默认显示为「待人工对位」；Step2 接入后将自动关联。",
     "activateNotYet": "尚未运行激活",
     "activateHint": "Step1 阶段先用 Dry-Run 演练；正式入库激活会在 Step2 接通后开放。",
     "activateDryRun": "Dry-Run 演练",

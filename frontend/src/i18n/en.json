@@ -189,13 +189,14 @@
     "diffNew": "New",
     "diffChanged": "Changed",
     "diffUnchanged": "Unchanged",
-    "diffUnmatched": "Unmatched",
+    "diffUnmatched": "Pending Match",
     "diffStatus": {
       "new": "New",
       "changed": "Changed",
       "unchanged": "Unchanged",
-      "unmatched": "Unmatched"
+      "unmatched": "Pending Match"
     },
+    "unmatchedHint": "Parser does not join carriers/ports master tables yet, so all draft rows show as Pending Match. Auto-matching lands after Step2 wiring.",
     "activateNotYet": "Not activated yet",
     "activateHint": "Step1 only supports dry-run. Real DB writes will land when Step2 wires the activation pipeline.",
     "activateDryRun": "Dry-run",

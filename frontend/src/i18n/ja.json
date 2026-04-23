@@ -189,13 +189,14 @@
     "diffNew": "新規",
     "diffChanged": "変更",
     "diffUnchanged": "変化なし",
-    "diffUnmatched": "未マッチ",
+    "diffUnmatched": "突合待ち",
     "diffStatus": {
       "new": "新規",
       "changed": "変更",
       "unchanged": "変化なし",
-      "unmatched": "未マッチ"
+      "unmatched": "突合待ち"
     },
+    "unmatchedHint": "Parser は現在 carriers/ports マスタと突合しないため、すべての行が「突合待ち」となります。Step2 連携後に自動マッチします。",
     "activateNotYet": "まだ有効化されていません",
     "activateHint": "Step1 では Dry-Run のみ対応。本番有効化は Step2 のパイプライン接続後にリリースされます。",
     "activateDryRun": "Dry-Run",

@@ -34,7 +34,7 @@ function diffStatusTag(status: string): string {
   if (status === 'new') return 'tag-info';
   if (status === 'changed') return 'tag-warn';
   if (status === 'unchanged') return 'tag-success';
-  if (status === 'unmatched') return 'tag-danger';
+  if (status === 'unmatched') return 'tag-muted';
   return 'tag-muted';
 }
 
@@ -416,10 +416,13 @@ function DetailDrawer({ batchId, onClose }: DetailDrawerProps) {
                           <div className="l">{t('batches.diffUnchanged')}</div>
                           <div className="v">{diff.summary.unchanged_rows}</div>
                         </div>
-                        <div className={`stat-tile ${diff.summary.unmatched_rows > 0 ? 'danger' : ''}`}>
+                        <div className={`stat-tile ${''}`}>
                           <div className="l">{t('batches.diffUnmatched')}</div>
                           <div className="v">{diff.summary.unmatched_rows}</div>
                         </div>
+                      </div>
+                      <div className="hint" style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted, #888)' }}>
+                        {t('batches.unmatchedHint')}
                       </div>
                       {diff.message && (
                         <div className="alert alert-info" style={{ marginBottom: 14 }}>
