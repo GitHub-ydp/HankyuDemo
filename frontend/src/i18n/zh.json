@@ -406,6 +406,101 @@
       "localDelivery": "本地派送"
     }
   },
+  "bidding": {
+    "title": "投标包自动填表",
+    "subtitle": "上传空白投标模板，自动识别客户、解析航线、匹配费率并产出成本价 / 销售价两版 Excel。",
+    "upload": {
+      "dragText": "点击或拖拽上传投标模板 (.xlsx)",
+      "hint": "仅支持 Customer A 的 2-①.xlsx 黄金样本；其它客户将被识别为 unknown 并阻断。",
+      "limitExt": "仅限 .xlsx",
+      "limitSize": "单文件最大 10 MB",
+      "uploading": "上传中 {{progress}}%",
+      "processing": "AI 处理中：识别客户 → 解析段 → 匹配费率 → 生成两版 Excel..."
+    },
+    "stepBar": {
+      "upload": "上传",
+      "processing": "处理中",
+      "done": "完成"
+    },
+    "identify": {
+      "title": "客户识别",
+      "customerLabel": "客户",
+      "confidenceLabel": "置信度",
+      "dimensionsLabel": "命中维度",
+      "noDimensions": "无",
+      "confidence": {
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      },
+      "warningsToggle": "警告 {{count}} 条",
+      "rejected": {
+        "title": "当前版本仅支持 Customer A",
+        "reasonLabel": "识别结果",
+        "backBtn": "重新上传"
+      }
+    },
+    "parse": {
+      "title": "解析结果",
+      "summaryTemplate": "期间 {{period}} · Sheet {{sheet}} · {{sections}} 段 · {{rows}} 行",
+      "sampleRowsTitle": "样例行（前 {{count}} 条）",
+      "colRow": "行",
+      "colSection": "段",
+      "colDestination": "目的地",
+      "colCostType": "类型",
+      "warningsToggle": "解析警告 {{count}} 条"
+    },
+    "fill": {
+      "title": "填入结果",
+      "filled": "已填入",
+      "noRate": "无匹配费率",
+      "skipped": "跳过",
+      "markupHintTemplate": "加价系数：{{ratio}}（默认值，待楢崎确认）",
+      "rowsTableTitle": "全部行状态",
+      "rowsExpandBtn": "展开全部 {{count}} 行",
+      "rowsCollapseBtn": "折叠",
+      "rowsShowAllBtn": "查看全部 {{count}} 行",
+      "filterFilledOnly": "仅显示已填入行",
+      "colRow": "行",
+      "colSection": "段",
+      "colDest": "目的地",
+      "colStatus": "状态",
+      "colCost": "成本价",
+      "colSell": "销售价",
+      "colBatch": "来源批次",
+      "warningsToggle": "填入警告 {{count}} 条",
+      "rowStatus": {
+        "filled": "已填入",
+        "no_rate": "无匹配费率",
+        "already_filled": "已有数据",
+        "example": "示范行",
+        "non_local_leg": "非本地发段",
+        "local_delivery_manual": "本地派送（人工）",
+        "constraint_block": "客户约束阻断",
+        "overridden": "已人工改价"
+      }
+    },
+    "download": {
+      "title": "下载两版 Excel",
+      "costBtn": "下载成本价版（社内決裁用）",
+      "srBtn": "下载销售价版（客户送付用）",
+      "expiresHint": "凭证 1 小时后失效，且每个文件仅可下载一次",
+      "resetBtn": "重新上传",
+      "downloadStarted": "已开始下载：{{filename}}"
+    },
+    "errors": {
+      "f1_invalid_xlsx": "文件无法打开，可能已损坏或不是有效的 xlsx 文件。请确认后重新上传。",
+      "f2_unsupported_customer": "当前版本仅支持 Customer A。",
+      "f3_parse_failed": "文件识别为 Customer A，但解析失败。请联系技术支持或上传样本文件。",
+      "f4_fill_failed": "解析成功，但自动填入失败。请重新上传或联系技术支持。",
+      "f5_token_expired": "下载凭证已失效（超过 1 小时或已下载过）。请重新上传文件。",
+      "f6_file_too_large": "文件大小超过 10 MB 限制。请压缩或拆分后重试。",
+      "f7_wrong_extension": "仅支持 .xlsx 格式。.xls / .xlsm / PDF / 图片等不被支持。",
+      "f8_network_error": "网络异常，请检查网络后重试。",
+      "retryBtn": "重新上传",
+      "detailLabel": "排障信息（可展开）"
+    }
+  },
   "email": {
     "title": "邮件搜索与AI分析",
     "description": "从真实邮箱中检索邮件，并基于查询结果生成时间线分析。",

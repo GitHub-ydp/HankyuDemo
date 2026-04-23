@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { ApiResponse } from '../types';
+import type { BiddingAutoFillResponse } from '../types/bidding';
 
 const resolveApiBaseUrl = () => {
   const envBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
@@ -171,6 +172,29 @@ export const rateBatchApi = {
     api.post<unknown, ApiResponse>(`/rate-batches/${batchId}/activate`, body),
   downloadUrl: (batchId: string) =>
     `${api.defaults.baseURL}/rate-batches/${batchId}/download`,
+};
+
+// --- Bidding (T-B10 v0.1 入札对应 / PkgAutoFill) ---
+export const biddingApi = {
+  autoFill: (
+    file: File,
+    onUploadProgress?: (percent: number) => void
+  ): Promise<BiddingAutoFillResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<unknown, BiddingAutoFillResponse>('/bidding/auto-fill', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
+      onUploadProgress: (evt) => {
+        if (!onUploadProgress) return;
+        const total = evt.total || file.size || 1;
+        const pct = Math.min(100, Math.round(((evt.loaded || 0) / total) * 100));
+        onUploadProgress(pct);
+      },
+    });
+  },
+  downloadUrl: (token: string) =>
+    `${api.defaults.baseURL}/bidding/download/${token}`,
 };
 
 // --- PKG 入札包 ---

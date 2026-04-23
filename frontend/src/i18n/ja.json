@@ -405,6 +405,101 @@
       "localDelivery": "現地配送"
     }
   },
+  "bidding": {
+    "title": "入札 PKG 自動入力",
+    "subtitle": "空の見積テンプレートをアップロードすると、顧客識別・明細解析・運賃マッチング・原価版／S/R 版 2 ファイル生成を一括で行います。",
+    "upload": {
+      "dragText": "クリックまたはドラッグして .xlsx をアップロード",
+      "hint": "現バージョンは Customer A の 2-①.xlsx のみ対応。他社は unknown 判定となり処理を中断します。",
+      "limitExt": ".xlsx のみ",
+      "limitSize": "ファイルサイズ 10 MB 以下",
+      "uploading": "アップロード中 {{progress}}%",
+      "processing": "AI 処理中：顧客識別 → 段解析 → 運賃照合 → 2 バリアント生成..."
+    },
+    "stepBar": {
+      "upload": "アップロード",
+      "processing": "処理中",
+      "done": "完了"
+    },
+    "identify": {
+      "title": "顧客識別",
+      "customerLabel": "顧客",
+      "confidenceLabel": "信頼度",
+      "dimensionsLabel": "命中ディメンション",
+      "noDimensions": "なし",
+      "confidence": {
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      },
+      "warningsToggle": "警告 {{count}} 件",
+      "rejected": {
+        "title": "現バージョンは Customer A のみ対応",
+        "reasonLabel": "識別結果",
+        "backBtn": "再アップロード"
+      }
+    },
+    "parse": {
+      "title": "解析結果",
+      "summaryTemplate": "入札期間 {{period}} · Sheet {{sheet}} · {{sections}} 段 · {{rows}} 行",
+      "sampleRowsTitle": "サンプル行（先頭 {{count}} 件）",
+      "colRow": "行",
+      "colSection": "段",
+      "colDestination": "着地",
+      "colCostType": "種別",
+      "warningsToggle": "解析 warning {{count}} 件"
+    },
+    "fill": {
+      "title": "自動入力結果",
+      "filled": "入力済み",
+      "noRate": "運賃なし",
+      "skipped": "スキップ",
+      "markupHintTemplate": "加算係数：{{ratio}}（デフォルト値、楢崎様ご確認待ち）",
+      "rowsTableTitle": "全行ステータス",
+      "rowsExpandBtn": "全 {{count}} 行を展開",
+      "rowsCollapseBtn": "折りたたむ",
+      "rowsShowAllBtn": "全 {{count}} 行を表示",
+      "filterFilledOnly": "入力済みのみ表示",
+      "colRow": "行",
+      "colSection": "段",
+      "colDest": "着地",
+      "colStatus": "ステータス",
+      "colCost": "原価",
+      "colSell": "売価",
+      "colBatch": "ソースバッチ",
+      "warningsToggle": "入力 warning {{count}} 件",
+      "rowStatus": {
+        "filled": "入力済み",
+        "no_rate": "運賃なし",
+        "already_filled": "既存値あり",
+        "example": "記入例",
+        "non_local_leg": "非ローカル発段",
+        "local_delivery_manual": "現地配送（手動）",
+        "constraint_block": "顧客制約で中断",
+        "overridden": "手動上書き"
+      }
+    },
+    "download": {
+      "title": "2 バリアントのダウンロード",
+      "costBtn": "原価版ダウンロード（社内決裁用）",
+      "srBtn": "S/R 版ダウンロード（顧客送付用）",
+      "expiresHint": "ダウンロード URL は 1 時間で失効し、各ファイルは 1 回のみダウンロード可能です。",
+      "resetBtn": "再アップロード",
+      "downloadStarted": "ダウンロード開始：{{filename}}"
+    },
+    "errors": {
+      "f1_invalid_xlsx": "ファイルを開けません。破損しているか、有効な xlsx ではない可能性があります。",
+      "f2_unsupported_customer": "現バージョンは Customer A のみ対応。",
+      "f3_parse_failed": "Customer A として認識しましたが、解析に失敗しました。技術サポートにご連絡ください。",
+      "f4_fill_failed": "解析は成功しましたが、自動入力に失敗しました。再アップロードしてください。",
+      "f5_token_expired": "ダウンロード URL が失効しました（1 時間超過またはダウンロード済み）。再アップロードしてください。",
+      "f6_file_too_large": "ファイルサイズが 10 MB を超えています。圧縮または分割してから再試行してください。",
+      "f7_wrong_extension": ".xlsx 形式のみ対応。.xls / .xlsm / PDF / 画像などは非対応。",
+      "f8_network_error": "ネットワーク異常です。接続を確認のうえ再試行してください。",
+      "retryBtn": "再アップロード",
+      "detailLabel": "詳細情報（展開可）"
+    }
+  },
   "email": {
     "title": "メール検索・AI分析",
     "description": "実メールボックスからメールを検索し、クエリ結果に基づく時系列分析を生成します。",

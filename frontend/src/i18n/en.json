@@ -405,6 +405,101 @@
       "localDelivery": "Local Delivery"
     }
   },
+  "bidding": {
+    "title": "Tender PKG Auto-Fill",
+    "subtitle": "Upload a blank tender template. The system will identify the customer, parse lanes, match rates, and produce cost / S-R variants in one go.",
+    "upload": {
+      "dragText": "Click or drag to upload (.xlsx)",
+      "hint": "This version only supports Customer A's 2-①.xlsx golden sample. Other customers are flagged as unknown and processing is blocked.",
+      "limitExt": ".xlsx only",
+      "limitSize": "Max file size 10 MB",
+      "uploading": "Uploading {{progress}}%",
+      "processing": "AI processing: identify → parse → match rates → generate two variants..."
+    },
+    "stepBar": {
+      "upload": "Upload",
+      "processing": "Processing",
+      "done": "Done"
+    },
+    "identify": {
+      "title": "Customer Identification",
+      "customerLabel": "Customer",
+      "confidenceLabel": "Confidence",
+      "dimensionsLabel": "Matched dimensions",
+      "noDimensions": "None",
+      "confidence": {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      },
+      "warningsToggle": "{{count}} warning(s)",
+      "rejected": {
+        "title": "This version only supports Customer A",
+        "reasonLabel": "Identification result",
+        "backBtn": "Re-upload"
+      }
+    },
+    "parse": {
+      "title": "Parse Result",
+      "summaryTemplate": "Period {{period}} · Sheet {{sheet}} · {{sections}} sections · {{rows}} rows",
+      "sampleRowsTitle": "Sample rows (first {{count}})",
+      "colRow": "Row",
+      "colSection": "Section",
+      "colDestination": "Destination",
+      "colCostType": "Type",
+      "warningsToggle": "{{count}} parse warning(s)"
+    },
+    "fill": {
+      "title": "Auto-Fill Result",
+      "filled": "Filled",
+      "noRate": "No Matching Rate",
+      "skipped": "Skipped",
+      "markupHintTemplate": "Markup ratio: {{ratio}} (default, pending Narasaki confirmation)",
+      "rowsTableTitle": "All rows",
+      "rowsExpandBtn": "Expand all {{count}} rows",
+      "rowsCollapseBtn": "Collapse",
+      "rowsShowAllBtn": "Show all {{count}} rows",
+      "filterFilledOnly": "Show filled only",
+      "colRow": "Row",
+      "colSection": "Sec",
+      "colDest": "Dest",
+      "colStatus": "Status",
+      "colCost": "Cost",
+      "colSell": "Sell",
+      "colBatch": "Batch",
+      "warningsToggle": "{{count}} fill warning(s)",
+      "rowStatus": {
+        "filled": "Filled",
+        "no_rate": "No rate",
+        "already_filled": "Already filled",
+        "example": "Example",
+        "non_local_leg": "Non-local leg",
+        "local_delivery_manual": "Local delivery (manual)",
+        "constraint_block": "Constraint blocked",
+        "overridden": "Overridden"
+      }
+    },
+    "download": {
+      "title": "Download two variants",
+      "costBtn": "Download Cost Variant (Internal)",
+      "srBtn": "Download S/R Variant (For Customer)",
+      "expiresHint": "Tokens expire in 1 hour and each file can be downloaded only once.",
+      "resetBtn": "Re-upload",
+      "downloadStarted": "Download started: {{filename}}"
+    },
+    "errors": {
+      "f1_invalid_xlsx": "The file could not be opened. It may be corrupt or not a valid xlsx file.",
+      "f2_unsupported_customer": "This version only supports Customer A.",
+      "f3_parse_failed": "Recognized as Customer A, but parsing failed. Please contact technical support.",
+      "f4_fill_failed": "Parsing succeeded, but auto-fill failed. Please re-upload or contact support.",
+      "f5_token_expired": "Download token expired (over 1 hour or already used). Please re-upload the file.",
+      "f6_file_too_large": "File size exceeds the 10 MB limit. Please compress or split it and retry.",
+      "f7_wrong_extension": "Only .xlsx is supported. .xls / .xlsm / PDF / images are not accepted.",
+      "f8_network_error": "Network error. Please check connectivity and retry.",
+      "retryBtn": "Re-upload",
+      "detailLabel": "Debug info (expand)"
+    }
+  },
   "email": {
     "title": "Email Search & AI Analysis",
     "description": "Search emails from the real mailbox and generate timeline-based analysis from the result set.",

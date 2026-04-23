@@ -23,6 +23,7 @@ from app.services.step2_bidding.customer_profiles.customer_a import (
     CustomerAProfile,
     default_markup_fn,
 )
+from app.services.step2_bidding.bidding_orchestrator import run_auto_fill
 
 __all__ = [
     "BiddingRequest",
@@ -42,4 +43,5 @@ __all__ = [
     "RowStatus",
     "default_markup_fn",
     "identify",
+    "run_auto_fill",
 ]
