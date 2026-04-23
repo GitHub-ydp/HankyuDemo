@@ -50,6 +50,18 @@ class TokenStore:
         with self._lock:
             self._sweep_expired_locked()
 
+    def clear(self) -> int:
+        """清空所有 token（admin 重置用）。返回清空前的条数。"""
+        with self._lock:
+            count = len(self._entries)
+            for entry in list(self._entries.values()):
+                try:
+                    entry.path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            self._entries.clear()
+        return count
+
     def _sweep_expired_locked(self) -> None:
         now = datetime.utcnow()
         dead = [t for t, e in self._entries.items() if e.expires_at < now]
