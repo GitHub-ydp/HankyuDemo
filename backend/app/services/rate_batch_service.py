@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models import FreightRate, RateStatus
+from app.services.step1_rates import activator
+from app.services.step1_rates.entities import ParsedRateRecord
 from app.services.step1_rates.service import (
     DEFAULT_RATE_ADAPTER_REGISTRY,
     parse_excel_file,
@@ -45,6 +47,7 @@ class DraftRateBatch:
     available_actions: list[str] = field(default_factory=lambda: ["diff", "activate"])
     file_path: str | None = None
     legacy_payload: dict[str, Any] = field(default_factory=dict)
+    parse_records: list[ParsedRateRecord] = field(default_factory=list)
 
 
 _draft_batches: dict[str, DraftRateBatch] = {}
@@ -165,42 +168,108 @@ def activate_rate_batch(
     force: bool = False,
     selected_row_indices: list[int] | None = None,
 ) -> dict[str, Any] | None:
-    """Return a stable activation payload without writing database rows yet."""
+    """真激活批次或 dry_run 预览。"""
     draft = _draft_batches.get(batch_id)
     if not draft:
         return None
 
     diff_payload = get_rate_batch_diff(batch_id, db)
-    if not diff_payload:
-        return None
+    diff_summary = diff_payload["summary"] if diff_payload else {
+        "total_rows": draft.total_rows,
+        "new_rows": 0,
+        "changed_rows": 0,
+        "unchanged_rows": 0,
+        "unmatched_rows": 0,
+    }
 
     selected_count = (
         len(selected_row_indices)
         if selected_row_indices is not None
         else draft.total_rows
     )
-    skipped_rows = 0 if dry_run else selected_count
-    activation_status = "dry_run" if dry_run else "stub"
-    message = (
-        "Dry-run only. No database rows were written."
-        if dry_run
-        else "Activation stub only. Database import is not wired yet."
-    )
-    if force:
-        message = f"{message} Force flag acknowledged but not executed."
+
+    if draft.batch_status == "active":
+        return {
+            "batch_id": draft.batch_id,
+            "batch_status": "active",
+            "activation_status": "already_active",
+            "activated": False,
+            "imported_rows": 0,
+            "skipped_rows": 0,
+            "generated_at": _now(),
+            "selected_rows": selected_count,
+            "diff_summary": diff_summary,
+            "is_stub": False,
+            "message": "该批次已激活，当前状态 active",
+            "file_type": (draft.legacy_payload or {}).get("file_type"),
+            "effective_from": (draft.legacy_payload or {}).get("effective_from"),
+            "effective_to": (draft.legacy_payload or {}).get("effective_to"),
+            "imported_detail": {},
+            "superseded_batch_ids": [],
+            "warnings": [],
+            "errors": [],
+        }
+
+    if len(draft.parse_records) == 0:
+        return {
+            "batch_id": draft.batch_id,
+            "batch_status": "draft",
+            "activation_status": "empty_batch",
+            "activated": False,
+            "imported_rows": 0,
+            "skipped_rows": 0,
+            "generated_at": _now(),
+            "selected_rows": selected_count,
+            "diff_summary": diff_summary,
+            "is_stub": False,
+            "message": "该批次无可入库数据（0 条）",
+            "file_type": (draft.legacy_payload or {}).get("file_type"),
+            "effective_from": (draft.legacy_payload or {}).get("effective_from"),
+            "effective_to": (draft.legacy_payload or {}).get("effective_to"),
+            "imported_detail": {},
+            "superseded_batch_ids": [],
+            "warnings": [],
+            "errors": [],
+        }
+
+    result = activator.activate(draft, db, dry_run=dry_run, force=force)
+
+    errors_payload = [
+        {
+            "code": e.code,
+            "detail": e.detail,
+            "row_index": e.row_index,
+            "record_kind": e.record_kind,
+        }
+        for e in result.errors
+    ]
+
+    if result.activation_status == "activated":
+        batch_status = "active"
+    elif result.activation_status == "dry_run":
+        batch_status = draft.batch_status
+    else:
+        batch_status = "draft"
 
     return {
-        "batch_id": draft.batch_id,
-        "batch_status": draft.batch_status,
-        "activation_status": activation_status,
-        "activated": False,
-        "imported_rows": 0,
-        "skipped_rows": skipped_rows,
+        "batch_id": result.batch_id,
+        "batch_status": batch_status,
+        "activation_status": result.activation_status,
+        "activated": result.activated,
+        "imported_rows": result.imported_rows,
+        "skipped_rows": result.skipped_rows,
         "generated_at": _now(),
         "selected_rows": selected_count,
-        "diff_summary": diff_payload["summary"],
-        "is_stub": True,
-        "message": message,
+        "diff_summary": diff_summary,
+        "is_stub": False,
+        "message": result.message,
+        "file_type": result.file_type,
+        "effective_from": result.effective_from,
+        "effective_to": result.effective_to,
+        "imported_detail": dict(result.imported_detail),
+        "superseded_batch_ids": list(result.superseded_batch_ids),
+        "warnings": list(result.warnings),
+        "errors": errors_payload,
     }
 
 
@@ -245,6 +314,14 @@ def _build_draft_batch(
     legacy_payload = parse_result.to_legacy_dict()
     all_rows = _collect_rows(legacy_payload)
     preview_rows = [row["preview"] for row in all_rows[:PREVIEW_LIMIT]]
+    parse_records: list[ParsedRateRecord] = []
+    records_attr = getattr(parse_result, "records", None)
+    if records_attr:
+        parse_records = list(records_attr)
+    else:
+        all_rows_fn = getattr(parse_result, "all_rows", None)
+        if callable(all_rows_fn):
+            parse_records = list(all_rows_fn())
     now = _now()
     return DraftRateBatch(
         batch_id=legacy_payload["batch_id"],
@@ -264,6 +341,7 @@ def _build_draft_batch(
         row_payloads=all_rows,
         file_path=file_path,
         legacy_payload=legacy_payload,
+        parse_records=parse_records,
     )
 
 

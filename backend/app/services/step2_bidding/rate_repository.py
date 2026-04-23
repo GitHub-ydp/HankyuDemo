@@ -13,7 +13,7 @@ ocean/lcl 留 v2.0 占位。
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.models.air_freight_rate import AirFreightRate
 from app.models.air_surcharge import AirSurcharge
-from app.models.import_batch import ImportBatch, ImportBatchStatus
+from app.models.import_batch import ImportBatch, ImportBatchFileType, ImportBatchStatus
 from app.services.step1_rates.entities import RateSourceKind, Step1RateRow
 
 
@@ -98,6 +98,39 @@ class Step1RateRepository:
 
         rows = self._db.execute(stmt).all()
         return [self._surcharge_to_step1_row(sur, batch) for sur, batch in rows]
+
+    # ---------- effective_on 默认推断（R-01） ----------
+
+    def infer_default_effective_on(
+        self,
+        *,
+        file_type: ImportBatchFileType = ImportBatchFileType.air,
+    ) -> date:
+        """推断 effective_on 默认值（窗口感知）。
+
+        策略（按优先级）：
+        1. 查该 file_type 最新 active 批次（effective_to desc）：
+           - today ∈ [effective_from, effective_to] → 返回 today
+           - 否则返回 effective_to
+        2. 找不到 active 批次 → 返回 utcnow().date()
+        """
+        today = datetime.utcnow().date()
+        stmt = (
+            select(ImportBatch.effective_from, ImportBatch.effective_to)
+            .where(ImportBatch.status == ImportBatchStatus.active)
+            .where(ImportBatch.file_type == file_type)
+            .order_by(ImportBatch.effective_to.desc())
+            .limit(1)
+        )
+        row = self._db.execute(stmt).first()
+        if row is None:
+            return today
+        eff_from, eff_to = row
+        if eff_from is not None and eff_to is not None and eff_from <= today <= eff_to:
+            return today
+        if eff_to is not None:
+            return eff_to
+        return today
 
     # ---------- Ocean / LCL 占位 ----------
 

@@ -38,6 +38,7 @@ from app.services.step2_bidding.entities import (
     QuoteCandidate,
     RowStatus,
 )
+from app.models.import_batch import ImportBatchFileType
 from app.services.step2_bidding.rate_matcher import RateMatcher
 from app.services.step2_bidding.rate_repository import Step1RateRepository
 from app.services.step2_bidding import temp_files
@@ -97,7 +98,10 @@ def run_auto_fill(
     try:
         repo = Step1RateRepository(db)
         matcher = RateMatcher(repo)
-        eff_date = effective_on or datetime.utcnow().date()
+        if effective_on is not None:
+            eff_date = effective_on
+        else:
+            eff_date = repo.infer_default_effective_on(file_type=ImportBatchFileType.air)
         row_reports = _match_all_rows(parsed, matcher, eff_date)
 
         cost_path = bid_dir / f"cost_{input_path.stem}_{bid_id}.xlsx"

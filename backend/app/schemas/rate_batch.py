@@ -1,5 +1,5 @@
 """Step1 rate batch API schemas."""
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -105,6 +105,15 @@ class RateBatchActivateRequest(BaseModel):
     selected_row_indices: list[int] | None = None
 
 
+class ActivationErrorItem(BaseModel):
+    """Single error entry for failed activations."""
+
+    code: str
+    detail: str
+    row_index: int | None = None
+    record_kind: str | None = None
+
+
 class RateBatchActivateResponse(BaseModel):
     """Stable activation response shape for Step1 draft batches."""
 
@@ -117,5 +126,13 @@ class RateBatchActivateResponse(BaseModel):
     generated_at: datetime
     selected_rows: int
     diff_summary: RateBatchDiffSummary
-    is_stub: bool = True
+    is_stub: bool = False
     message: str | None = None
+
+    file_type: str | None = None
+    effective_from: date | None = None
+    effective_to: date | None = None
+    imported_detail: dict[str, int] = Field(default_factory=dict)
+    superseded_batch_ids: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    errors: list[ActivationErrorItem] = Field(default_factory=list)
