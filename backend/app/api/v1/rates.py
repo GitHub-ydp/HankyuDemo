@@ -10,7 +10,13 @@ from app.api.deps import get_db
 from app.core.config import settings
 from app.models import RateStatus
 from app.schemas.common import ApiResponse, PaginatedData
-from app.schemas.freight_rate import FreightRateDetail
+from app.schemas.freight_rate import (
+    AirSurchargeResponse,
+    AirWeeklyRateResponse,
+    FreightRateDetail,
+    LclRateResponse,
+    RateType,
+)
 from app.schemas.upload_log import ImportResultResponse, ParsePreviewResponse, ParsePreviewRow
 from app.services import freight_rate_service
 from app.services.rate_parser import (
@@ -28,21 +34,48 @@ _parse_cache: dict[str, dict] = {}
 
 # ========== 费率查询 ==========
 
-@router.get("", response_model=ApiResponse[PaginatedData[FreightRateDetail]])
+@router.get("")
 def list_rates(
+    rate_type: RateType | None = Query(None, description="运价类型 (ocean_fcl/ocean_ngb/air_weekly/air_surcharge/lcl)；缺省走老海运路径"),
     origin_port_id: int | None = Query(None),
     destination_port_id: int | None = Query(None),
     carrier_id: int | None = Query(None),
-    origin: str | None = Query(None, description="起运港关键词"),
-    destination: str | None = Query(None, description="目的港关键词"),
-    carrier: str | None = Query(None, description="船司关键词"),
+    origin: str | None = Query(None, description="起运港关键词（海运）"),
+    destination: str | None = Query(None, description="目的港关键词（海运）"),
+    carrier: str | None = Query(None, description="船司关键词（海运）"),
     status: str | None = Query(None, description="状态: draft/active/expired"),
+    origin_text: str | None = Query(None, description="起运地文本（空运）"),
+    destination_text: str | None = Query(None, description="目的地文本（空运）"),
+    airline_code: str | None = Query(None, description="航司代码（空运）"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
-    items, total = freight_rate_service.get_rates(
+    """按 rate_type 分派 5 tab。缺省时走老海运逻辑（向后兼容）。"""
+    if rate_type is None:
+        items, total = freight_rate_service.get_rates(
+            db,
+            origin_port_id=origin_port_id,
+            destination_port_id=destination_port_id,
+            carrier_id=carrier_id,
+            origin_keyword=origin,
+            destination_keyword=destination,
+            carrier_keyword=carrier,
+            status=status,
+            page=page,
+            page_size=page_size,
+        )
+        return ApiResponse(data=PaginatedData(
+            items=[FreightRateDetail.model_validate(i) for i in items],
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=(total + page_size - 1) // page_size,
+        ))
+
+    items, total = freight_rate_service.list_rates_by_type(
         db,
+        rate_type,
         origin_port_id=origin_port_id,
         destination_port_id=destination_port_id,
         carrier_id=carrier_id,
@@ -50,11 +83,26 @@ def list_rates(
         destination_keyword=destination,
         carrier_keyword=carrier,
         status=status,
+        origin_text=origin_text,
+        destination_text=destination_text,
+        airline_code=airline_code,
         page=page,
         page_size=page_size,
     )
+
+    if rate_type in (RateType.ocean_fcl, RateType.ocean_ngb):
+        serialized = [FreightRateDetail.model_validate(i) for i in items]
+    elif rate_type == RateType.air_weekly:
+        serialized = [AirWeeklyRateResponse.model_validate(i) for i in items]
+    elif rate_type == RateType.air_surcharge:
+        serialized = [AirSurchargeResponse.model_validate(i) for i in items]
+    elif rate_type == RateType.lcl:
+        serialized = [LclRateResponse.model_validate(i) for i in items]
+    else:
+        serialized = []
+
     return ApiResponse(data=PaginatedData(
-        items=[FreightRateDetail.model_validate(i) for i in items],
+        items=serialized,
         total=total,
         page=page,
         page_size=page_size,
@@ -70,23 +118,75 @@ def rate_stats(db: Session = Depends(get_db)):
 
 @router.get("/compare")
 def compare_rates(
-    origin_port_id: int = Query(..., description="起运港ID"),
-    destination_port_id: int = Query(..., description="目的港ID"),
+    rate_type: RateType | None = Query(None, description="比价类型 (ocean_fcl/ocean_ngb/air_weekly/lcl)；缺省走老海运路径"),
+    origin_port_id: int | None = Query(None, description="起运港ID（ocean/lcl）"),
+    destination_port_id: int | None = Query(None, description="目的港ID（ocean/lcl）"),
+    origin_text: str | None = Query(None, description="起运地文本（air_weekly）"),
+    destination_text: str | None = Query(None, description="目的地文本（air_weekly）"),
     db: Session = Depends(get_db),
 ):
-    """同航线多供应商比价"""
-    from app.services.port_service import get_port
-    origin = get_port(db, origin_port_id)
-    destination = get_port(db, destination_port_id)
-    if not origin or not destination:
-        return ApiResponse(code=400, message="无效的港口ID")
+    """同航线多供应商比价；按 rate_type 分派 4 tab，缺省海运保持向后兼容。"""
+    if rate_type is None:
+        if origin_port_id is None or destination_port_id is None:
+            return ApiResponse(code=400, message="origin_port_id / destination_port_id 必填")
+        from app.services.port_service import get_port
+        origin = get_port(db, origin_port_id)
+        destination = get_port(db, destination_port_id)
+        if not origin or not destination:
+            return ApiResponse(code=400, message="无效的港口ID")
 
-    rates = freight_rate_service.compare_rates(db, origin_port_id, destination_port_id)
+        rates = freight_rate_service.compare_rates(db, origin_port_id, destination_port_id)
+        return ApiResponse(data={
+            "origin": {"id": origin.id, "un_locode": origin.un_locode, "name_en": origin.name_en, "name_cn": origin.name_cn},
+            "destination": {"id": destination.id, "un_locode": destination.un_locode, "name_en": destination.name_en, "name_cn": destination.name_cn},
+            "rates": rates,
+            "total": len(rates),
+        })
+
+    if rate_type == RateType.air_surcharge:
+        return ApiResponse(code=400, message="air_surcharge 不支持比价")
+
+    try:
+        result = freight_rate_service.compare_rates_by_type(
+            db,
+            rate_type,
+            origin_port_id=origin_port_id,
+            destination_port_id=destination_port_id,
+            origin_text=origin_text,
+            destination_text=destination_text,
+        )
+    except ValueError as exc:
+        return ApiResponse(code=400, message=str(exc))
+
+    origin_obj = result["origin"]
+    destination_obj = result["destination"]
+    origin_payload = None
+    destination_payload = None
+    if hasattr(origin_obj, "un_locode"):
+        origin_payload = {
+            "id": origin_obj.id,
+            "un_locode": origin_obj.un_locode,
+            "name_en": origin_obj.name_en,
+            "name_cn": origin_obj.name_cn,
+        }
+    else:
+        origin_payload = origin_obj
+    if hasattr(destination_obj, "un_locode"):
+        destination_payload = {
+            "id": destination_obj.id,
+            "un_locode": destination_obj.un_locode,
+            "name_en": destination_obj.name_en,
+            "name_cn": destination_obj.name_cn,
+        }
+    else:
+        destination_payload = destination_obj
+
     return ApiResponse(data={
-        "origin": {"id": origin.id, "un_locode": origin.un_locode, "name_en": origin.name_en, "name_cn": origin.name_cn},
-        "destination": {"id": destination.id, "un_locode": destination.un_locode, "name_en": destination.name_en, "name_cn": destination.name_cn},
-        "rates": rates,
-        "total": len(rates),
+        "origin": origin_payload,
+        "destination": destination_payload,
+        "rates": result["rates"],
+        "total": result["total"],
+        "rate_type": rate_type.value,
     })
 
 

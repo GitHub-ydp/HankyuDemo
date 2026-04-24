@@ -273,6 +273,58 @@
     "statusExpired": "失効",
     "statusUpdateSuccess": "状態を更新しました",
     "statusUpdateFailed": "更新に失敗しました",
+    "tabsLabel": "運賃種別",
+    "tabs": {
+      "ocean_fcl": "海上 FCL",
+      "ocean_ngb": "海上 NGB",
+      "air_weekly": "空輸 週次",
+      "air_surcharge": "空輸 サーチャージ",
+      "lcl": "混載 LCL"
+    },
+    "cols": {
+      "air_weekly": {
+        "airline": "航空会社",
+        "service": "サービス",
+        "weekFrom": "週開始",
+        "weekTo": "週終了",
+        "day1": "1日目",
+        "day2": "2日目",
+        "day3": "3日目",
+        "day4": "4日目",
+        "day5": "5日目",
+        "day6": "6日目",
+        "day7": "7日目"
+      },
+      "air_surcharge": {
+        "airline": "航空会社",
+        "fromRegion": "発地域",
+        "area": "エリア",
+        "destScope": "着地域",
+        "mycMin": "MYC 最低",
+        "mycPerKg": "MYC /kg",
+        "mscMin": "MSC 最低",
+        "mscPerKg": "MSC /kg",
+        "effective": "適用開始日"
+      },
+      "lcl": {
+        "perCbm": "/ CBM",
+        "perTon": "/ TON",
+        "lss": "LSS",
+        "ebs": "EBS",
+        "cic": "CIC",
+        "amsAciEns": "AMS/ACI/ENS",
+        "sailingDay": "出港日",
+        "via": "経由",
+        "validity": "有効期間"
+      }
+    },
+    "originText": "出発地",
+    "destinationText": "到着地",
+    "airlineCode": "航空会社コード",
+    "empty": {
+      "title": "該当運賃がありません",
+      "hint": "「運賃取込」から取り込んでください"
+    },
     "sources": {
       "excel": "Excel",
       "pdf": "PDF",
@@ -289,11 +341,22 @@
     "selectDestination": "仕向地を選択",
     "compareBtn": "比較する",
     "missingPorts": "積地と仕向地を選択してください",
+    "missingAirports": "出発地と到着地を入力してください",
     "noData": "このレーンには運賃データがありません",
     "totalQuotes": "{{count}} 件の見積",
     "direct": "直行",
     "transshipment": "経由",
-    "expiryDate": "終了日"
+    "expiryDate": "終了日",
+    "tabsLabel": "比較種別",
+    "tabs": {
+      "ocean_fcl": "海上 FCL",
+      "ocean_ngb": "海上 NGB",
+      "air_weekly": "空輸 週次",
+      "lcl": "混載 LCL"
+    },
+    "ngbTag": "NGB 半月更新",
+    "airOriginPlaceholder": "空港コード (例: PVG, 前方一致)",
+    "airDestinationPlaceholder": "空港コード (例: LAX)"
   },
   "upload": {
     "title": "運賃データ取込",

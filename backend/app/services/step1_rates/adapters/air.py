@@ -260,7 +260,7 @@ class AirAdapter:
                     record_kind="air_weekly",
                     carrier_name=None,
                     carrier_id=None,
-                    airline_code=None,
+                    airline_code="/".join(airline_codes) if airline_codes else None,
                     service_desc=service_text,
                     origin_port_id=None,
                     origin_port_name=self._DEFAULT_ORIGIN,

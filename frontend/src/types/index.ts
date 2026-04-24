@@ -148,11 +148,119 @@ export interface CompareRateItem {
   status?: string;
 }
 
+// 海运比价别名（与后端 OceanCompareItem 对齐）
+export type OceanCompareItem = CompareRateItem;
+
+// 5 tab 运价类型（列表）
+export type RateType =
+  | 'ocean_fcl'
+  | 'ocean_ngb'
+  | 'air_weekly'
+  | 'air_surcharge'
+  | 'lcl';
+
+// 4 tab 比价类型（不含 air_surcharge）
+export type CompareRateType = 'ocean_fcl' | 'ocean_ngb' | 'air_weekly' | 'lcl';
+
+// 空运周价
+export interface AirWeeklyRate {
+  id: number;
+  origin: string;
+  destination: string;
+  airline_code?: string | null;
+  service_desc?: string | null;
+  effective_week_start?: string | null;
+  effective_week_end?: string | null;
+  price_day1?: string | null;
+  price_day2?: string | null;
+  price_day3?: string | null;
+  price_day4?: string | null;
+  price_day5?: string | null;
+  price_day6?: string | null;
+  price_day7?: string | null;
+  currency: string;
+  remark?: string | null;
+  batch_id: string;
+}
+
+// 空运附加费
+export interface AirSurchargeRate {
+  id: number;
+  airline_code?: string | null;
+  from_region?: string | null;
+  area?: string | null;
+  destination_scope?: string | null;
+  myc_min?: string | null;
+  myc_fee_per_kg?: string | null;
+  msc_min?: string | null;
+  msc_fee_per_kg?: string | null;
+  effective_date?: string | null;
+  currency: string;
+  remarks?: string | null;
+  batch_id: string;
+}
+
+// 拼箱
+export interface LclRate {
+  id: number;
+  origin_port?: Port | null;
+  destination_port?: Port | null;
+  freight_per_cbm?: string | null;
+  freight_per_ton?: string | null;
+  currency: string;
+  lss?: string | null;
+  ebs?: string | null;
+  cic?: string | null;
+  ams_aci_ens?: string | null;
+  sailing_day?: string | null;
+  via?: string | null;
+  transit_time_text?: string | null;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  batch_id: string;
+}
+
+// 空运周价比价条目
+export interface AirWeeklyCompareItem {
+  rate_id: number;
+  airline_code?: string | null;
+  service_desc?: string | null;
+  effective_week_start?: string | null;
+  effective_week_end?: string | null;
+  price_day1?: string | null;
+  price_day2?: string | null;
+  price_day3?: string | null;
+  price_day4?: string | null;
+  price_day5?: string | null;
+  price_day6?: string | null;
+  price_day7?: string | null;
+  currency: string;
+  remark?: string | null;
+}
+
+// 拼箱比价条目
+export interface LclCompareItem {
+  rate_id: number;
+  freight_per_cbm?: string | null;
+  freight_per_ton?: string | null;
+  currency: string;
+  lss?: string | null;
+  ebs?: string | null;
+  cic?: string | null;
+  ams_aci_ens?: string | null;
+  sailing_day?: string | null;
+  via?: string | null;
+  transit_time_text?: string | null;
+  valid_from?: string | null;
+  valid_to?: string | null;
+}
+
 export interface CompareResult {
-  origin: Port;
-  destination: Port;
-  rates: CompareRateItem[];
+  origin: Port | string;
+  destination: Port | string;
+  rates: OceanCompareItem[] | AirWeeklyCompareItem[] | LclCompareItem[];
   total: number;
+  rate_type?: CompareRateType;
 }
 
 // ============ Step1 Rate Batches ============

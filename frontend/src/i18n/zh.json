@@ -273,6 +273,58 @@
     "statusExpired": "已过期",
     "statusUpdateSuccess": "状态更新成功",
     "statusUpdateFailed": "更新失败",
+    "tabsLabel": "运价类型",
+    "tabs": {
+      "ocean_fcl": "海运 FCL",
+      "ocean_ngb": "海运 NGB",
+      "air_weekly": "空运周价",
+      "air_surcharge": "空运附加费",
+      "lcl": "拼箱 LCL"
+    },
+    "cols": {
+      "air_weekly": {
+        "airline": "航司",
+        "service": "服务",
+        "weekFrom": "周起",
+        "weekTo": "周止",
+        "day1": "第1日",
+        "day2": "第2日",
+        "day3": "第3日",
+        "day4": "第4日",
+        "day5": "第5日",
+        "day6": "第6日",
+        "day7": "第7日"
+      },
+      "air_surcharge": {
+        "airline": "航司",
+        "fromRegion": "起运区域",
+        "area": "区域",
+        "destScope": "目的地范围",
+        "mycMin": "MYC 最低",
+        "mycPerKg": "MYC /kg",
+        "mscMin": "MSC 最低",
+        "mscPerKg": "MSC /kg",
+        "effective": "生效日"
+      },
+      "lcl": {
+        "perCbm": "/ CBM",
+        "perTon": "/ TON",
+        "lss": "LSS",
+        "ebs": "EBS",
+        "cic": "CIC",
+        "amsAciEns": "AMS/ACI/ENS",
+        "sailingDay": "开船日",
+        "via": "中转",
+        "validity": "有效期"
+      }
+    },
+    "originText": "起运地",
+    "destinationText": "目的地",
+    "airlineCode": "航司代码",
+    "empty": {
+      "title": "暂无此类运价",
+      "hint": "请前往「运价导入」上传文件"
+    },
     "sources": {
       "excel": "Excel",
       "pdf": "PDF",
@@ -289,11 +341,22 @@
     "selectDestination": "选择目的港",
     "compareBtn": "查询比价",
     "missingPorts": "请选择起运港和目的港",
+    "missingAirports": "请输入起运地和目的地",
     "noData": "该航线暂无运价数据",
     "totalQuotes": "共 {{count}} 条报价",
     "direct": "直达",
     "transshipment": "中转",
-    "expiryDate": "到期日"
+    "expiryDate": "到期日",
+    "tabsLabel": "比价类型",
+    "tabs": {
+      "ocean_fcl": "海运 FCL",
+      "ocean_ngb": "海运 NGB",
+      "air_weekly": "空运周价",
+      "lcl": "拼箱 LCL"
+    },
+    "ngbTag": "NGB 半月更新",
+    "airOriginPlaceholder": "输入机场三字码（支持前缀，如 PVG）",
+    "airDestinationPlaceholder": "输入机场三字码（如 LAX）"
   },
   "upload": {
     "title": "运价数据导入",

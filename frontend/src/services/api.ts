@@ -76,9 +76,21 @@ export const rateApi = {
     api.get<unknown, ApiResponse>(`/rates/${id}`),
   stats: () =>
     api.get<unknown, ApiResponse>('/rates/stats'),
-  compare: (originPortId: number, destinationPortId: number) =>
+  compare: (params: {
+    rateType?: string;
+    originPortId?: number;
+    destinationPortId?: number;
+    originText?: string;
+    destinationText?: string;
+  }) =>
     api.get<unknown, ApiResponse>('/rates/compare', {
-      params: { origin_port_id: originPortId, destination_port_id: destinationPortId },
+      params: {
+        rate_type: params.rateType,
+        origin_port_id: params.originPortId,
+        destination_port_id: params.destinationPortId,
+        origin_text: params.originText,
+        destination_text: params.destinationText,
+      },
     }),
   updateStatus: (id: number, status: string) =>
     api.put<unknown, ApiResponse>(`/rates/${id}/status`, null, { params: { status } }),
@@ -202,26 +214,6 @@ export const biddingApi = {
   },
   downloadUrl: (token: string) =>
     `${api.defaults.baseURL}/bidding/download/${token}`,
-};
-
-// --- PKG 入札包 ---
-export const pkgApi = {
-  upload: (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post<unknown, ApiResponse>('/pkg/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 60000,
-    });
-  },
-  fill: (sessionId: string, overwrite = false) =>
-    api.post<unknown, ApiResponse>(`/pkg/fill/${sessionId}`, null, {
-      params: { overwrite },
-    }),
-  downloadUrl: (sessionId: string) =>
-    `${api.defaults.baseURL}/pkg/download/${sessionId}`,
-  rates: () =>
-    api.get<unknown, ApiResponse>('/pkg/rates'),
 };
 
 export default api;

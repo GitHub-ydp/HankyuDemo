@@ -47,7 +47,7 @@ def to_air_freight_rate(record: ParsedRateRecord, batch_id: uuid.UUID) -> AirFre
     return AirFreightRate(
         origin=record.origin_port_name or "",
         destination=record.destination_port_name or "",
-        airline_code=None,
+        airline_code=record.airline_code,
         service_desc=record.service_desc,
         effective_week_start=record.effective_week_start,
         effective_week_end=record.effective_week_end,

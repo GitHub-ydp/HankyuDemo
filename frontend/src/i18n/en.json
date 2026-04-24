@@ -273,6 +273,58 @@
     "statusExpired": "Expired",
     "statusUpdateSuccess": "Status updated",
     "statusUpdateFailed": "Update failed",
+    "tabsLabel": "Rate Type",
+    "tabs": {
+      "ocean_fcl": "Ocean FCL",
+      "ocean_ngb": "Ocean NGB",
+      "air_weekly": "Air Weekly",
+      "air_surcharge": "Air Surcharge",
+      "lcl": "LCL"
+    },
+    "cols": {
+      "air_weekly": {
+        "airline": "Airline",
+        "service": "Service",
+        "weekFrom": "Week From",
+        "weekTo": "Week To",
+        "day1": "Day 1",
+        "day2": "Day 2",
+        "day3": "Day 3",
+        "day4": "Day 4",
+        "day5": "Day 5",
+        "day6": "Day 6",
+        "day7": "Day 7"
+      },
+      "air_surcharge": {
+        "airline": "Airline",
+        "fromRegion": "From",
+        "area": "Area",
+        "destScope": "Destination",
+        "mycMin": "MYC Min",
+        "mycPerKg": "MYC /kg",
+        "mscMin": "MSC Min",
+        "mscPerKg": "MSC /kg",
+        "effective": "Effective"
+      },
+      "lcl": {
+        "perCbm": "/ CBM",
+        "perTon": "/ TON",
+        "lss": "LSS",
+        "ebs": "EBS",
+        "cic": "CIC",
+        "amsAciEns": "AMS/ACI/ENS",
+        "sailingDay": "Sailing Day",
+        "via": "Via",
+        "validity": "Validity"
+      }
+    },
+    "originText": "Origin",
+    "destinationText": "Destination",
+    "airlineCode": "Airline Code",
+    "empty": {
+      "title": "No rates of this type yet",
+      "hint": "Please upload via Rate Import"
+    },
     "sources": {
       "excel": "Excel",
       "pdf": "PDF",
@@ -289,11 +341,22 @@
     "selectDestination": "Select destination port",
     "compareBtn": "Compare",
     "missingPorts": "Please select both origin and destination ports",
+    "missingAirports": "Please enter origin and destination airports",
     "noData": "No rate data is available for this lane",
     "totalQuotes": "{{count}} quotes",
     "direct": "Direct",
     "transshipment": "Transshipment",
-    "expiryDate": "Expiry Date"
+    "expiryDate": "Expiry Date",
+    "tabsLabel": "Compare Type",
+    "tabs": {
+      "ocean_fcl": "Ocean FCL",
+      "ocean_ngb": "Ocean NGB",
+      "air_weekly": "Air Weekly",
+      "lcl": "LCL"
+    },
+    "ngbTag": "NGB Bi-Weekly",
+    "airOriginPlaceholder": "Airport code (e.g. PVG, prefix OK)",
+    "airDestinationPlaceholder": "Airport code (e.g. LAX)"
   },
   "upload": {
     "title": "Rate Data Import",

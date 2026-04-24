@@ -13,7 +13,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models import FreightRate, RateStatus
+from app.models import FreightRate, ImportBatch, ImportBatchStatus, RateStatus
 from app.services.email_text_parser import parse_email_text
 from app.services.step1_rates import activator
 from app.services.step1_rates.entities import ParsedRateBatch, ParsedRateRecord, Step1FileType
@@ -120,21 +120,82 @@ def create_draft_batch_from_upload(
 
 def list_rate_batches(
     *,
+    db: Session | None = None,
     page: int = 1,
     page_size: int = 20,
     batch_status: str | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
-    """List draft rate batches from the in-memory store."""
-    items = list(_draft_batches.values())
+    """合并内存 _draft_batches 与 DB import_batches 表，分页返回批次列表。"""
+    memory_items: list[dict[str, Any]] = [
+        serialize_summary(draft) for draft in _draft_batches.values()
+    ]
+    memory_ids = {item["batch_id"] for item in memory_items}
+
+    db_items: list[dict[str, Any]] = []
+    if db is not None:
+        db_rows = (
+            db.query(ImportBatch)
+            .order_by(ImportBatch.imported_at.desc())
+            .all()
+        )
+        for row in db_rows:
+            if str(row.batch_id) in memory_ids:
+                continue
+            db_items.append(_serialize_import_batch_row(row))
+
+    merged = memory_items + db_items
+
     if batch_status:
         normalized_status = batch_status.strip().lower()
-        items = [item for item in items if item.batch_status == normalized_status]
+        merged = [item for item in merged if item["batch_status"] == normalized_status]
 
-    items.sort(key=lambda item: item.created_at, reverse=True)
-    total = len(items)
+    def _sort_key(item: dict[str, Any]) -> datetime:
+        created = item.get("created_at")
+        if isinstance(created, datetime):
+            if created.tzinfo is None:
+                return created.replace(tzinfo=timezone.utc)
+            return created
+        return datetime.min.replace(tzinfo=timezone.utc)
+
+    merged.sort(key=_sort_key, reverse=True)
+    total = len(merged)
     start = (page - 1) * page_size
     end = start + page_size
-    return [serialize_summary(item) for item in items[start:end]], total
+    return merged[start:end], total
+
+
+def _serialize_import_batch_row(row: ImportBatch) -> dict[str, Any]:
+    """把 ImportBatch DB 行映射成与 serialize_summary 对齐的 dict。"""
+    status_value = (
+        "active"
+        if row.status == ImportBatchStatus.active
+        else row.status.value
+    )
+    activation_status = (
+        "activated"
+        if row.status == ImportBatchStatus.active
+        else "not_activated"
+    )
+    imported_at = row.imported_at
+    if isinstance(imported_at, datetime) and imported_at.tzinfo is None:
+        imported_at = imported_at.replace(tzinfo=timezone.utc)
+    return {
+        "batch_id": str(row.batch_id),
+        "file_name": row.source_file or "",
+        "source_type": "excel",
+        "batch_status": status_value,
+        "activation_status": activation_status,
+        "adapter_key": row.file_type.value,
+        "parser_hint": None,
+        "carrier_code": None,
+        "total_rows": row.row_count,
+        "preview_count": 0,
+        "warnings": [],
+        "sheets": [],
+        "storage_mode": "db",
+        "created_at": imported_at,
+        "updated_at": imported_at,
+    }
 
 
 def get_rate_batch_detail(batch_id: str) -> dict[str, Any] | None:

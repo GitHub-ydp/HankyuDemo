@@ -49,9 +49,11 @@ def list_rate_batches(
     batch_status: str | None = Query(None, description="Batch status filter"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
+    db: Session = Depends(get_db),
 ):
-    """List Step1 draft batches."""
+    """List Step1 draft batches (合并内存 draft + DB import_batches)。"""
     items, total = rate_batch_service.list_rate_batches(
+        db=db,
         page=page,
         page_size=page_size,
         batch_status=batch_status,
