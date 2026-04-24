@@ -33,6 +33,11 @@ async def upload_rate_batch(
             parser_hint=parser_hint,
         )
         return ApiResponse(data=RateBatchDetail.model_validate(payload))
+    except rate_batch_service.NoRatesFoundError:
+        return ApiResponse(
+            code=422,
+            message="NO_RATES_IN_FILE",
+        )
     except ValueError as exc:
         return ApiResponse(code=400, message=str(exc))
     except Exception as exc:  # noqa: BLE001

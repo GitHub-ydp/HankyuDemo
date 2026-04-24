@@ -10,7 +10,6 @@ import { AuthProvider } from './contexts/AuthContext';
 import Dashboard from './pages/Dashboard';
 import RateList from './pages/RateList';
 import RateUpload from './pages/RateUpload';
-import RateBatches from './pages/RateBatches';
 import RateCompare from './pages/RateCompare';
 import CarrierList from './pages/CarrierList';
 import EmailSearch from './pages/EmailSearch';
@@ -56,7 +55,7 @@ export default function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/pkg" element={<PkgAutoFill />} />
                 <Route path="/rates" element={<RateList />} />
-                <Route path="/batches" element={<RateBatches />} />
+                <Route path="/batches" element={<Navigate to="/upload" replace />} />
                 <Route path="/upload" element={<RateUpload />} />
                 <Route path="/compare" element={<RateCompare />} />
                 <Route path="/carriers" element={<CarrierList />} />

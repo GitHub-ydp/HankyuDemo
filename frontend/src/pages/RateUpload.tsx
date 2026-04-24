@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { message } from 'antd';
 import Icon from '../components/Icon';
 import type { IconName } from '../components/Icon';
-import { aiParseApi, rateApi } from '../services/api';
-import type { ParsePreviewRow } from '../types';
+import BatchesPanel from '../components/BatchesPanel';
+import { aiParseApi, rateApi, rateBatchApi } from '../services/api';
+import type { ParsePreviewRow, RateBatchDetail } from '../types';
 
 interface InboxImageMeta {
   index: number;
@@ -236,6 +237,8 @@ export default function RateUpload() {
   const [parsingAttachKey, setParsingAttachKey] = useState('');
   const [localMsgItem, setLocalMsgItem] = useState<InboxEmailItem | null>(null);
   const [msgUploading, setMsgUploading] = useState(false);
+  const [batchesReloadKey, setBatchesReloadKey] = useState(0);
+  const [focusBatchId, setFocusBatchId] = useState<string | null>(null);
 
   const handleParseSuccess = (res: unknown) => {
     const envelope = res as { code?: number; message?: string; data?: ParseResult & { message?: string } };
@@ -257,8 +260,27 @@ export default function RateUpload() {
   const handleExcelUpload = async (file: File) => {
     setLoading(true);
     try {
-      const res = await rateApi.uploadAndParse(file);
-      handleParseSuccess(res);
+      const res = await rateBatchApi.upload(file);
+      const envelope = res as { code?: number; message?: string; data?: RateBatchDetail };
+      if (envelope.code === 422 && envelope.message === 'NO_RATES_IN_FILE') {
+        message.warning(t('upload.noRatesFound'));
+        return;
+      }
+      if (envelope.code !== 0 && envelope.code !== undefined) {
+        message.error(envelope.message || t('upload.uploadFailed'));
+        return;
+      }
+      const data = envelope.data;
+      if (!data) return;
+      if (data.source_type === 'excel_ai_fallback') {
+        message.success(t('upload.aiFallbackUsed', { rows: data.total_rows }));
+      } else {
+        message.success(
+          t('batches.uploadSuccess', { rows: data.total_rows, parser: data.adapter_key || 'auto' })
+        );
+      }
+      setFocusBatchId(data.batch_id);
+      setBatchesReloadKey((k) => k + 1);
     } catch (error) {
       message.error(error instanceof Error ? error.message : t('upload.uploadFailed'));
     } finally {
@@ -793,6 +815,8 @@ export default function RateUpload() {
           )}
         </div>
       </div>
+
+      <BatchesPanel reloadKey={batchesReloadKey} focusBatchId={focusBatchId} />
     </div>
   );
 }

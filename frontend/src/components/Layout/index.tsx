@@ -17,7 +17,6 @@ interface NavEntry {
 const OPS_NAV: NavEntry[] = [
   { to: '/', icon: 'dashboard', labelKey: 'menu.dashboard' },
   { to: '/rates', icon: 'rates', labelKey: 'menu.rates' },
-  { to: '/batches', icon: 'sparkles', labelKey: 'menu.batches' },
   { to: '/upload', icon: 'import', labelKey: 'menu.upload' },
   { to: '/compare', icon: 'compare', labelKey: 'menu.compare' },
   { to: '/pkg', icon: 'package', labelKey: 'menu.pkg' },

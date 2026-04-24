@@ -14,17 +14,25 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models import FreightRate, RateStatus
+from app.services.email_text_parser import parse_email_text
 from app.services.step1_rates import activator
-from app.services.step1_rates.entities import ParsedRateRecord
+from app.services.step1_rates.entities import ParsedRateBatch, ParsedRateRecord, Step1FileType
+from app.services.step1_rates.normalizers import legacy_payload_to_parsed_batch
 from app.services.step1_rates.service import (
     DEFAULT_RATE_ADAPTER_REGISTRY,
     parse_excel_file,
 )
+import openpyxl
 
 SUPPORTED_BATCH_FILE_EXTENSIONS = {".xlsx", ".xls", ".csv"}
 PREVIEW_LIMIT = 50
 DIFF_ITEM_LIMIT = 20
 STORAGE_MODE = "memory_stub"
+AI_FALLBACK_SOURCE_TYPE = "excel_ai_fallback"
+
+
+class NoRatesFoundError(ValueError):
+    """Raised when AI fallback cannot extract any rate rows from the Excel."""
 
 
 @dataclass(slots=True)
@@ -77,6 +85,7 @@ def create_draft_batch_from_upload(
     saved_path = upload_dir / saved_name
     saved_path.write_bytes(content)
 
+    ai_fallback_used = False
     try:
         parse_result = parse_excel_file(
             str(saved_path),
@@ -84,10 +93,17 @@ def create_draft_batch_from_upload(
             file_name=file_name,
             parser_hint=parser_hint,
         )
-    except LookupError as exc:
-        saved_path.unlink(missing_ok=True)
-        available = ", ".join(DEFAULT_RATE_ADAPTER_REGISTRY.keys())
-        raise ValueError(f"{exc}. Available parser_hint values: {available}") from exc
+    except LookupError:
+        # 第 2 段：AI 兜底
+        try:
+            parse_result = _try_ai_fallback_on_excel(saved_path, file_name, db)
+        except NoRatesFoundError:
+            saved_path.unlink(missing_ok=True)
+            raise
+        except Exception:
+            saved_path.unlink(missing_ok=True)
+            raise
+        ai_fallback_used = True
     except Exception:
         saved_path.unlink(missing_ok=True)
         raise
@@ -96,6 +112,7 @@ def create_draft_batch_from_upload(
         parse_result=parse_result,
         parser_hint=parser_hint,
         file_path=str(saved_path),
+        source_type_override=AI_FALLBACK_SOURCE_TYPE if ai_fallback_used else None,
     )
     _draft_batches[draft.batch_id] = draft
     return serialize_detail(draft)
@@ -310,6 +327,7 @@ def _build_draft_batch(
     parse_result: Any,
     parser_hint: str | None,
     file_path: str,
+    source_type_override: str | None = None,
 ) -> DraftRateBatch:
     legacy_payload = parse_result.to_legacy_dict()
     all_rows = _collect_rows(legacy_payload)
@@ -326,7 +344,7 @@ def _build_draft_batch(
     return DraftRateBatch(
         batch_id=legacy_payload["batch_id"],
         file_name=legacy_payload.get("file_name") or Path(file_path).name,
-        source_type=legacy_payload.get("source_type", "excel"),
+        source_type=source_type_override or legacy_payload.get("source_type", "excel"),
         batch_status="draft",
         activation_status="not_activated",
         adapter_key=getattr(parse_result, "adapter_key", None),
@@ -526,3 +544,44 @@ def _stringify(value: Any) -> str | None:
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _try_ai_fallback_on_excel(
+    saved_path: Path, file_name: str, db: Session
+) -> ParsedRateBatch:
+    """第 2 段：读 Excel 纯文本 → parse_email_text → ParsedRateBatch。
+
+    AI 抓不到任何行时抛 NoRatesFoundError（第 3 段）。
+    """
+    try:
+        text = _extract_excel_text(saved_path)
+    except Exception as exc:  # noqa: BLE001
+        raise NoRatesFoundError(
+            f"Failed to read Excel text from {file_name}: {exc}"
+        ) from exc
+    legacy = parse_email_text(text, db)
+    if not legacy.get("parsed_rows"):
+        raise NoRatesFoundError(
+            f"AI fallback found no rates in {file_name}"
+        )
+    return legacy_payload_to_parsed_batch(
+        legacy,
+        file_type=Step1FileType.ocean,
+        adapter_key=None,
+        source_file=file_name,
+    )
+
+
+def _extract_excel_text(path: Path, max_chars: int = 20000) -> str:
+    wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+    lines: list[str] = []
+    for sheet in wb.worksheets:
+        lines.append(f"# Sheet: {sheet.title}")
+        for row in sheet.iter_rows(values_only=True):
+            cells = [str(c) for c in row if c is not None and str(c).strip()]
+            if cells:
+                lines.append(" | ".join(cells))
+        if sum(len(l) for l in lines) > max_chars:
+            break
+    wb.close()
+    return "\n".join(lines)[:max_chars]
