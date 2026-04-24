@@ -5,6 +5,7 @@ from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import FreightRate, Port, Carrier, RateStatus
+from app.models.air_freight_rate import AirFreightRate
 
 
 def get_rates(
@@ -169,21 +170,50 @@ def delete_rate(db: Session, rate_id: int) -> bool:
 
 
 def get_rate_stats(db: Session) -> dict:
-    """费率统计信息"""
-    total = db.query(FreightRate).count()
-    active = db.query(FreightRate).filter(FreightRate.status == RateStatus.active).count()
-    draft = db.query(FreightRate).filter(FreightRate.status == RateStatus.draft).count()
-    carriers = db.query(func.count(func.distinct(FreightRate.carrier_id))).scalar()
-    routes = db.query(
-        func.count(func.distinct(
-            func.concat(FreightRate.origin_port_id, '-', FreightRate.destination_port_id)
-        ))
-    ).scalar()
+    """费率统计信息（海运 FreightRate + 空运 AirFreightRate 合并）。"""
+    # 海运 FreightRate 侧（Ocean / Ocean-NGB / 旧导入链路）
+    ocean_total = db.query(FreightRate).count()
+    ocean_active = (
+        db.query(FreightRate).filter(FreightRate.status == RateStatus.active).count()
+    )
+    ocean_draft = (
+        db.query(FreightRate).filter(FreightRate.status == RateStatus.draft).count()
+    )
+    ocean_carriers = db.query(func.count(func.distinct(FreightRate.carrier_id))).scalar() or 0
+    ocean_routes = (
+        db.query(
+            func.count(
+                func.distinct(
+                    func.concat(
+                        FreightRate.origin_port_id, "-", FreightRate.destination_port_id
+                    )
+                )
+            )
+        ).scalar()
+        or 0
+    )
 
+    # 空运 AirFreightRate 侧 — 无 status 字段，整表视为 active
+    air_total = db.query(AirFreightRate).count()
+    air_carriers = (
+        db.query(func.count(func.distinct(AirFreightRate.airline_code))).scalar() or 0
+    )
+    air_routes = (
+        db.query(
+            func.count(
+                func.distinct(
+                    func.concat(AirFreightRate.origin, "-", AirFreightRate.destination)
+                )
+            )
+        ).scalar()
+        or 0
+    )
+
+    # 注：海/空运承运商可能重叠但跨表无法精确去重，此处为合计估算（Demo 可接受）
     return {
-        "total_rates": total,
-        "active_rates": active,
-        "draft_rates": draft,
-        "carriers_count": carriers or 0,
-        "routes_count": routes or 0,
+        "total_rates": ocean_total + air_total,
+        "active_rates": ocean_active + air_total,
+        "draft_rates": ocean_draft,
+        "carriers_count": ocean_carriers + air_carriers,
+        "routes_count": ocean_routes + air_routes,
     }

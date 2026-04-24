@@ -252,7 +252,11 @@ export default function RateUpload() {
       if (data.warnings?.length) message.warning(data.warnings[0]);
       return;
     }
-    setParseResult(data);
+    setParseResult({
+      ...data,
+      warnings: data.warnings || [],
+      preview_rows: data.preview_rows || [],
+    });
     setStep(1);
     message.success(t('upload.parseCompleted', { count: data.total_rows }));
   };
@@ -420,6 +424,11 @@ export default function RateUpload() {
     setStep(0);
     setParseResult(null);
     setImportResult(null);
+    setEmailText('');
+    setImageContext('');
+    setLocalMsgItem(null);
+    setParsingKey('');
+    setParsingAttachKey('');
   };
 
   const sourceTagClass = (type: string) =>

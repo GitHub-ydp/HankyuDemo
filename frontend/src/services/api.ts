@@ -27,7 +27,23 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    const message = error.response?.data?.message || error.response?.data?.detail || error.message || '请求失败';
+    const raw = error.response?.data ?? {};
+    const detail = raw.detail;
+    let detailMsg: string | undefined;
+    if (Array.isArray(detail)) {
+      // FastAPI 422 校验错误：detail 是 [{loc, msg, type}, ...]，取每条 msg 连接
+      detailMsg = detail
+        .map((e: { msg?: string; loc?: unknown[] }) => {
+          if (typeof e?.msg !== 'string') return '';
+          const loc = Array.isArray(e.loc) ? e.loc.slice(-1).join('.') : '';
+          return loc ? `${loc}: ${e.msg}` : e.msg;
+        })
+        .filter(Boolean)
+        .join('; ');
+    } else if (typeof detail === 'string') {
+      detailMsg = detail;
+    }
+    const message = raw.message || detailMsg || error.message || '请求失败';
     return Promise.reject(new Error(message));
   }
 );
@@ -71,15 +87,6 @@ export const rateApi = {
   delete: (id: number) =>
     api.delete<unknown, ApiResponse>(`/rates/${id}`),
 
-  // 上传与解析
-  uploadAndParse: (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post<unknown, ApiResponse>('/rates/upload/parse', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 120000,
-    });
-  },
   confirmImport: (batchId: string) =>
     api.post<unknown, ApiResponse>(`/rates/upload/confirm`, null, {
       params: { batch_id: batchId },

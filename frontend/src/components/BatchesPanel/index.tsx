@@ -105,13 +105,13 @@ function DetailDrawer({ batchId, onClose, onActivated }: DetailDrawerProps) {
           return;
         }
         if (status === 'empty_batch') {
-          message.warning(envelope.data.message || '该批次无可入库数据');
+          message.warning(envelope.data.message || t('batches.emptyBatchMsg'));
           setActivate(envelope.data);
           setSection('activate');
           return;
         }
         if (status === 'already_active') {
-          message.info(envelope.data.message || '该批次已采用');
+          message.info(envelope.data.message || t('batches.alreadyActiveMsg'));
           setActivate(envelope.data);
           setSection('activate');
           return;
@@ -649,7 +649,7 @@ export default function BatchesPanel({ reloadKey, focusBatchId, onOpenDetail }: 
         {total > 0 && (
           <div className="pager">
             <div className="pg-total">
-              共 {total} 条 · 第 {page} / {totalPages} 页
+              {t('batches.pageSummary', { total, page, totalPages })}
             </div>
             <button disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
               ‹

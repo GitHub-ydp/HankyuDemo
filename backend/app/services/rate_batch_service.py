@@ -322,6 +322,34 @@ def serialize_detail(draft: DraftRateBatch) -> dict[str, Any]:
     return payload
 
 
+def _summarize_carriers_from_records(records: list[ParsedRateRecord]) -> str | None:
+    """当 adapter 没在 metadata 填 batch 级 carrier_code 时，从行级 carrier_name 聚合成摘要。
+
+    单一承运商：「SITC」；两家：「SITC/SINO」；多于两家：「SITC/SINO +3」。
+    """
+    if not records:
+        return None
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for rec in records:
+        name = (getattr(rec, "carrier_name", "") or "").strip()
+        if not name:
+            continue
+        key = name.upper()
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(name)
+    if not ordered:
+        return None
+    if len(ordered) == 1:
+        return ordered[0]
+    head = "/".join(ordered[:2])
+    if len(ordered) > 2:
+        return f"{head} +{len(ordered) - 2}"
+    return head
+
+
 def _build_draft_batch(
     *,
     parse_result: Any,
@@ -349,7 +377,8 @@ def _build_draft_batch(
         activation_status="not_activated",
         adapter_key=getattr(parse_result, "adapter_key", None),
         parser_hint=parser_hint,
-        carrier_code=legacy_payload.get("carrier_code"),
+        carrier_code=legacy_payload.get("carrier_code")
+        or _summarize_carriers_from_records(parse_records),
         total_rows=legacy_payload.get("total_rows", len(all_rows)),
         warnings=list(legacy_payload.get("warnings", [])),
         sheets=_extract_sheets(legacy_payload),

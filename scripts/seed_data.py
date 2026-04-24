@@ -38,6 +38,8 @@ PORTS = [
     ("CNYTN", "Yantian", "盐田", "China", "East Asia"),
     ("CNDLC", "Dalian", "大连", "China", "East Asia"),
     ("CNTSN", "Tianjin", "天津", "China", "East Asia"),
+    ("CNZAP", "Zhapu", "乍浦", "China", "East Asia"),
+    ("CNZOS", "Zhoushan", "舟山", "China", "East Asia"),
 
     # 韩国
     ("KRPUS", "Busan", "釜山", "South Korea", "East Asia"),
