@@ -158,7 +158,101 @@
     "pkg": "PKG 自动填充",
     "emails": "邮件分析",
     "dataGroup": "基础数据",
-    "carriers": "承运商管理"
+    "carriers": "承运商管理",
+    "settings": "系统设置"
+  },
+  "settings": {
+    "title": "系统设置",
+    "subtitle": "SYSTEM SETTINGS · AI 参数配置",
+    "menu": {
+      "settings": "系统设置"
+    },
+    "section": {
+      "provider": "AI 提供方",
+      "providerDesc": "当前请求走哪个 AI 后端；切换后下一次 AI 调用生效。",
+      "vllm": "vLLM 连接",
+      "vllmDesc": "本地 / 自建 vLLM 服务，OpenAI 兼容端点。",
+      "anthropic": "Anthropic 连接",
+      "anthropicDesc": "Claude API 配置，用于回滚或对比。",
+      "tokens": "Token 超参",
+      "tokensDesc": "控制 AI 回复长度；vLLM 有死守上限，Anthropic 窗口较大。",
+      "image": "图片压缩",
+      "imageDesc": "发送图片给 AI 前自动压缩，节省 token 与带宽。"
+    },
+    "field": {
+      "provider": "AI 提供方",
+      "baseUrl": "vLLM 服务地址",
+      "apiKey": "vLLM API Key",
+      "model": "vLLM 模型名",
+      "timeout": "超时秒数",
+      "autoNoThink": "自动 /no_think",
+      "enableThinking": "启用思考",
+      "enableChatTemplateKwargs": "启用模板参数",
+      "anthropicApiKey": "Anthropic API Key",
+      "anthropicModel": "Anthropic 模型名",
+      "maxTokensDefault": "默认 max_tokens",
+      "maxTokensExtract": "抽取 JSON 的 max_tokens",
+      "maxTokensCap": "max_tokens 上限",
+      "imageCompress": "启用压缩",
+      "imageMaxEdge": "最长边像素",
+      "imageJpegQuality": "JPEG 质量"
+    },
+    "action": {
+      "save": "保存",
+      "cancel": "取消",
+      "resetDefault": "重置为默认",
+      "testConnection": "测试连通性",
+      "editApiKey": "修改",
+      "cancelEditApiKey": "取消",
+      "clearApiKey": "清空",
+      "saveField": "保存此字段"
+    },
+    "confirm": {
+      "switchProviderTitle": "切换 AI 提供方",
+      "switchProvider": "切换 AI 提供方会改变下一次 AI 调用的后端，确定切换到 {{target}} 吗？",
+      "switchProviderWarnKey": "注意：目标 Provider 的 API Key 当前为空，切换后下一次调用会失败。",
+      "editApiKeyTitle": "修改 API Key",
+      "editApiKey": "确定要修改 API Key 吗？改错会导致 AI 调用失败。",
+      "clearApiKeyTitle": "清空 API Key",
+      "clearApiKey": "确定清空 API Key？清空后该 Provider 下一次调用会失败。",
+      "resetDefaultTitle": "重置为默认",
+      "resetDefault": "重置为默认会清空所有在 UI 上改过的 AI 配置，包括 API Key，确定继续吗？",
+      "leaveUnsavedTitle": "尚未保存",
+      "leaveUnsaved": "设置尚未保存，确定离开吗？",
+      "leaveOk": "离开不保存"
+    },
+    "toast": {
+      "saved": "保存成功",
+      "saveFailed": "保存失败",
+      "testOk": "{{provider}} 连接正常，延迟 {{latency}}ms",
+      "testFailed": "连通性测试失败：{{detail}}",
+      "apiKeyEmpty": "API Key 已清空，该 Provider 下一次调用会失败",
+      "resetDone": "已重置为默认值",
+      "testDirtyBlock": "请先保存再测试",
+      "baseUrlInvalid": "地址必须以 http:// 或 https:// 开头"
+    },
+    "tooltip": {
+      "autoNoThink": "用于 vLLM/Qwen 模型，在 user 文本末尾追加 /no_think 以关闭思考链，节省 token。Anthropic 下不生效。",
+      "enableThinking": "仅 vLLM/Qwen 有效。关闭可显著降 max_tokens 消耗，建议保持关闭。",
+      "enableChatTemplateKwargs": "仅 vLLM 生效。切到阿里云百炼若被 HTTP 400 拒绝请关闭此项。"
+    },
+    "preset": {
+      "label": "快捷填入",
+      "prodVllm": "生产 vLLM",
+      "localVllm": "本地开发",
+      "bailianFallback": "阿里云百炼（兜底）"
+    },
+    "source": {
+      "db": "已覆盖",
+      "env": "默认值"
+    },
+    "apiKey": {
+      "placeholderEditing": "请输入新 API Key",
+      "notSet": "未配置",
+      "cleared": "待清空"
+    },
+    "modelHint": "常见值：vLLM 用 qwen3.6-27b；Anthropic 用 claude-sonnet-4-20250514",
+    "currentProviderTag": "当前：{{provider}}"
   },
   "batches": {
     "title": "运价批次",

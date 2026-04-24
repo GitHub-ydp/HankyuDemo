@@ -170,6 +170,17 @@ export const adminApi = {
     api.post<unknown, ApiResponse>('/admin/reset-rates'),
 };
 
+// --- 系统设置 · AI 参数（T-ST） ---
+export const settingsApi = {
+  getAIConfig: () => api.get<unknown, ApiResponse>('/admin/settings/ai'),
+  updateAIConfig: (patch: Record<string, unknown>) =>
+    api.patch<unknown, ApiResponse>('/admin/settings/ai', patch),
+  testConnection: () =>
+    api.post<unknown, ApiResponse>('/admin/settings/ai/test-connection', {}),
+  resetAIConfig: () =>
+    api.post<unknown, ApiResponse>('/admin/settings/ai/reset', {}),
+};
+
 // --- Step1 Rate Batches（Air / Ocean / Ocean_NGB 标准模板批次） ---
 export const rateBatchApi = {
   upload: (file: File, parserHint?: string) => {

@@ -369,3 +369,44 @@ export interface RateBatchActivateResponse {
 }
 
 export type ParserHint = 'air' | 'ocean' | 'ocean_ngb';
+
+// ============ 系统设置 · AI 参数（T-ST） ============
+
+export type AIProvider = 'vllm' | 'anthropic';
+export type ConfigSource = 'db' | 'env';
+
+export interface MaskedSecret {
+  masked: string;
+  is_set: boolean;
+}
+
+export interface FieldWithSource<T> {
+  value: T;
+  source: ConfigSource;
+}
+
+export interface AIConfigResponse {
+  ai_provider: FieldWithSource<AIProvider>;
+  ai_timeout_seconds: FieldWithSource<number>;
+  ai_auto_no_think: FieldWithSource<boolean>;
+  ai_max_tokens_default: FieldWithSource<number>;
+  ai_max_tokens_extract_json: FieldWithSource<number>;
+  ai_max_tokens_cap: FieldWithSource<number>;
+  ai_image_compress: FieldWithSource<boolean>;
+  ai_image_max_edge_px: FieldWithSource<number>;
+  ai_image_jpeg_quality: FieldWithSource<number>;
+  vllm_base_url: FieldWithSource<string>;
+  vllm_api_key: FieldWithSource<MaskedSecret>;
+  vllm_model: FieldWithSource<string>;
+  vllm_enable_thinking: FieldWithSource<boolean>;
+  vllm_enable_chat_template_kwargs: FieldWithSource<boolean>;
+  anthropic_api_key: FieldWithSource<MaskedSecret>;
+  anthropic_model: FieldWithSource<string>;
+}
+
+export interface TestConnectionResponse {
+  ok: boolean;
+  provider: AIProvider;
+  latency_ms: number;
+  detail: string;
+}

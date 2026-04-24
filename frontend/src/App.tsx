@@ -14,6 +14,7 @@ import RateCompare from './pages/RateCompare';
 import CarrierList from './pages/CarrierList';
 import EmailSearch from './pages/EmailSearch';
 import PkgAutoFill from './pages/PkgAutoFill';
+import Settings from './pages/Settings';
 import LoginPage from './pages/Login';
 import RegisterPage from './pages/Register';
 import './i18n';
@@ -60,6 +61,7 @@ export default function App() {
                 <Route path="/compare" element={<RateCompare />} />
                 <Route path="/carriers" element={<CarrierList />} />
                 <Route path="/emails" element={<EmailSearch />} />
+                <Route path="/settings" element={<Settings />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

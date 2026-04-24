@@ -1,9 +1,9 @@
 """统一 AI 客户端 — 默认走本地 vLLM (OpenAI-compatible)，保留 Anthropic 分支供后续设置页切换。
 
 设计要点：
-- Provider 由 settings.ai_provider 决定，单次调用可用 provider= 参数临时 override
+- Provider 由 get_ai_config().ai_provider 决定，单次调用可用 provider= 参数临时 override
 - vLLM / Anthropic 两底层通过私有 helper 实现，public chat/chat_with_image 只拼 messages
-- 超时统一走 settings.ai_timeout_seconds，Anthropic 分支显式传 timeout 修历史卡死 bug
+- 超时统一走 get_ai_config().ai_timeout_seconds，Anthropic 分支显式传 timeout 修历史卡死 bug
 - max_tokens 按 purpose 解析；vLLM 死守 2048-512 buffer，Anthropic 保留大窗口
 - 图片自动 Pillow 压到 1280px / JPEG 85；HEIC 等不支持格式回退原字节
 - vLLM user text 末尾自动追加 /no_think（双保险关思考）
@@ -18,7 +18,8 @@ from typing import Any
 
 import httpx
 
-from app.core.config import settings
+from app.core.config import settings  # 保留给 DEFAULT_CORS_ORIGINS 等非 AI 配置（当前无用，但与原签名约定一致）
+from app.services.config_service import get_ai_config
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +41,9 @@ class ProviderUnavailableError(AIClientError):
 # ========== 私有 helpers ==========
 
 def _resolve_provider(override: str | None) -> str:
-    """解析最终 provider 名。override > settings.ai_provider。"""
-    name = (override or settings.ai_provider or "vllm").strip().lower()
+    """解析最终 provider 名。override > get_ai_config().ai_provider。"""
+    cfg = get_ai_config()
+    name = (override or cfg.ai_provider or "vllm").strip().lower()
     if name not in ("vllm", "anthropic"):
         raise AIClientError(f"未知 provider: {name}（仅支持 vllm / anthropic）")
     return name
@@ -51,10 +53,11 @@ def _resolve_model(provider: str, override: str | None) -> str:
     """按 provider 解析 model。override 优先。"""
     if override:
         return override
+    cfg = get_ai_config()
     if provider == "vllm":
-        return settings.vllm_model
+        return cfg.vllm_model
     if provider == "anthropic":
-        return settings.anthropic_model
+        return cfg.anthropic_model
     raise AIClientError(f"未知 provider: {provider}")
 
 
@@ -65,32 +68,33 @@ def _resolve_max_tokens(override: int | None, purpose: str, provider: str) -> in
     - vllm：min(override or default_by_purpose, ai_max_tokens_cap)
     - anthropic：override or 4096（不走 vllm 的 1536 cap，R3 风险缓解）
     """
+    cfg = get_ai_config()
     default_by_purpose = {
-        "default": settings.ai_max_tokens_default,
-        "extract_json": settings.ai_max_tokens_extract_json,
-    }.get(purpose, settings.ai_max_tokens_default)
+        "default": cfg.ai_max_tokens_default,
+        "extract_json": cfg.ai_max_tokens_extract_json,
+    }.get(purpose, cfg.ai_max_tokens_default)
 
     if provider == "anthropic":
         return override if override is not None else 4096
 
     # vllm 分支（包括回滚到百炼）
     val = override if override is not None else default_by_purpose
-    if val > settings.ai_max_tokens_cap:
+    if val > cfg.ai_max_tokens_cap:
         logger.warning(
             "max_tokens=%d 超过 ai_max_tokens_cap=%d，已降到 cap",
-            val, settings.ai_max_tokens_cap,
+            val, cfg.ai_max_tokens_cap,
         )
-        val = settings.ai_max_tokens_cap
+        val = cfg.ai_max_tokens_cap
     return val
 
 
 def _append_no_think(messages: list[dict]) -> list[dict]:
-    """若 settings.ai_auto_no_think 开启，在最后一条 user 的纯文本内容末尾追加 /no_think。
+    """若 ai_auto_no_think 开启，在最后一条 user 的纯文本内容末尾追加 /no_think。
 
     幂等：已含 /no_think 就不再追加。
     对 content 是 list（多模态）的情况，追加到最后一条 text 段。
     """
-    if not settings.ai_auto_no_think or not messages:
+    if not get_ai_config().ai_auto_no_think or not messages:
         return messages
 
     # 从后往前找第一条 role=user
@@ -120,12 +124,13 @@ def _append_no_think(messages: list[dict]) -> list[dict]:
 
 
 def _compress_image(path: str) -> tuple[bytes, str]:
-    """Pillow 压图到最长边 settings.ai_image_max_edge_px / JPEG quality 85。
+    """Pillow 压图到最长边 ai_image_max_edge_px / JPEG quality 85。
 
     失败回退原字节 + 按扩展名推 mime。
     返回 (bytes, mime)。
     """
-    if not settings.ai_image_compress:
+    cfg = get_ai_config()
+    if not cfg.ai_image_compress:
         return _read_raw_image(path)
 
     try:
@@ -139,13 +144,13 @@ def _compress_image(path: str) -> tuple[bytes, str]:
             im.load()
             if im.mode not in ("RGB", "L"):
                 im = im.convert("RGB")
-            max_edge = settings.ai_image_max_edge_px
+            max_edge = cfg.ai_image_max_edge_px
             w, h = im.size
             if max(w, h) > max_edge:
                 ratio = max_edge / float(max(w, h))
                 im = im.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
             buf = io.BytesIO()
-            im.save(buf, format="JPEG", quality=settings.ai_image_jpeg_quality, optimize=True)
+            im.save(buf, format="JPEG", quality=cfg.ai_image_jpeg_quality, optimize=True)
             return buf.getvalue(), "image/jpeg"
     except Exception as e:
         logger.warning("图片压缩失败，回退原字节 path=%s err=%s", path, e)
@@ -174,7 +179,8 @@ def _vllm_raw(
     timeout: float,
 ) -> str:
     """打 vLLM / OpenAI-compatible 端点。抛 ProviderUnavailableError 或 AIClientError。"""
-    if not settings.vllm_api_key:
+    cfg = get_ai_config()
+    if not cfg.vllm_api_key:
         raise ProviderUnavailableError("VLLM_API_KEY 未配置")
 
     body: dict[str, Any] = {
@@ -183,15 +189,15 @@ def _vllm_raw(
         "max_tokens": max_tokens,
         "messages": messages,
     }
-    if settings.vllm_enable_chat_template_kwargs:
-        body["chat_template_kwargs"] = {"enable_thinking": settings.vllm_enable_thinking}
+    if cfg.vllm_enable_chat_template_kwargs:
+        body["chat_template_kwargs"] = {"enable_thinking": cfg.vllm_enable_thinking}
 
-    url = f"{settings.vllm_base_url.rstrip('/')}/chat/completions"
+    url = f"{cfg.vllm_base_url.rstrip('/')}/chat/completions"
     try:
         resp = httpx.post(
             url,
             headers={
-                "Authorization": f"Bearer {settings.vllm_api_key}",
+                "Authorization": f"Bearer {cfg.vllm_api_key}",
                 "Content-Type": "application/json",
             },
             json=body,
@@ -227,7 +233,8 @@ def _anthropic_raw(
 
     显式传 timeout / max_retries=1 修历史卡死 bug。
     """
-    if not settings.anthropic_api_key:
+    cfg = get_ai_config()
+    if not cfg.anthropic_api_key:
         raise ProviderUnavailableError("ANTHROPIC_API_KEY 未配置")
 
     try:
@@ -237,7 +244,7 @@ def _anthropic_raw(
 
     try:
         client = anthropic.Anthropic(
-            api_key=settings.anthropic_api_key,
+            api_key=cfg.anthropic_api_key,
             timeout=timeout,
             max_retries=1,
         )
@@ -291,13 +298,13 @@ def chat(
 ) -> str:
     """纯文本对话 — 返回 AI 原始文本响应。
 
-    max_tokens=None 时按 settings.ai_max_tokens_default。
-    provider=None 时按 settings.ai_provider（默认 vllm）。
+    max_tokens=None 时按 ai_max_tokens_default（get_ai_config）。
+    provider=None 时按 ai_provider（get_ai_config，默认 vllm）。
     """
     prov = _resolve_provider(provider)
     mdl = _resolve_model(prov, model)
     mt = _resolve_max_tokens(max_tokens, "default", prov)
-    to = timeout if timeout is not None else settings.ai_timeout_seconds
+    to = timeout if timeout is not None else get_ai_config().ai_timeout_seconds
 
     if prov == "anthropic":
         messages = [{"role": "user", "content": user_message}]
@@ -329,7 +336,7 @@ def chat_with_image(
     prov = _resolve_provider(provider)
     mdl = _resolve_model(prov, model)
     mt = _resolve_max_tokens(max_tokens, "extract_json", prov)
-    to = timeout if timeout is not None else settings.ai_timeout_seconds
+    to = timeout if timeout is not None else get_ai_config().ai_timeout_seconds
 
     image_bytes, mime = _compress_image(image_path)
 
@@ -365,10 +372,11 @@ def extract_json(text: str) -> Any:
 def health_check(provider: str | None = None, timeout: float = 5.0) -> dict:
     """轻量连通性检查。返回 {'provider': ..., 'ok': bool, 'latency_ms': int, 'detail': str}"""
     prov = _resolve_provider(provider)
+    cfg = get_ai_config()
     t0 = time.time()
 
     if prov == "vllm":
-        url = f"{settings.vllm_base_url.rstrip('/').rsplit('/v1', 1)[0]}/health"
+        url = f"{cfg.vllm_base_url.rstrip('/').rsplit('/v1', 1)[0]}/health"
         try:
             resp = httpx.get(url, timeout=timeout)
             ok = resp.status_code == 200
@@ -389,12 +397,12 @@ def health_check(provider: str | None = None, timeout: float = 5.0) -> dict:
     # anthropic：没有公开 /health，用 models 列表也不划算。只验证 key 配置
     return {
         "provider": "anthropic",
-        "ok": bool(settings.anthropic_api_key),
+        "ok": bool(cfg.anthropic_api_key),
         "latency_ms": int((time.time() - t0) * 1000),
-        "detail": "key configured" if settings.anthropic_api_key else "ANTHROPIC_API_KEY 未配置",
+        "detail": "key configured" if cfg.anthropic_api_key else "ANTHROPIC_API_KEY 未配置",
     }
 
 
 def get_current_provider() -> str:
-    """给前端 /admin/ai-status 用；返回 settings.ai_provider。"""
+    """给前端 /admin/ai-status 用；返回 get_ai_config().ai_provider。"""
     return _resolve_provider(None)

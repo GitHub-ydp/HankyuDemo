@@ -158,7 +158,101 @@
     "pkg": "PKG Auto Fill",
     "emails": "Email Analysis",
     "dataGroup": "Data",
-    "carriers": "Carriers"
+    "carriers": "Carriers",
+    "settings": "System Settings"
+  },
+  "settings": {
+    "title": "System Settings",
+    "subtitle": "SYSTEM SETTINGS · AI Configuration",
+    "menu": {
+      "settings": "System Settings"
+    },
+    "section": {
+      "provider": "AI Provider",
+      "providerDesc": "Which AI backend the runtime uses; the next AI call picks up the change.",
+      "vllm": "vLLM Connection",
+      "vllmDesc": "Local / self-hosted vLLM service, OpenAI-compatible endpoint.",
+      "anthropic": "Anthropic Connection",
+      "anthropicDesc": "Claude API config, used for rollback or A/B comparison.",
+      "tokens": "Token Parameters",
+      "tokensDesc": "Caps reply length; vLLM enforces a hard ceiling, Anthropic has a bigger window.",
+      "image": "Image Compression",
+      "imageDesc": "Auto-compress images before sending to AI to save tokens and bandwidth."
+    },
+    "field": {
+      "provider": "AI Provider",
+      "baseUrl": "vLLM Base URL",
+      "apiKey": "vLLM API Key",
+      "model": "vLLM Model",
+      "timeout": "Timeout (sec)",
+      "autoNoThink": "Auto /no_think",
+      "enableThinking": "Enable Thinking",
+      "enableChatTemplateKwargs": "Enable Template Kwargs",
+      "anthropicApiKey": "Anthropic API Key",
+      "anthropicModel": "Anthropic Model",
+      "maxTokensDefault": "Default max_tokens",
+      "maxTokensExtract": "JSON Extract max_tokens",
+      "maxTokensCap": "max_tokens Cap",
+      "imageCompress": "Enable Compression",
+      "imageMaxEdge": "Max Edge (px)",
+      "imageJpegQuality": "JPEG Quality"
+    },
+    "action": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "resetDefault": "Reset to Default",
+      "testConnection": "Test Connection",
+      "editApiKey": "Edit",
+      "cancelEditApiKey": "Cancel",
+      "clearApiKey": "Clear",
+      "saveField": "Save this field"
+    },
+    "confirm": {
+      "switchProviderTitle": "Switch AI Provider",
+      "switchProvider": "Switching AI provider changes the backend for the next AI call. Switch to {{target}}?",
+      "switchProviderWarnKey": "Warning: target provider's API Key is empty; the next call will fail after switch.",
+      "editApiKeyTitle": "Edit API Key",
+      "editApiKey": "Edit API Key? A wrong value will break AI calls.",
+      "clearApiKeyTitle": "Clear API Key",
+      "clearApiKey": "Clear the API Key? Next call for this provider will fail.",
+      "resetDefaultTitle": "Reset to Default",
+      "resetDefault": "Reset will wipe every field you changed in the UI, including API Keys. Continue?",
+      "leaveUnsavedTitle": "Unsaved Changes",
+      "leaveUnsaved": "You have unsaved changes. Leave anyway?",
+      "leaveOk": "Leave without saving"
+    },
+    "toast": {
+      "saved": "Saved",
+      "saveFailed": "Save failed",
+      "testOk": "{{provider}} OK, latency {{latency}}ms",
+      "testFailed": "Connection test failed: {{detail}}",
+      "apiKeyEmpty": "API Key cleared; next call for this provider will fail",
+      "resetDone": "Reset to defaults",
+      "testDirtyBlock": "Save first before testing",
+      "baseUrlInvalid": "URL must start with http:// or https://"
+    },
+    "tooltip": {
+      "autoNoThink": "vLLM/Qwen only. Appends /no_think to user text to disable thinking chain and save tokens. No effect on Anthropic.",
+      "enableThinking": "vLLM/Qwen only. Disabling significantly reduces max_tokens usage; keep off unless needed.",
+      "enableChatTemplateKwargs": "vLLM only. Disable this if Alibaba DashScope returns HTTP 400."
+    },
+    "preset": {
+      "label": "Preset",
+      "prodVllm": "Production vLLM",
+      "localVllm": "Local dev",
+      "bailianFallback": "Alibaba DashScope (fallback)"
+    },
+    "source": {
+      "db": "Overridden",
+      "env": "Default"
+    },
+    "apiKey": {
+      "placeholderEditing": "Enter new API Key",
+      "notSet": "Not set",
+      "cleared": "Will be cleared"
+    },
+    "modelHint": "Common values: vLLM uses qwen3.6-27b; Anthropic uses claude-sonnet-4-20250514",
+    "currentProviderTag": "Current: {{provider}}"
   },
   "batches": {
     "title": "Rate Batches",

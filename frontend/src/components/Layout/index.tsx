@@ -34,6 +34,7 @@ const BREADCRUMBS: Record<string, string[]> = {
   '/pkg': ['breadcrumb.pkg'],
   '/emails': ['breadcrumb.emails'],
   '/carriers': ['breadcrumb.dataGroup', 'breadcrumb.carriers'],
+  '/settings': ['breadcrumb.settings'],
 };
 
 export default function AppLayout() {
@@ -173,6 +174,14 @@ export default function AppLayout() {
               style={{ color: 'var(--danger)' }}
             >
               <Icon name="trash" size={16} />
+            </button>
+            <button
+              type="button"
+              className="icon-btn"
+              title={t('settings.menu.settings')}
+              onClick={() => navigate('/settings')}
+            >
+              <Icon name="settings" size={16} />
             </button>
             <button type="button" className="icon-btn" title={t('topbar.help')}>
               <Icon name="help" size={16} />

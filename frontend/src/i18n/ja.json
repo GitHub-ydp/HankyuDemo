@@ -158,7 +158,101 @@
     "pkg": "PKG 自動入力",
     "emails": "メール分析",
     "dataGroup": "基礎データ",
-    "carriers": "船社管理"
+    "carriers": "船社管理",
+    "settings": "システム設定"
+  },
+  "settings": {
+    "title": "システム設定",
+    "subtitle": "SYSTEM SETTINGS · AI パラメータ",
+    "menu": {
+      "settings": "システム設定"
+    },
+    "section": {
+      "provider": "AI プロバイダ",
+      "providerDesc": "現在どの AI バックエンドを利用するか。切替後、次回の AI 呼び出しから反映されます。",
+      "vllm": "vLLM 接続",
+      "vllmDesc": "ローカル / 自社運用 vLLM サービス、OpenAI 互換エンドポイント。",
+      "anthropic": "Anthropic 接続",
+      "anthropicDesc": "Claude API の設定。ロールバックや比較検証用。",
+      "tokens": "Token パラメータ",
+      "tokensDesc": "AI 応答長の上限。vLLM は固定キャップ、Anthropic はより大きな窓を持ちます。",
+      "image": "画像圧縮",
+      "imageDesc": "AI 送信前に画像を自動圧縮し、トークンと帯域を節約します。"
+    },
+    "field": {
+      "provider": "AI プロバイダ",
+      "baseUrl": "vLLM サービス URL",
+      "apiKey": "vLLM API Key",
+      "model": "vLLM モデル名",
+      "timeout": "タイムアウト（秒）",
+      "autoNoThink": "自動 /no_think",
+      "enableThinking": "思考を有効化",
+      "enableChatTemplateKwargs": "template kwargs を有効化",
+      "anthropicApiKey": "Anthropic API Key",
+      "anthropicModel": "Anthropic モデル名",
+      "maxTokensDefault": "既定 max_tokens",
+      "maxTokensExtract": "JSON 抽出 max_tokens",
+      "maxTokensCap": "max_tokens 上限",
+      "imageCompress": "圧縮を有効化",
+      "imageMaxEdge": "最長辺ピクセル",
+      "imageJpegQuality": "JPEG 品質"
+    },
+    "action": {
+      "save": "保存",
+      "cancel": "キャンセル",
+      "resetDefault": "既定値にリセット",
+      "testConnection": "接続テスト",
+      "editApiKey": "変更",
+      "cancelEditApiKey": "キャンセル",
+      "clearApiKey": "クリア",
+      "saveField": "このフィールドを保存"
+    },
+    "confirm": {
+      "switchProviderTitle": "AI プロバイダ切替",
+      "switchProvider": "AI プロバイダを切替えると次回の AI 呼び出しのバックエンドが変わります。{{target}} に切替えますか？",
+      "switchProviderWarnKey": "注意：切替先プロバイダの API Key が空です。切替後、次回呼び出しは失敗します。",
+      "editApiKeyTitle": "API Key の変更",
+      "editApiKey": "API Key を変更しますか？誤入力は AI 呼び出し失敗の原因になります。",
+      "clearApiKeyTitle": "API Key のクリア",
+      "clearApiKey": "API Key をクリアしますか？クリア後、このプロバイダの次回呼び出しは失敗します。",
+      "resetDefaultTitle": "既定値にリセット",
+      "resetDefault": "UI で変更した AI 設定（API Key 含む）がすべて既定値に戻ります。続行しますか？",
+      "leaveUnsavedTitle": "未保存の変更",
+      "leaveUnsaved": "設定が未保存です。離れてもよろしいですか？",
+      "leaveOk": "保存せず離れる"
+    },
+    "toast": {
+      "saved": "保存しました",
+      "saveFailed": "保存に失敗しました",
+      "testOk": "{{provider}} 接続 OK、遅延 {{latency}}ms",
+      "testFailed": "接続テスト失敗：{{detail}}",
+      "apiKeyEmpty": "API Key がクリアされました。このプロバイダの次回呼び出しは失敗します",
+      "resetDone": "既定値にリセットしました",
+      "testDirtyBlock": "先に保存してからテストしてください",
+      "baseUrlInvalid": "URL は http:// または https:// で始まる必要があります"
+    },
+    "tooltip": {
+      "autoNoThink": "vLLM/Qwen 用。user テキスト末尾に /no_think を追加し thinking を無効化、token を節約。Anthropic では無効。",
+      "enableThinking": "vLLM/Qwen のみ有効。無効化すると max_tokens 消費が大幅減。通常オフ推奨。",
+      "enableChatTemplateKwargs": "vLLM のみ。阿里云百炼で HTTP 400 が返る場合は無効化してください。"
+    },
+    "preset": {
+      "label": "プリセット",
+      "prodVllm": "本番 vLLM",
+      "localVllm": "ローカル開発",
+      "bailianFallback": "阿里云百炼（フォールバック）"
+    },
+    "source": {
+      "db": "上書き済み",
+      "env": "既定値"
+    },
+    "apiKey": {
+      "placeholderEditing": "新しい API Key を入力してください",
+      "notSet": "未設定",
+      "cleared": "クリア予定"
+    },
+    "modelHint": "例: vLLM は qwen3.6-27b、Anthropic は claude-sonnet-4-20250514",
+    "currentProviderTag": "現在: {{provider}}"
   },
   "batches": {
     "title": "運賃バッチ",

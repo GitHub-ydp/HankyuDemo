@@ -11,6 +11,7 @@ from app.models.lcl_rate import LclRate
 from app.models.surcharge import Surcharge, CalculationType
 from app.models.tariff import Tariff
 from app.models.upload_log import UploadLog, UploadStatus
+from app.models.app_settings import AppSettings
 
 __all__ = [
     "Base",
@@ -26,4 +27,5 @@ __all__ = [
     "Surcharge", "CalculationType",
     "Tariff",
     "UploadLog", "UploadStatus",
+    "AppSettings",
 ]
