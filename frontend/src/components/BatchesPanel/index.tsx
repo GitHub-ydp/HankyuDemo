@@ -92,6 +92,31 @@ function DetailDrawer({ batchId, onClose, onActivated }: DetailDrawerProps) {
         message.error(envelope.message || t('batches.activateFailed'));
         return;
       }
+      if (envelope.data && !dryRun) {
+        const status = envelope.data.activation_status;
+        if (status === 'failed') {
+          const errDetail =
+            envelope.data.errors?.[0]?.detail ||
+            envelope.data.message ||
+            t('batches.activateFailed');
+          message.error(errDetail);
+          setActivate(envelope.data);
+          setSection('activate');
+          return;
+        }
+        if (status === 'empty_batch') {
+          message.warning(envelope.data.message || '该批次无可入库数据');
+          setActivate(envelope.data);
+          setSection('activate');
+          return;
+        }
+        if (status === 'already_active') {
+          message.info(envelope.data.message || '该批次已采用');
+          setActivate(envelope.data);
+          setSection('activate');
+          return;
+        }
+      }
       if (envelope.data) {
         setActivate(envelope.data);
         message.success(envelope.data.message || t('batches.activateOk'));

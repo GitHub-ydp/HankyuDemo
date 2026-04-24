@@ -14,6 +14,22 @@ from app.models import Port, Carrier, CarrierType
 # 港口字典 — 从 KMTC/NVO FAK 实际数据提取 + 补充常用港口
 # ============================================================
 PORTS = [
+    # 日本 (目的港)
+    ("JPTYO", "Tokyo", "东京", "Japan", "East Asia"),
+    ("JPYOK", "Yokohama", "横滨", "Japan", "East Asia"),
+    ("JPOSA", "Osaka", "大阪", "Japan", "East Asia"),
+    ("JPUKB", "Kobe", "神户", "Japan", "East Asia"),
+    ("JPNGO", "Nagoya", "名古屋", "Japan", "East Asia"),
+    ("JPHKT", "Hakata", "博多", "Japan", "East Asia"),
+    ("JPKKJ", "Kitakyushu", "北九州", "Japan", "East Asia"),
+    ("JPSMZ", "Shimizu", "清水", "Japan", "East Asia"),
+    ("JPMOJ", "Moji", "门司", "Japan", "East Asia"),
+    ("JPSKD", "Sakaide", "坂出", "Japan", "East Asia"),
+    ("JPHIJ", "Hiroshima", "广岛", "Japan", "East Asia"),
+    ("JPNII", "Niigata", "新潟", "Japan", "East Asia"),
+    ("JPTOY", "Toyohashi", "丰桥", "Japan", "East Asia"),
+    ("JPTYOYOK", "TOKYO YOKOHAMA", "东京横滨(组合)", "Japan", "East Asia"),
+
     # 中国 (起运港)
     ("CNSHA", "Shanghai", "上海", "China", "East Asia"),
     ("CNNGB", "Ningbo", "宁波", "China", "East Asia"),
@@ -184,6 +200,24 @@ CARRIERS = [
     ("TSL", "T.S. Lines", "德翔航运", CarrierType.shipping_line, "Taiwan"),
     ("ESL", "Emirates Shipping Line", "阿联酋航运", CarrierType.shipping_line, "UAE"),
     ("NVO_FAK", "NVO FAK (Consolidated)", "NVO FAK整合", CarrierType.nvo, "USA"),
+    ("T.S.L", "T.S. Lines (dotted)", "德翔航运(点号别名)", CarrierType.shipping_line, "Taiwan"),
+    ("ASL", "Antong Shipping Line", "安通", CarrierType.shipping_line, "China"),
+    ("CCL", "China Container Line", "中集航运", CarrierType.shipping_line, "China"),
+    ("DONGJIN", "Dongjin Shipping", "东进商船", CarrierType.shipping_line, "South Korea"),
+    ("EAS", "EAS International Shipping", "锦江航运", CarrierType.shipping_line, "China"),
+    ("GOTO", "Goto Shipping", "五島汽船", CarrierType.shipping_line, "Japan"),
+    ("HASCO", "Shanghai Hai Hua Shipping", "海华轮船", CarrierType.shipping_line, "China"),
+    ("JIANZHENHAO", "Jianzhen Shipping", "鉴真轮船", CarrierType.shipping_line, "China"),
+    ("KAMBARA", "Kambara Kisen", "神原汽船", CarrierType.shipping_line, "Japan"),
+    ("MINSHENG", "Minsheng Shipping", "民生轮船", CarrierType.shipping_line, "China"),
+    ("NOS", "NOS Line", "NOS 航运", CarrierType.shipping_line, "South Korea"),
+    ("SINO", "Sinokor Merchant Marine", "长锦商船", CarrierType.shipping_line, "South Korea"),
+    ("SINOTRANS", "Sinotrans Container Lines", "中外运集装箱", CarrierType.shipping_line, "China"),
+    ("SITC", "SITC Container Lines", "海丰国际", CarrierType.shipping_line, "China"),
+    ("SJJ", "SJJ Shipping", "信使航运", CarrierType.shipping_line, "China"),
+    ("SSF", "SSF Shipping", "SSF 航运", CarrierType.shipping_line, "China"),
+    ("TCLC", "Tokyo Container Line", "东京货柜", CarrierType.shipping_line, "Japan"),
+    ("XINJIANZHEN", "Xinjianzhen Shipping", "新鉴真轮船", CarrierType.shipping_line, "China"),
 ]
 
 

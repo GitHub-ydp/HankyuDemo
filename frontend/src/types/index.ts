@@ -238,6 +238,13 @@ export interface RateBatchDiffResponse {
   message?: string | null;
 }
 
+export interface RateBatchActivationErrorItem {
+  code: string;
+  detail: string;
+  row_index?: number | null;
+  record_kind?: string | null;
+}
+
 export interface RateBatchActivateResponse {
   batch_id: string;
   batch_status: string;
@@ -250,6 +257,7 @@ export interface RateBatchActivateResponse {
   diff_summary: RateBatchDiffSummary;
   is_stub: boolean;
   message?: string | null;
+  errors?: RateBatchActivationErrorItem[];
 }
 
 export type ParserHint = 'air' | 'ocean' | 'ocean_ngb';

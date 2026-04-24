@@ -200,11 +200,13 @@ def _lookup_carrier(db: Session, carrier_name: str | None, record: ParsedRateRec
             record_kind=record.record_kind,
         )
     name = carrier_name.strip()
-    carrier = (
-        db.query(Carrier)
-        .filter(Carrier.name_en.ilike(f"%{name}%"))
-        .first()
-    )
+    carrier = db.query(Carrier).filter(Carrier.code == name).first()
+    if carrier is None:
+        carrier = (
+            db.query(Carrier)
+            .filter(Carrier.name_en.ilike(f"%{name}%"))
+            .first()
+        )
     if carrier is None:
         carrier = (
             db.query(Carrier)

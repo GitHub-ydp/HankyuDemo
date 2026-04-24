@@ -139,9 +139,12 @@ def activate(
     source_file = (draft.legacy_payload or {}).get("source_file") or draft.file_name
 
     imported_detail: dict[str, int] = {}
+    skipped_by_dict_miss = 0
+    skipped_dict_samples: list[str] = []
+    _DICT_MISS_CODES = {"CARRIER_NOT_FOUND", "PORT_NOT_FOUND"}
     try:
         # Session 可能已 autobegin（上游已 query）。用 savepoint 嵌套保证原子：
-        # 任一步异常触发 nested rollback，调用方未 commit 之前不会泄漏到外层事务。
+        # 字典缺失行走软失败（try/except 内层），真·系统错误仍触发 nested rollback。
         with db.begin_nested():
             superseded_ids = _supersede_old_active(db, file_type_enum)
 
@@ -165,29 +168,40 @@ def activate(
 
             for record in dispatchable:
                 kind = record.record_kind
-                if kind == "air_weekly":
-                    air_objs.append(to_air_freight_rate(record, batch_uuid))
-                elif kind == "air_surcharge":
-                    sur_objs.append(to_air_surcharge(record, batch_uuid))
-                elif kind == "fcl":
-                    freight_objs.append(
-                        to_freight_rate_from_ocean(
-                            record, batch_uuid, db, source_file=source_file
+                row_idx = record.extras.get("row_index") if record.extras else None
+                try:
+                    if kind == "air_weekly":
+                        air_objs.append(to_air_freight_rate(record, batch_uuid))
+                    elif kind == "air_surcharge":
+                        sur_objs.append(to_air_surcharge(record, batch_uuid))
+                    elif kind == "fcl":
+                        freight_objs.append(
+                            to_freight_rate_from_ocean(
+                                record, batch_uuid, db, source_file=source_file
+                            )
                         )
-                    )
-                elif kind == "ocean_ngb_fcl":
-                    freight_objs.append(
-                        to_freight_rate_from_ngb(
-                            record, batch_uuid, db, source_file=source_file
+                    elif kind == "ocean_ngb_fcl":
+                        freight_objs.append(
+                            to_freight_rate_from_ngb(
+                                record, batch_uuid, db, source_file=source_file
+                            )
                         )
-                    )
-                else:
-                    raise ActivationError(
-                        code="F-ACT-05",
-                        detail=f"unknown record_kind '{kind}'",
-                        row_index=record.extras.get("row_index") if record.extras else None,
-                        record_kind=kind,
-                    )
+                    else:
+                        raise ActivationError(
+                            code="F-ACT-05",
+                            detail=f"unknown record_kind '{kind}'",
+                            row_index=row_idx,
+                            record_kind=kind,
+                        )
+                except ActivationError as row_err:
+                    if row_err.code in _DICT_MISS_CODES:
+                        skipped_by_dict_miss += 1
+                        if len(skipped_dict_samples) < 10:
+                            skipped_dict_samples.append(
+                                f"  row {row_idx}: {row_err.code} — {row_err.detail[:80]}"
+                            )
+                        continue
+                    raise
 
             if air_objs:
                 db.add_all(air_objs)
@@ -210,19 +224,32 @@ def activate(
         draft.batch_status = "active"
         draft.activation_status = "activated"
 
+        if skipped_by_dict_miss > 0:
+            warnings.append(
+                f"第 2 段跳过 {skipped_by_dict_miss} 行（字典缺失）"
+            )
+            warnings.extend(skipped_dict_samples)
+            overflow = skipped_by_dict_miss - len(skipped_dict_samples)
+            if overflow > 0:
+                warnings.append(f"  …还有 {overflow} 行")
+
         return ActivationResult(
             batch_id=draft.batch_id,
             file_type=file_type_raw,
             activation_status="activated",
             activated=True,
             imported_rows=imported_rows,
-            skipped_rows=lcl_skipped_count,
+            skipped_rows=lcl_skipped_count + skipped_by_dict_miss,
             imported_detail=imported_detail,
             superseded_batch_ids=superseded_ids,
             warnings=warnings,
             effective_from=effective_from,
             effective_to=effective_to,
-            message=f"Activated {imported_rows} rows.",
+            message=(
+                f"Activated {imported_rows} rows, "
+                f"skipped {skipped_by_dict_miss} by dict miss, "
+                f"{lcl_skipped_count} LCL."
+            ),
         )
 
     except ActivationError as err:
