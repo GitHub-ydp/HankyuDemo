@@ -45,14 +45,34 @@ class Settings(BaseSettings):
     email_address: str = ""
     email_password: str = ""
 
-    # 通义千问 Qwen（阿里云百炼，OpenAI 兼容模式，支持多模态）
+    # AI Provider 选择（vllm | anthropic）
+    ai_provider: str = "vllm"
+    ai_timeout_seconds: int = 90
+    ai_auto_no_think: bool = True            # vLLM/Qwen 族：user text 自动补 /no_think
+    ai_max_tokens_default: int = 512
+    ai_max_tokens_extract_json: int = 1024
+    ai_max_tokens_cap: int = 1536            # 死守 2048 - 512 prompt buffer
+    ai_image_compress: bool = True
+    ai_image_max_edge_px: int = 1280
+    ai_image_jpeg_quality: int = 85          # 0~95
+
+    # vLLM (OpenAI-compatible)
+    vllm_base_url: str = "http://43.133.197.65:8000/v1"
+    vllm_api_key: str = ""                   # 必须通过 env 注入
+    vllm_model: str = "qwen3.6-27b"
+    vllm_enable_thinking: bool = False
+    # True 时请求体追加 chat_template_kwargs；切回阿里云百炼若被 400 拒绝可设 False
+    vllm_enable_chat_template_kwargs: bool = True
+
+    # 旧 Qwen 保留别名（回滚到阿里云百炼用；兼容老 env）
     qwen_api_key: str = ""
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     qwen_model: str = "qwen3.6-plus"
-    qwen_enable_thinking: bool = False
+    qwen_enable_thinking: bool = False       # 已弃用，保留避免 env 报错
 
-    # Claude API
+    # Anthropic
     anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-4-20250514"
 
     # 文件上传
     upload_dir: str = "uploads"

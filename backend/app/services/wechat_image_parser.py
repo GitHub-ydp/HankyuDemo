@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models import Port, Carrier
 from app.services import ai_client
 from app.services.rate_parser import _resolve_port, _safe_decimal
@@ -83,7 +84,8 @@ def parse_wechat_image(image_path: str, db: Session, extra_context: str = "") ->
     try:
         raw_response = ai_client.chat_with_image(
             system, user_text, image_path,
-            temperature=0.0, max_tokens=1200,
+            temperature=0.0,
+            max_tokens=settings.ai_max_tokens_extract_json,
         )
         rates_json = ai_client.extract_json(raw_response)
     except Exception as e:

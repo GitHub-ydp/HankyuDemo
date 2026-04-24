@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models import Port, Carrier
 from app.services import ai_client
 from app.services.rate_parser import _resolve_port, _safe_decimal
@@ -65,13 +66,23 @@ def parse_email_text(text: str, db: Session) -> dict:
     batch_id = f"EMAIL-{uuid.uuid4().hex[:8]}"
     warnings = []
 
+    # 长邮件兜底：vLLM max_model_len=2048，粗略 6000 中文字符 ≈ 1500 tokens
+    MAX_EMAIL_CHARS = 6000
+    if len(text) > MAX_EMAIL_CHARS:
+        warnings.append(f"邮件正文超长（{len(text)} 字），已截断到 {MAX_EMAIL_CHARS} 字符")
+        text = text[:MAX_EMAIL_CHARS]
+
     # 调用 AI
     current_year = date.today().year
     system = SYSTEM_PROMPT.replace("{year}", str(current_year))
     user_msg = f"请从以下邮件文本中提取所有海运费率信息：\n\n{text}"
 
     try:
-        raw_response = ai_client.chat(system, user_msg, temperature=0.0, max_tokens=8192)
+        raw_response = ai_client.chat(
+            system, user_msg,
+            temperature=0.0,
+            max_tokens=settings.ai_max_tokens_extract_json,
+        )
         rates_json = ai_client.extract_json(raw_response)
     except Exception as e:
         return {
