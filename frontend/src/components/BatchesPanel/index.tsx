@@ -336,7 +336,7 @@ function DetailDrawer({ batchId, onClose, onActivated }: DetailDrawerProps) {
                     </div>
                   ) : (
                     <>
-                      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                         <div className="stat-tile success">
                           <div className="l">{t('batches.diffNew')}</div>
                           <div className="v">{diff.summary.new_rows}</div>
@@ -348,10 +348,6 @@ function DetailDrawer({ batchId, onClose, onActivated }: DetailDrawerProps) {
                         <div className="stat-tile">
                           <div className="l">{t('batches.diffUnchanged')}</div>
                           <div className="v">{diff.summary.unchanged_rows}</div>
-                        </div>
-                        <div className={`stat-tile ${''}`}>
-                          <div className="l">{t('batches.diffUnmatched')}</div>
-                          <div className="v">{diff.summary.unmatched_rows}</div>
                         </div>
                       </div>
                       <div className="table-scroll">
@@ -367,23 +363,25 @@ function DetailDrawer({ batchId, onClose, onActivated }: DetailDrawerProps) {
                             </tr>
                           </thead>
                           <tbody>
-                            {diff.items.map((item) => (
-                              <tr key={item.row_index}>
-                                <td className="num" style={{ color: 'var(--ink-500)' }}>{item.row_index}</td>
-                                <td>
-                                  <span className={`tag zh ${diffStatusTag(item.status)}`}>
-                                    {t(`batches.diffStatus.${item.status}`, item.status)}
-                                  </span>
-                                </td>
-                                <td>{item.preview.carrier || '—'}</td>
-                                <td>{item.preview.origin_port || '—'}</td>
-                                <td>{item.preview.destination_port || '—'}</td>
-                                <td style={{ fontSize: 11.5, color: 'var(--ink-500)' }}>
-                                  {item.changed_fields.length > 0 ? item.changed_fields.join(', ') : '—'}
-                                </td>
-                              </tr>
-                            ))}
-                            {diff.items.length === 0 && (
+                            {diff.items
+                              .filter((item) => item.status !== 'unmatched')
+                              .map((item) => (
+                                <tr key={item.row_index}>
+                                  <td className="num" style={{ color: 'var(--ink-500)' }}>{item.row_index}</td>
+                                  <td>
+                                    <span className={`tag zh ${diffStatusTag(item.status)}`}>
+                                      {t(`batches.diffStatus.${item.status}`, item.status)}
+                                    </span>
+                                  </td>
+                                  <td>{item.preview.carrier || '—'}</td>
+                                  <td>{item.preview.origin_port || '—'}</td>
+                                  <td>{item.preview.destination_port || '—'}</td>
+                                  <td style={{ fontSize: 11.5, color: 'var(--ink-500)' }}>
+                                    {item.changed_fields.length > 0 ? item.changed_fields.join(', ') : '—'}
+                                  </td>
+                                </tr>
+                              ))}
+                            {diff.items.filter((item) => item.status !== 'unmatched').length === 0 && (
                               <tr>
                                 <td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--ink-500)' }}>
                                   {t('common.noData')}

@@ -233,8 +233,8 @@ CARRIERS = [
 ]
 
 
-def seed_ports(db: Session):
-    """导入港口数据"""
+def seed_ports(db: Session) -> int:
+    """导入港口数据，返回新增条数"""
     created = 0
     for un_locode, name_en, name_cn, country, region in PORTS:
         existing = db.query(Port).filter(Port.un_locode == un_locode).first()
@@ -251,10 +251,11 @@ def seed_ports(db: Session):
         created += 1
     db.commit()
     print(f"港口: 新增 {created} 条, 已存在 {len(PORTS) - created} 条")
+    return created
 
 
-def seed_carriers(db: Session):
-    """导入船司数据"""
+def seed_carriers(db: Session) -> int:
+    """导入船司数据，返回新增条数"""
     created = 0
     for code, name_en, name_cn, carrier_type, country in CARRIERS:
         existing = db.query(Carrier).filter(Carrier.code == code).first()
@@ -271,6 +272,20 @@ def seed_carriers(db: Session):
         created += 1
     db.commit()
     print(f"船司: 新增 {created} 条, 已存在 {len(CARRIERS) - created} 条")
+    return created
+
+
+def reseed_dictionaries(db: Session) -> dict:
+    """供 admin/reset-rates 调用：在已传入的 db session 上灌字典，返回新增数量。
+
+    与 seed_ports / seed_carriers 共享同一个数据源（PORTS / CARRIERS），不复制列表。
+    """
+    ports_created = seed_ports(db)
+    carriers_created = seed_carriers(db)
+    return {
+        "ports_reseeded": ports_created,
+        "carriers_reseeded": carriers_created,
+    }
 
 
 def main():
