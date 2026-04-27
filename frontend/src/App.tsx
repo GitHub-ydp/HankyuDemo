@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { ConfigProvider, theme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import jaJP from 'antd/locale/ja_JP';
@@ -25,9 +25,38 @@ const antLocales = {
   en: enUS,
 } as const;
 
+const routerBasename = import.meta.env.BASE_URL === '/' ? undefined : import.meta.env.BASE_URL;
+
+const router = createBrowserRouter(
+  [
+    { path: '/login', element: <LoginPage /> },
+    { path: '/register', element: <RegisterPage /> },
+    {
+      element: <ProtectedRoute />,
+      children: [
+        {
+          element: <AppLayout />,
+          children: [
+            { path: '/', element: <Dashboard /> },
+            { path: '/pkg', element: <PkgAutoFill /> },
+            { path: '/rates', element: <RateList /> },
+            { path: '/batches', element: <Navigate to="/upload" replace /> },
+            { path: '/upload', element: <RateUpload /> },
+            { path: '/compare', element: <RateCompare /> },
+            { path: '/carriers', element: <CarrierList /> },
+            { path: '/emails', element: <EmailSearch /> },
+            { path: '/settings', element: <Settings /> },
+          ],
+        },
+      ],
+    },
+    { path: '*', element: <Navigate to="/" replace /> },
+  ],
+  { basename: routerBasename },
+);
+
 export default function App() {
   const { i18n } = useTranslation();
-  const routerBasename = import.meta.env.BASE_URL === '/' ? undefined : import.meta.env.BASE_URL;
 
   return (
     <ConfigProvider
@@ -47,26 +76,7 @@ export default function App() {
       }}
     >
       <AuthProvider>
-        <BrowserRouter basename={routerBasename}>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route element={<ProtectedRoute />}>
-              <Route element={<AppLayout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/pkg" element={<PkgAutoFill />} />
-                <Route path="/rates" element={<RateList />} />
-                <Route path="/batches" element={<Navigate to="/upload" replace />} />
-                <Route path="/upload" element={<RateUpload />} />
-                <Route path="/compare" element={<RateCompare />} />
-                <Route path="/carriers" element={<CarrierList />} />
-                <Route path="/emails" element={<EmailSearch />} />
-                <Route path="/settings" element={<Settings />} />
-              </Route>
-            </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
+        <RouterProvider router={router} />
       </AuthProvider>
     </ConfigProvider>
   );
