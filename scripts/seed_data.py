@@ -90,6 +90,7 @@ PORTS = [
     ("IDPTK", "Pontianak", "坤甸", "Indonesia", "Southeast Asia"),
     ("IDBTM", "Batam", "巴淡", "Indonesia", "Southeast Asia"),
     ("IDBJM", "Banjarmasin", "马辰港", "Indonesia", "Southeast Asia"),
+    ("IDOKI", "Oki Mill Site Jetty", "OKI 米仓码头", "Indonesia", "Southeast Asia"),
 
     # 印度
     ("INNSA", "Nhava Sheva", "那瓦什瓦", "India", "South Asia"),
