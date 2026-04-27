@@ -92,10 +92,22 @@ def reset_rates(db: Session = Depends(get_db)):
     # 向后兼容字段：rates_deleted 聚合所有 rate 类表，前端原有消息模板不破
     total_rates_deleted = air_freight_count + air_surcharge_count + lcl_count + freight_count
 
+    # 净清掉的临时船司/港口 = 清前总数 - reseed 重灌数。
+    # carriers_deleted 字段历史返回的是「清前总数」，前端拿它直接显示「已清空 X 条船司」
+    # 会让用户误以为字典也被清；实际重灌后表里仍有 33 条，用户去字典页一看：「为什么没动？」
+    # 改为返回净删除数（用户/auto-create 临时新增的部分），并新增 carriers_kept_dict
+    # 让前端 toast 能如实告诉用户「清掉 X 条临时 / 保留 Y 条字典」。
+    carriers_net_removed = max(0, carrier_count - reseed_result["carriers_reseeded"])
+    ports_net_removed = max(0, port_count - reseed_result["ports_reseeded"])
+
     return ApiResponse(data={
         "rates_deleted": total_rates_deleted,
-        "carriers_deleted": carrier_count,
-        "ports_deleted": port_count,
+        "carriers_deleted": carriers_net_removed,           # 净删除（不含重灌字典）
+        "carriers_purged_total": carrier_count,             # 清前总数（含字典）
+        "carriers_kept_dict": reseed_result["carriers_reseeded"],
+        "ports_deleted": ports_net_removed,
+        "ports_purged_total": port_count,
+        "ports_kept_dict": reseed_result["ports_reseeded"],
         "carriers_reseeded": reseed_result["carriers_reseeded"],
         "ports_reseeded": reseed_result["ports_reseeded"],
         "upload_logs_deleted": upload_count,
@@ -107,4 +119,7 @@ def reset_rates(db: Session = Depends(get_db)):
         "air_surcharges_deleted": air_surcharge_count,
         "lcl_rates_deleted": lcl_count,
         "freight_rates_deleted": freight_count,
-    }, message=f"已清空 {total_rates_deleted} 条运价 / {batch_count} 个批次 / {drafts_cleared} 个草稿；重灌 {reseed_result['carriers_reseeded']} 船司 / {reseed_result['ports_reseeded']} 港口")
+    }, message=(
+        f"已清空 {total_rates_deleted} 条运价 / {batch_count} 个批次 / {drafts_cleared} 个草稿；"
+        f"清掉 {carriers_net_removed} 条临时船司（保留 {reseed_result['carriers_reseeded']} 条字典）"
+    ))

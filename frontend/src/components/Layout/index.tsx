@@ -63,12 +63,14 @@ export default function AppLayout() {
           const d = (res?.data || {}) as {
             rates_deleted?: number;
             carriers_deleted?: number;
+            carriers_kept_dict?: number;
             upload_logs_deleted?: number;
           };
           message.success(
             t('admin.resetSuccess', {
               rates: d.rates_deleted ?? 0,
               carriers: d.carriers_deleted ?? 0,
+              kept: d.carriers_kept_dict ?? 0,
               logs: d.upload_logs_deleted ?? 0,
             })
           );

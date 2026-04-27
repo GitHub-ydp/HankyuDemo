@@ -48,9 +48,9 @@
   "admin": {
     "resetBtn": "清空数据",
     "resetTitle": "一键清空业务数据",
-    "resetDesc": "将清空所有运价、船司与供应商、上传记录与解析缓存（保留港口字典）。仅限演示，不可恢复。",
+    "resetDesc": "将清空所有运价、上传记录、解析缓存与用户新增的临时船司；保留港口字典与船司字典（导入运价表所必需）。仅限演示，不可恢复。",
     "resetOk": "清空",
-    "resetSuccess": "已清空 {{rates}} 条运价 / {{carriers}} 条船司 / {{logs}} 条上传记录",
+    "resetSuccess": "已清空 {{rates}} 条运价 / {{carriers}} 条临时船司 / {{logs}} 条上传记录（保留 {{kept}} 条船司字典）",
     "resetFailed": "清空失败："
   },
   "dashboard": {

@@ -61,6 +61,43 @@ class DraftRateBatch:
 _draft_batches: dict[str, DraftRateBatch] = {}
 
 
+# upload_dir 解析锚点：始终落到「backend/」目录之下，避免依赖进程 cwd。
+# 进程从仓库根、systemd unit、docker、IDE 各种姿势启动时，cwd 不一致会让
+# `Path("uploads")` 解析到完全不同的位置（甚至无写权限的根目录）。
+# rate_batch_service.py 在 backend/app/services/ → parents[2] = backend/
+_BACKEND_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _resolve_upload_dir() -> Path:
+    """把 settings.upload_dir 解析成绝对路径，并确保目录存在 + 可写。
+
+    - 绝对路径：原样使用（典型 prod 场景：UPLOAD_DIR=/var/lib/hankyu/uploads）
+    - 相对路径：锚定到 backend/ 而非进程 cwd，行为与启动姿势解耦
+    """
+    raw = Path(settings.upload_dir)
+    if raw.is_absolute():
+        upload_dir = raw
+    else:
+        upload_dir = (_BACKEND_ROOT / raw).resolve()
+
+    try:
+        upload_dir.mkdir(parents=True, exist_ok=True)
+    except PermissionError as exc:
+        import getpass
+
+        try:
+            user = getpass.getuser()
+        except Exception:
+            user = f"uid={os.getuid()}"
+        raise PermissionError(
+            f"Cannot create upload dir: {upload_dir} "
+            f"(user={user}, settings.upload_dir={settings.upload_dir!r}). "
+            f"Fix: sudo mkdir -p {upload_dir} && sudo chown -R {user}: {upload_dir.parent} "
+            f"or set UPLOAD_DIR=/abs/path in .env"
+        ) from exc
+    return upload_dir
+
+
 def create_draft_batch_from_upload(
     *,
     file_name: str,
@@ -77,13 +114,29 @@ def create_draft_batch_from_upload(
         allowed = ", ".join(sorted(SUPPORTED_BATCH_FILE_EXTENSIONS))
         raise ValueError(f"Unsupported file type: {file_ext or 'unknown'}. Allowed: {allowed}")
 
-    upload_dir = Path(settings.upload_dir)
-    upload_dir.mkdir(parents=True, exist_ok=True)
+    upload_dir = _resolve_upload_dir()
 
     safe_name = _safe_file_name(file_name)
     saved_name = f"step1_batch_{uuid.uuid4().hex[:8]}_{safe_name}"
     saved_path = upload_dir / saved_name
-    saved_path.write_bytes(content)
+    try:
+        saved_path.write_bytes(content)
+    except PermissionError as exc:
+        # 服务器上常见：upload_dir 属主与 uvicorn 运行用户不一致（之前 sudo 跑过留下的 root 目录）
+        # 报错暴露 cwd + 解析路径 + 当前 uid，方便运维一眼定位
+        import getpass
+
+        cwd = os.getcwd()
+        try:
+            user = getpass.getuser()
+        except Exception:
+            user = f"uid={os.getuid()}"
+        raise PermissionError(
+            f"Cannot write to upload dir: {saved_path} "
+            f"(cwd={cwd}, user={user}, settings.upload_dir={settings.upload_dir!r}). "
+            f"Fix: chown -R {user}: {upload_dir} && chmod -R u+rwX {upload_dir} "
+            f"or set UPLOAD_DIR=/abs/path in .env"
+        ) from exc
 
     ai_fallback_used = False
     try:

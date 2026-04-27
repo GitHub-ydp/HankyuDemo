@@ -48,9 +48,9 @@
   "admin": {
     "resetBtn": "Reset Data",
     "resetTitle": "Reset all business data",
-    "resetDesc": "This will wipe all rates, carriers/suppliers, upload logs, and parse cache while keeping the port dictionary. Demo only and cannot be undone.",
+    "resetDesc": "This will wipe all rates, upload logs, parse cache, and user-added carriers. Port and carrier dictionaries are kept (required for re-importing rate sheets). Demo only and cannot be undone.",
     "resetOk": "Reset",
-    "resetSuccess": "Removed {{rates}} rates / {{carriers}} carriers / {{logs}} upload logs",
+    "resetSuccess": "Removed {{rates}} rates / {{carriers}} ad-hoc carriers / {{logs}} upload logs ({{kept}} dictionary carriers kept)",
     "resetFailed": "Reset failed: "
   },
   "dashboard": {

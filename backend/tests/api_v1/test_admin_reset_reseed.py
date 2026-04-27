@@ -4,7 +4,8 @@
 1. reset 前的 carriers / ports 被清空
 2. 重灌后 carriers ≥ seed 列表数量
 3. 返回体含 carriers_reseeded / ports_reseeded > 0
-4. carriers_deleted 不再固定 0，反映实际清掉的条数
+4. carriers_deleted 反映「净清掉的临时船司」（清前总数 - 重灌字典数），
+   carriers_purged_total 反映清前总数，carriers_kept_dict 反映保留的字典数
 """
 from typing import Iterator
 
@@ -81,9 +82,13 @@ def test_reset_clears_dict_and_reseeds(client_with_isolated_db):
     assert data["carriers_reseeded"] > 0
     assert data["ports_reseeded"] > 0
 
-    # carriers_deleted 反映实际清掉的条数（不再固定 0）
-    assert data["carriers_deleted"] == carrier_before
-    assert data["ports_deleted"] == port_before
+    # purged_total = 清前总数；kept_dict = 重灌字典数；deleted = 净清掉（临时部分）
+    assert data["carriers_purged_total"] == carrier_before
+    assert data["ports_purged_total"] == port_before
+    assert data["carriers_kept_dict"] == data["carriers_reseeded"]
+    assert data["ports_kept_dict"] == data["ports_reseeded"]
+    assert data["carriers_deleted"] == max(0, carrier_before - data["carriers_reseeded"])
+    assert data["ports_deleted"] == max(0, port_before - data["ports_reseeded"])
 
     # 重灌后 db 里 carriers / ports ≥ seed 列表数量
     gen = app.dependency_overrides[get_db]()
