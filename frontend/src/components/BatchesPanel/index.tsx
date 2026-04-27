@@ -48,7 +48,7 @@ function DetailDrawer({ batchId, onClose, onActivated }: DetailDrawerProps) {
   const [diffLoading, setDiffLoading] = useState(false);
   const [activate, setActivate] = useState<RateBatchActivateResponse | null>(null);
   const [activating, setActivating] = useState(false);
-  const [section, setSection] = useState<'preview' | 'diff' | 'activate'>('preview');
+  const [section, setSection] = useState<'preview' | 'diff'>('preview');
 
   const fetchDetail = async () => {
     try {
@@ -101,19 +101,16 @@ function DetailDrawer({ batchId, onClose, onActivated }: DetailDrawerProps) {
             t('batches.activateFailed');
           message.error(errDetail);
           setActivate(envelope.data);
-          setSection('activate');
           return;
         }
         if (status === 'empty_batch') {
           message.warning(envelope.data.message || t('batches.emptyBatchMsg'));
           setActivate(envelope.data);
-          setSection('activate');
           return;
         }
         if (status === 'already_active') {
           message.info(envelope.data.message || t('batches.alreadyActiveMsg'));
           setActivate(envelope.data);
-          setSection('activate');
           return;
         }
       }
@@ -121,7 +118,6 @@ function DetailDrawer({ batchId, onClose, onActivated }: DetailDrawerProps) {
         setActivate(envelope.data);
         message.success(envelope.data.message || t('batches.activateOk'));
       }
-      setSection('activate');
       if (!dryRun) {
         await fetchDetail();
         onActivated?.();
@@ -203,6 +199,26 @@ function DetailDrawer({ batchId, onClose, onActivated }: DetailDrawerProps) {
                 </div>
               </div>
 
+              {activate && activate.activated && (
+                <div
+                  className="stat-grid"
+                  style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginTop: -6, marginBottom: 14 }}
+                >
+                  <div className="stat-tile success">
+                    <div className="l">{t('batches.activatedFlag')}</div>
+                    <div className="v"><Icon name="check" size={16} /></div>
+                  </div>
+                  <div className="stat-tile">
+                    <div className="l">{t('batches.importedRows')}</div>
+                    <div className="v">{activate.imported_rows}</div>
+                  </div>
+                  <div className="stat-tile">
+                    <div className="l">{t('batches.skippedRows')}</div>
+                    <div className="v">{activate.skipped_rows}</div>
+                  </div>
+                </div>
+              )}
+
               {detail.warnings.length > 0 && (
                 <div className="alert alert-warn" style={{ marginBottom: 14 }}>
                   <div className="alert-icon">
@@ -249,14 +265,6 @@ function DetailDrawer({ batchId, onClose, onActivated }: DetailDrawerProps) {
                       · {diff.summary.total_rows}
                     </span>
                   )}
-                </button>
-                <button
-                  type="button"
-                  className={`tab${section === 'activate' ? ' on' : ''}`}
-                  onClick={() => setSection('activate')}
-                >
-                  <Icon name="check" size={13} />
-                  {t('batches.tabActivate')}
                 </button>
               </div>
 
@@ -346,19 +354,6 @@ function DetailDrawer({ batchId, onClose, onActivated }: DetailDrawerProps) {
                           <div className="v">{diff.summary.unmatched_rows}</div>
                         </div>
                       </div>
-                      <div className="hint" style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted, #888)' }}>
-                        {t('batches.unmatchedHint')}
-                      </div>
-                      {diff.message && (
-                        <div className="alert alert-info" style={{ marginBottom: 14 }}>
-                          <div className="alert-icon">
-                            <Icon name="sparkles" size={14} />
-                          </div>
-                          <div className="alert-body">
-                            <div className="alert-desc">{diff.message}</div>
-                          </div>
-                        </div>
-                      )}
                       <div className="table-scroll">
                         <table className="rtable" style={{ minWidth: 680, fontSize: 12 }}>
                           <thead>
@@ -403,74 +398,6 @@ function DetailDrawer({ batchId, onClose, onActivated }: DetailDrawerProps) {
                 </>
               )}
 
-              {section === 'activate' && (
-                <>
-                  {detail && (detail.batch_status === 'active' || detail.batch_status === 'activated') ? (
-                    <div className="alert alert-success" style={{ marginBottom: 14 }}>
-                      <div className="alert-icon">
-                        <Icon name="check" size={14} />
-                      </div>
-                      <div className="alert-body">
-                        <div className="alert-title">{t('batches.alreadyApplied')}</div>
-                      </div>
-                    </div>
-                  ) : !activate ? (
-                    <div className="alert alert-info" style={{ marginBottom: 14 }}>
-                      <div className="alert-icon">
-                        <Icon name="sparkles" size={14} />
-                      </div>
-                      <div className="alert-body">
-                        <div className="alert-title">{t('batches.activateNotYet')}</div>
-                        <div className="alert-desc">{t('batches.activateHint')}</div>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="alert alert-info" style={{ marginBottom: 14 }}>
-                        <div className="alert-icon">
-                          <Icon name={activate.is_stub ? 'sparkles' : 'check'} size={14} />
-                        </div>
-                        <div className="alert-body">
-                          <div className="alert-title">
-                            {activate.activation_status} · {t('batches.selectedRows', { n: activate.selected_rows })}
-                          </div>
-                          <div className="alert-desc">{activate.message || ''}</div>
-                        </div>
-                      </div>
-                      <dl className="kv-grid">
-                        <dt>{t('batches.activatedFlag')}</dt>
-                        <dd>{activate.activated ? t('common.yes') : t('common.no')}</dd>
-                        <dt>{t('batches.importedRows')}</dt>
-                        <dd className="num">{activate.imported_rows}</dd>
-                        <dt>{t('batches.skippedRows')}</dt>
-                        <dd className="num">{activate.skipped_rows}</dd>
-                        <dt>{t('batches.generatedAt')}</dt>
-                        <dd className="num">{formatTimestamp(activate.generated_at)}</dd>
-                      </dl>
-                    </>
-                  )}
-
-                  <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => runActivate(true)}
-                      disabled={activating}
-                    >
-                      <Icon name="check" size={13} />
-                      {t('batches.activateDryRun')}
-                    </button>
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => runActivate(false)}
-                      disabled={activating}
-                      title={t('batches.activateRealHint')}
-                    >
-                      <Icon name="check" size={13} />
-                      {t('batches.activateReal')}
-                    </button>
-                  </div>
-                </>
-              )}
             </>
           )}
         </div>
@@ -479,11 +406,16 @@ function DetailDrawer({ batchId, onClose, onActivated }: DetailDrawerProps) {
           <button className="btn btn-ghost" onClick={onClose}>
             {t('common.cancel')}
           </button>
-          <button className="btn btn-secondary" onClick={runDiff} disabled={diffLoading}>
-            <Icon name="compare" size={13} />
-            {diffLoading ? t('batches.diffing') : t('batches.runDiff')}
+          <button
+            className="btn btn-primary"
+            onClick={() => runActivate(false)}
+            disabled={activating || !detail}
+            title={t('batches.activateRealHint')}
+          >
+            <Icon name="check" size={13} />
+            {t('batches.activateReal')}
           </button>
-          <button className="btn btn-primary" onClick={downloadOriginal} disabled={!detail}>
+          <button className="btn btn-secondary" onClick={downloadOriginal} disabled={!detail}>
             <Icon name="download" size={13} />
             {t('batches.download')}
           </button>
@@ -553,14 +485,15 @@ export default function BatchesPanel({ reloadKey, focusBatchId, onOpenDetail }: 
   };
 
   return (
-    <div className="page">
-      <div className="card" style={{ padding: 0, overflow: 'hidden', opacity: loading ? 0.7 : 1 }}>
+    <>
+      <div className="card" style={{ marginBottom: 16, opacity: loading ? 0.7 : 1 }}>
         <div className="card-head">
           <h3>{t('batches.listTitle')}</h3>
           <span className="sub right">DRAFTS</span>
         </div>
-        <div className="table-scroll">
-          <table className="rtable" style={{ minWidth: 920 }}>
+        <div className="card-body" style={{ padding: 0 }}>
+          <div className="table-scroll">
+            <table className="rtable" style={{ minWidth: 920 }}>
             <thead>
               <tr>
                 <th style={{ width: 100 }}>{t('batches.col.batchId')}</th>
@@ -646,27 +579,28 @@ export default function BatchesPanel({ reloadKey, focusBatchId, onOpenDetail }: 
             </tbody>
           </table>
         </div>
-        {total > 0 && (
-          <div className="pager">
-            <div className="pg-total">
-              {t('batches.pageSummary', { total, page, totalPages })}
-            </div>
-            <button disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-              ‹
-            </button>
-            {pageNumbers.map((n) => (
-              <button key={n} className={page === n ? 'on' : ''} onClick={() => setPage(n)}>
-                {n}
+          {total > 0 && (
+            <div className="pager">
+              <div className="pg-total">
+                {t('batches.pageSummary', { total, page, totalPages })}
+              </div>
+              <button disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                ‹
               </button>
-            ))}
-            <button
-              disabled={page === totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              ›
-            </button>
-          </div>
-        )}
+              {pageNumbers.map((n) => (
+                <button key={n} className={page === n ? 'on' : ''} onClick={() => setPage(n)}>
+                  {n}
+                </button>
+              ))}
+              <button
+                disabled={page === totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                ›
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {selected && (
@@ -676,6 +610,6 @@ export default function BatchesPanel({ reloadKey, focusBatchId, onOpenDetail }: 
           onActivated={() => fetchList()}
         />
       )}
-    </div>
+    </>
   );
 }

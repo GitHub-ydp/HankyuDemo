@@ -438,10 +438,10 @@ export default function RateUpload() {
         ? 'tag-warn'
         : 'tag-info';
 
+  // 邮件类（inbox/email）tab 已隐藏，只保留 excel + wechat；
+  // 相关 state/handler 暂时保留以避免影响 InboxRow / handleMsgUpload 等共用逻辑
   const tabs: { key: SourceTab; label: string; icon: IconName }[] = [
     { key: 'excel', label: t('upload.tabExcel'), icon: 'import' },
-    { key: 'inbox', label: t('upload.tabInbox'), icon: 'mail' },
-    { key: 'email', label: t('upload.tabEmailText'), icon: 'mail' },
     { key: 'wechat', label: t('upload.tabWechat'), icon: 'sparkles' },
   ];
 

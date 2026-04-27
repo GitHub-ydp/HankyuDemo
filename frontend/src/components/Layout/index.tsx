@@ -20,7 +20,6 @@ const OPS_NAV: NavEntry[] = [
   { to: '/upload', icon: 'import', labelKey: 'menu.upload' },
   { to: '/compare', icon: 'compare', labelKey: 'menu.compare' },
   { to: '/pkg', icon: 'package', labelKey: 'menu.pkg' },
-  { to: '/emails', icon: 'mail', labelKey: 'menu.emailSearch' },
 ];
 
 const DATA_NAV: NavEntry[] = [{ to: '/carriers', icon: 'carriers', labelKey: 'menu.carriers' }];
