@@ -82,6 +82,7 @@ PORT_ALIAS_MAP: dict[str, str] = {
     "abu dhabi": "AEAUH", "阿布扎比": "AEAUH",
     "kuwait": "KWKWI", "kuwai": "KWKWI", "科威特": "KWKWI",
     "umm qasr": "IQUQR", "umm qasar": "IQUQR",
+    "oki mill site jetty": "IDOKI", "oki": "IDOKI", "OKI 米仓码头": "IDOKI",
     "khalifa": "BHKBS", "khalifa bin salman": "BHKBS", "khalifabin salman": "BHKBS",
     "khalifabin salman port": "BHKBS", "khalifa bin salman port": "BHKBS", "哈里发港": "BHKBS",
     # 红海
