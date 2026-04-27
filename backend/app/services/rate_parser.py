@@ -80,7 +80,7 @@ PORT_ALIAS_MAP: dict[str, str] = {
     "jebel ali": "AEJEA", "杰贝阿里": "AEJEA",
     "sohar": "OMSOH", "苏哈尔": "OMSOH",
     "abu dhabi": "AEAUH", "阿布扎比": "AEAUH",
-    "kuwait": "KWKWI", "科威特": "KWKWI",
+    "kuwait": "KWKWI", "kuwai": "KWKWI", "科威特": "KWKWI",
     "umm qasr": "IQUQR", "umm qasar": "IQUQR",
     "khalifa": "BHKBS", "khalifa bin salman": "BHKBS", "khalifabin salman": "BHKBS",
     "khalifabin salman port": "BHKBS", "khalifa bin salman port": "BHKBS", "哈里发港": "BHKBS",

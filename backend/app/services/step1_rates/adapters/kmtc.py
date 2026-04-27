@@ -10,8 +10,53 @@ from typing import Any
 from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
-from app.services.rate_parser import _resolve_port, _safe_decimal
+from app.services.rate_parser import (
+    PORT_ALIAS_MAP,
+    _TERMINAL_CONNECTORS,
+    _TERMINAL_SUFFIXES,
+    _resolve_port,
+    _safe_decimal,
+)
 from app.services.step1_rates.entities import ParsedRateBatch, ParsedRateRecord, Step1FileType
+
+
+def _clean_and_resolve_port(name_raw: str | None) -> str | None:
+    """把 KMTC 的港名清洗为 alias 命中时的 UN/LOCODE，或清洗后纯英文名。
+
+    供 activator._resolve_port 精确/ilike 匹配。返回 None 仅当输入为空。
+    """
+    if not name_raw or not str(name_raw).strip():
+        return None
+    name = str(name_raw).strip()
+
+    # 1. 取斜杠左半（中英合并 → 英文部分）
+    en = name.split("/")[0].strip() if "/" in name else name
+
+    # 2. 去掉括号（半角全角）
+    en = re.sub(r"[（(].*?[）)]", "", en).strip()
+
+    # 3. 去掉终端后缀（PAT/TCTB/UNITHAI/BMT/SCT 等）
+    for suf in _TERMINAL_SUFFIXES:
+        if en.upper().endswith(suf):
+            en = en[: -len(suf)].strip()
+            break
+
+    # 4. 去掉连字符及之后内容（'BKK - BMT' → 'BKK'）
+    for conn in _TERMINAL_CONNECTORS:
+        if conn in en:
+            en = en.split(conn)[0].strip()
+            break
+
+    if not en:
+        return None
+
+    # 5. alias 查表 → UN/LOCODE（命中即返回 5 字符大写）
+    locode = PORT_ALIAS_MAP.get(en.lower())
+    if locode:
+        return locode
+
+    # 6. fallback：返回清洗后纯英文（让 activator 走 ilike）
+    return en
 
 
 class KmtcAdapter:
@@ -22,7 +67,7 @@ class KmtcAdapter:
     priority: int = 15
 
     _SHEET_NAME: str = "KMTC-专刊"
-    _DEFAULT_ORIGIN_NAME: str = "Shanghai"
+    _DEFAULT_ORIGIN_NAME: str = "CNSHA"
     _CARRIER_NAME: str = "KMTC"
     _CURRENCY: str = "USD"
     _MAX_COL: int = 15
@@ -138,7 +183,7 @@ class KmtcAdapter:
             "carrier_code": self._CARRIER_NAME,
             "parser_version": self._PARSER_VERSION,
             "adapter_key": self.key,
-            "kmtc_origin_assumption": "default origin = Shanghai for all rows",
+            "kmtc_origin_assumption": "default origin = CNSHA (Shanghai) for all rows",
             "sheets": [sheet_summary],
             "region_lss_defaults": region_lss_defaults,
             "record_kind_distribution": kind_distribution,
@@ -372,13 +417,14 @@ class KmtcAdapter:
             "destination_port_raw": port_name_raw,
         }
 
+        destination_resolved = _clean_and_resolve_port(port_name_raw)
         record = ParsedRateRecord(
             record_kind="ocean_ngb_fcl",
             carrier_name=self._CARRIER_NAME,
             origin_port_id=None,
             origin_port_name=self._DEFAULT_ORIGIN_NAME,
             destination_port_id=None,
-            destination_port_name=port_name_raw,
+            destination_port_name=destination_resolved,
             container_20gp=container_20gp,
             container_40gp=container_40gp,
             container_40hq=container_40hq,
@@ -513,7 +559,7 @@ class KmtcAdapter:
                 "carrier_code": self._CARRIER_NAME,
                 "parser_version": self._PARSER_VERSION,
                 "adapter_key": self.key,
-                "kmtc_origin_assumption": "default origin = Shanghai for all rows",
+                "kmtc_origin_assumption": "default origin = CNSHA (Shanghai) for all rows",
                 "sheets": [sheet_summary],
                 "region_lss_defaults": region_lss_defaults,
                 "record_kind_distribution": {"ocean_ngb_fcl": 0},

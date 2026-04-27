@@ -99,7 +99,8 @@ def test_v_k_04_region_headers_skipped(real_batch: ParsedRateBatch) -> None:
 def test_v_k_05_busan_row_six(real_batch: ParsedRateBatch) -> None:
     """V-K05：R6 釜山 — 容器 130/260/260；BAF 220/440；LSS None；lss_20_raw='含'。"""
     rec = _find(real_batch.records, 6)
-    assert rec.destination_port_name == "BUSAN/釜山"
+    assert rec.destination_port_name == "KRPUS"
+    assert rec.extras.get("destination_port_raw") == "BUSAN/釜山"
     assert rec.container_20gp == Decimal("130")
     assert rec.container_40gp == Decimal("260")
     assert rec.container_40hq == Decimal("260")
@@ -116,7 +117,8 @@ def test_v_k_05_busan_row_six(real_batch: ParsedRateBatch) -> None:
 def test_v_k_06_hongkong_row_fourteen(real_batch: ParsedRateBatch) -> None:
     """V-K06：R14 香港 — BAF '含'→None / raw='含'；LSS 0→Decimal('0') / raw='0'。"""
     rec = _find(real_batch.records, 14)
-    assert rec.destination_port_name == "HONGKONG/香港"
+    assert rec.destination_port_name == "HKHKG"
+    assert rec.extras.get("destination_port_raw") == "HONGKONG/香港"
     assert rec.baf_20 is None
     assert rec.extras.get("baf_20_raw") == "含"
     assert rec.lss_20 == Decimal("0")
@@ -204,7 +206,7 @@ def test_v_k_11_batch_metadata(real_batch: ParsedRateBatch) -> None:
     for rec in real_batch.records:
         assert rec.record_kind == "ocean_ngb_fcl"
         assert rec.carrier_name == "KMTC"
-        assert rec.origin_port_name == "Shanghai"
+        assert rec.origin_port_name == "CNSHA"
         assert rec.currency == "USD"
     expected_min = min(
         (r.valid_from for r in real_batch.records if r.valid_from is not None),
@@ -212,6 +214,33 @@ def test_v_k_11_batch_metadata(real_batch: ParsedRateBatch) -> None:
     )
     assert real_batch.effective_from == expected_min
     assert real_batch.effective_to is None
+
+
+# ------------- V-K12 -------------
+
+# ------------- V-K13 -------------
+
+def test_v_k_13_port_name_resolution_coverage(real_batch: ParsedRateBatch) -> None:
+    """V-K13：destination_port_name 99% 以上是 5 字符大写 UN/LOCODE。
+
+    仅 OKI MILL SITE JETTY 一个独立港需要走 ilike fallback；其余应全部命中 alias 表。
+    """
+    locode_count = 0
+    fallback = []
+    for rec in real_batch.records:
+        n = rec.destination_port_name or ""
+        if len(n) == 5 and n.isupper() and n.isalpha():
+            locode_count += 1
+        else:
+            fallback.append((rec.extras.get("row_index"), n))
+    # 90 行总数下，至少 88 命中 alias 表
+    assert locode_count >= 88, (
+        f"locode coverage too low: {locode_count}/{len(real_batch.records)}; "
+        f"fallback={fallback}"
+    )
+    # fallback 名称必须是 OKI MILL SITE JETTY（已知遗留）
+    for _row, name in fallback:
+        assert "OKI" in name.upper(), f"unexpected fallback: {name!r}"
 
 
 # ------------- V-K12 -------------
