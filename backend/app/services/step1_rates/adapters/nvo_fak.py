@@ -23,6 +23,7 @@ from app.services.step1_rates.entities import ParsedRateBatch, ParsedRateRecord,
 _STATE_SUFFIX_RE = re.compile(r",\s*[A-Z]{2}\s*$")
 _PAREN_RE = re.compile(r"[（(].*?[）)]")
 _LOCODE_RE = re.compile(r"^[A-Z]{5}$")
+_TRAILING_STATE_PART_RE = re.compile(r"^[A-Z]{2}$")
 
 
 def _nvo_safe_decimal(value: Any) -> Decimal | None:
@@ -50,10 +51,37 @@ def _split_origins(s: str | None) -> list[str]:
     return [part.strip() for part in text.split(",") if part.strip()]
 
 
+def _split_multi_port_dest(name_raw: str | None) -> list[str]:
+    """destination 多港拆分（与 origin 的逗号拆 LOCODE 对称）。
+
+    州缩写形态不拆（'New York, NY' → ['New York, NY']），
+    多港形态拆开（'Los Angeles, Long Beach' → ['Los Angeles', 'Long Beach']）。
+
+    判别规则：以逗号拆段，若除第一段外的所有尾段都是 2 字大写（州缩写） → 不拆；
+    否则视为真多港，拆出每一段独立返回。
+    """
+    if name_raw is None:
+        return []
+    text = str(name_raw).strip()
+    if not text:
+        return []
+    if "," not in text:
+        return [text]
+    parts = [p.strip() for p in text.split(",")]
+    if any(not p for p in parts):
+        # 含空段（如 ", LA" 或 "LA,"）— 不拆，交给清洗
+        return [text]
+    # 尾段全部为 2 字大写 → 视为州缩写（含 'Walvis Bay, Namibia' 这类 → 尾段不是 2 字 → 走拆分）
+    if all(_TRAILING_STATE_PART_RE.match(p) for p in parts[1:]):
+        return [text]
+    return parts
+
+
 def _clean_destination(name_raw: str | None) -> str | None:
     """destination：去 ', ST'、去括号、查 alias → LOCODE 或纯英文。
 
-    多港描述（"Los Angeles, Long Beach"）取第一段；adapter 不接 db。
+    本函数负责单段港名清洗。多港拆分由 _split_multi_port_dest 在调用前完成；
+    含 '/' 的多港（如 "Cape Town / Durban / Coega"）仍在此取第一段。
     """
     if name_raw is None:
         return None
@@ -61,17 +89,14 @@ def _clean_destination(name_raw: str | None) -> str | None:
     if not text:
         return None
 
-    # 多港描述（含 / 或 ,）取第一段（注意：先按 / 切再按 , 切，因为
-    # "Cape Town / Durban / Coega" 与 "Los Angeles, Long Beach" 都属于多港）
     head = text
     if "/" in head:
         head = head.split("/")[0].strip()
     if "," in head:
-        # 注意：可能是 "Norfolk, VA"（state 缩写）或 "Los Angeles, Long Beach"
-        # 先剥 state 后缀，否则两段都被切掉就只剩第一个
+        # 走到这里通常已被 _split_multi_port_dest 拆过，剩余的 "," 形态
+        # 期望是 state 后缀（"Norfolk, VA"）。若不是，仍兜底取第一段。
         head_no_state = _STATE_SUFFIX_RE.sub("", head).strip()
         if head_no_state == head:
-            # 没有 state 后缀，是多港 → 取第一段
             head = head.split(",")[0].strip()
         else:
             head = head_no_state
@@ -425,21 +450,17 @@ class NvoFakAdapter:
         )
         # destination 优先 dest 列，回退 pod
         dest_source = dest_raw or pod_raw
-        dest_clean = _clean_destination(dest_source)
-        if not dest_clean:
+        dest_segments = _split_multi_port_dest(dest_source)
+        dest_cleans: list[str] = []
+        for seg in dest_segments:
+            cleaned = _clean_destination(seg)
+            if cleaned:
+                dest_cleans.append(cleaned)
+        if not dest_cleans:
             warnings.append(
                 f"{sheet_name} row {row_index}: missing destination; raw='{dest_source}'"
             )
             return records, unseeded, warnings
-
-        # 多港 destination 提示（仅当原文含 , 或 / 且非 state 后缀）
-        if dest_source:
-            stripped_state = _STATE_SUFFIX_RE.sub("", dest_source).strip()
-            if "/" in dest_source or ("," in stripped_state):
-                warnings.append(
-                    f"{sheet_name} row {row_index}: multi-port destination "
-                    f"'{dest_source}' simplified to '{dest_clean}'"
-                )
 
         coast_text = (
             self._normalize_text(row[coast_idx]) if coast_idx is not None else None
@@ -471,51 +492,52 @@ class NvoFakAdapter:
                 if origin_clean not in PORT_ALIAS_MAP.values():
                     unseeded.add(origin_clean)
 
-            extras: dict[str, Any] = {
-                "sheet_name": sheet_name,
-                "row_index": row_index,
-                "section_label": section_label,
-                "section_kind": section_kind,
-                "origin_raw": origin_raw_text,
-                "pod_raw": pod_raw,
-                "destination_raw": dest_raw,
-                "coast": coast_text,
-                "rad_raw": rad_raw_text,
-                "container_20gp_raw": self._raw_text(row[c20_idx]),
-                "container_40gp_raw": self._raw_text(row[c40_idx])
-                if c40_idx is not None
-                else None,
-                "container_40hq_raw": self._raw_text(row[hc_idx])
-                if hc_idx is not None
-                else None,
-                "container_45_raw": self._raw_text(row[c45_idx])
-                if c45_idx is not None
-                else None,
-            }
+            for dest_clean in dest_cleans:
+                extras: dict[str, Any] = {
+                    "sheet_name": sheet_name,
+                    "row_index": row_index,
+                    "section_label": section_label,
+                    "section_kind": section_kind,
+                    "origin_raw": origin_raw_text,
+                    "pod_raw": pod_raw,
+                    "destination_raw": dest_raw,
+                    "coast": coast_text,
+                    "rad_raw": rad_raw_text,
+                    "container_20gp_raw": self._raw_text(row[c20_idx]),
+                    "container_40gp_raw": self._raw_text(row[c40_idx])
+                    if c40_idx is not None
+                    else None,
+                    "container_40hq_raw": self._raw_text(row[hc_idx])
+                    if hc_idx is not None
+                    else None,
+                    "container_45_raw": self._raw_text(row[c45_idx])
+                    if c45_idx is not None
+                    else None,
+                }
 
-            record = ParsedRateRecord(
-                record_kind="ocean_ngb_fcl",
-                carrier_name=self._CARRIER_NAME,
-                origin_port_id=None,
-                origin_port_name=origin_clean,
-                destination_port_id=None,
-                destination_port_name=dest_clean,
-                service_code=service_text,
-                container_20gp=c20,
-                container_40gp=c40,
-                container_40hq=hc,
-                container_45=c45,
-                currency=self._CURRENCY,
-                valid_from=eff_from,
-                valid_to=eff_to,
-                transit_days=None,
-                is_direct=True,
-                remarks=None,
-                source_type="excel",
-                source_file=source_file,
-                extras=extras,
-            )
-            records.append(record)
+                record = ParsedRateRecord(
+                    record_kind="ocean_ngb_fcl",
+                    carrier_name=self._CARRIER_NAME,
+                    origin_port_id=None,
+                    origin_port_name=origin_clean,
+                    destination_port_id=None,
+                    destination_port_name=dest_clean,
+                    service_code=service_text,
+                    container_20gp=c20,
+                    container_40gp=c40,
+                    container_40hq=hc,
+                    container_45=c45,
+                    currency=self._CURRENCY,
+                    valid_from=eff_from,
+                    valid_to=eff_to,
+                    transit_days=None,
+                    is_direct=True,
+                    remarks=None,
+                    source_type="excel",
+                    source_file=source_file,
+                    extras=extras,
+                )
+                records.append(record)
 
         return records, unseeded, warnings
 
@@ -546,7 +568,7 @@ class NvoFakAdapter:
             origin_text = self._normalize_text(row[1])
             if not origin_text:
                 continue
-            record = self._build_hawaii_record(
+            built = self._build_hawaii_records(
                 row=row,
                 row_index=ri,
                 eff_from=eff_from,
@@ -554,8 +576,7 @@ class NvoFakAdapter:
                 source_file=source_file,
                 warnings=warnings,
             )
-            if record is not None:
-                records.append(record)
+            records.extend(built)
 
         summary = {
             "sheet_name": self._SHEET_HAWAII,
@@ -567,7 +588,7 @@ class NvoFakAdapter:
         }
         return records, warnings, summary
 
-    def _build_hawaii_record(
+    def _build_hawaii_records(
         self,
         *,
         row: list[Any],
@@ -576,63 +597,73 @@ class NvoFakAdapter:
         eff_to: date | None,
         source_file: str,
         warnings: list[str],
-    ) -> ParsedRateRecord | None:
+    ) -> list[ParsedRateRecord]:
         country_text = self._normalize_text(row[0])
         origin_text = self._normalize_text(row[1])
         dest_text = self._normalize_text(row[2])
         if not origin_text:
-            return None
+            return []
 
         c20 = _nvo_safe_decimal(row[3])
         c40 = _nvo_safe_decimal(row[4])
         hc = _nvo_safe_decimal(row[5])
         c45 = _nvo_safe_decimal(row[6])
         if c20 is None and c40 is None and hc is None and c45 is None:
-            return None
+            return []
 
         origin_clean = _clean_origin_locode(origin_text)
-        dest_clean = _clean_destination(dest_text)
         if dest_text and dest_text.strip().upper() == "CY":
             warnings.append(
                 f"Hawaii row {row_index}: destination 'CY' (Container Yard) is non-specific"
             )
+        dest_segments = _split_multi_port_dest(dest_text)
+        dest_cleans: list[str | None] = []
+        if dest_segments:
+            for seg in dest_segments:
+                dest_cleans.append(_clean_destination(seg))
+        else:
+            dest_cleans.append(None)
 
-        extras: dict[str, Any] = {
-            "sheet_name": self._SHEET_HAWAII,
-            "row_index": row_index,
-            "section_label": None,
-            "section_kind": "hawaii",
-            "country": country_text,
-            "origin_raw": origin_text,
-            "destination_raw": dest_text,
-            "container_20gp_raw": self._raw_text(row[3]),
-            "container_40gp_raw": self._raw_text(row[4]),
-            "container_40hq_raw": self._raw_text(row[5]),
-            "container_45_raw": self._raw_text(row[6]),
-        }
-
-        return ParsedRateRecord(
-            record_kind="ocean_ngb_fcl",
-            carrier_name=self._CARRIER_NAME,
-            origin_port_id=None,
-            origin_port_name=origin_clean,
-            destination_port_id=None,
-            destination_port_name=dest_clean,
-            service_code=None,
-            container_20gp=c20,
-            container_40gp=c40,
-            container_40hq=hc,
-            container_45=c45,
-            currency=self._CURRENCY,
-            valid_from=eff_from,
-            valid_to=eff_to,
-            transit_days=None,
-            is_direct=True,
-            remarks=None,
-            source_type="excel",
-            source_file=source_file,
-            extras=extras,
-        )
+        records: list[ParsedRateRecord] = []
+        for dest_clean in dest_cleans:
+            extras: dict[str, Any] = {
+                "sheet_name": self._SHEET_HAWAII,
+                "row_index": row_index,
+                "section_label": None,
+                "section_kind": "hawaii",
+                "country": country_text,
+                "origin_raw": origin_text,
+                "destination_raw": dest_text,
+                "container_20gp_raw": self._raw_text(row[3]),
+                "container_40gp_raw": self._raw_text(row[4]),
+                "container_40hq_raw": self._raw_text(row[5]),
+                "container_45_raw": self._raw_text(row[6]),
+            }
+            records.append(
+                ParsedRateRecord(
+                    record_kind="ocean_ngb_fcl",
+                    carrier_name=self._CARRIER_NAME,
+                    origin_port_id=None,
+                    origin_port_name=origin_clean,
+                    destination_port_id=None,
+                    destination_port_name=dest_clean,
+                    service_code=None,
+                    container_20gp=c20,
+                    container_40gp=c40,
+                    container_40hq=hc,
+                    container_45=c45,
+                    currency=self._CURRENCY,
+                    valid_from=eff_from,
+                    valid_to=eff_to,
+                    transit_days=None,
+                    is_direct=True,
+                    remarks=None,
+                    source_type="excel",
+                    source_file=source_file,
+                    extras=extras,
+                )
+            )
+        return records
 
     # ------------------------------------------------------------------
     # section iteration / detection

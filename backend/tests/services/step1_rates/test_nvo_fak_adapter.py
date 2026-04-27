@@ -25,6 +25,7 @@ from app.services.step1_rates.adapters.nvo_fak import (
     _clean_destination,
     _clean_origin_locode,
     _nvo_safe_decimal,
+    _split_multi_port_dest,
     _split_origins,
 )
 from app.services.step1_rates.entities import ParsedRateBatch, Step1FileType
@@ -114,25 +115,32 @@ def test_v_n_03_tpe_multi_section_identification(real_batch: ParsedRateBatch) ->
 # ---------- V-N04 ----------
 
 def test_v_n_04_origin_multi_split(real_batch: ParsedRateBatch) -> None:
+    """TPE R6: origin 'KRPUS,KRKAN' × dest 'Los Angeles, Long Beach'
+    → 2 origin × 2 dest = 4 record（同价同字段）。
+    """
     r6 = [
         r
         for r in real_batch.records
         if r.extras.get("sheet_name") == "TPE" and r.extras.get("row_index") == 6
     ]
-    assert len(r6) == 2
-    origins = sorted(r.origin_port_name for r in r6)
-    assert origins == ["KRKAN", "KRPUS"]
+    assert len(r6) == 4
+    pairs = sorted((r.origin_port_name, r.destination_port_name) for r in r6)
+    assert pairs == [
+        ("KRKAN", "USLAX"),
+        ("KRKAN", "USLGB"),
+        ("KRPUS", "USLAX"),
+        ("KRPUS", "USLGB"),
+    ]
     base = r6[0]
-    other = r6[1]
-    for fld in (
-        "destination_port_name",
-        "container_20gp",
-        "container_40gp",
-        "container_40hq",
-        "container_45",
-    ):
-        assert getattr(base, fld) == getattr(other, fld)
-    assert base.extras.get("coast") == other.extras.get("coast")
+    for other in r6[1:]:
+        for fld in (
+            "container_20gp",
+            "container_40gp",
+            "container_40hq",
+            "container_45",
+        ):
+            assert getattr(base, fld) == getattr(other, fld)
+        assert base.extras.get("coast") == other.extras.get("coast")
 
 
 # ---------- V-N05 ----------
@@ -205,12 +213,13 @@ def test_v_n_10_effective_dates(real_batch: ParsedRateBatch) -> None:
 # ---------- V-N11 ----------
 
 def test_v_n_11_total_records_in_range(real_batch: ParsedRateBatch) -> None:
-    """任务单预估 [260,320]，实测 374；适配器按真实数据展开后 [340,410]。
+    """origin × dest 笛卡尔展开（多港 dest 真拆分后）实测 405；放宽到 [380,440]。
 
-    任务单偏差来源：WPE 主段 origin 拆分倍率 (~1.7) 高于预估 (~1.5)。
+    历史：原 single-dest 取首段 374；启用多港 dest 拆分（'Los Angeles, Long Beach'
+    → USLAX + USLGB）后新增 31 条 USLGB record。
     """
     n = len(real_batch.records)
-    assert 340 <= n <= 410, f"records={n} out of [340,410]"
+    assert 380 <= n <= 440, f"records={n} out of [380,440]"
 
 
 # ---------- V-N12 ----------
@@ -424,6 +433,119 @@ def test_v_n_15_end_to_end_sqlite_activation_chain(
         .count()
     )
     assert krpus_rates >= 1
+
+
+# ---------- V-N16 ----------
+
+def test_v_n_16_multi_port_dest_split_real_file(real_batch: ParsedRateBatch) -> None:
+    """destination 多港真拆分：'Los Angeles, Long Beach' → 2 record (USLAX + USLGB)
+    同价同 origin；不再抛 'multi-port destination simplified to' warning。
+
+    抽样 TPE R6 / WPE R88 / WPE R90 / WPE R94 全配对。
+    """
+    multi_warns = [w for w in real_batch.warnings if "multi-port destination" in w]
+    assert multi_warns == [], f"unexpected multi-port warnings: {multi_warns}"
+
+    cases = [
+        ("TPE", 6, "KRPUS"),
+        ("TPE", 16, "CNNGB"),
+        ("TPE", 26, "TWKHH"),
+        ("TPE", 36, "SGSIN"),
+        ("WPE", 88, "PKBQM"),
+        ("WPE", 90, "INNSA"),
+        ("WPE", 94, "INCCU"),
+    ]
+    for sheet, row, origin in cases:
+        lax = [
+            r
+            for r in real_batch.records
+            if r.extras.get("sheet_name") == sheet
+            and r.extras.get("row_index") == row
+            and r.origin_port_name == origin
+            and r.destination_port_name == "USLAX"
+        ]
+        lgb = [
+            r
+            for r in real_batch.records
+            if r.extras.get("sheet_name") == sheet
+            and r.extras.get("row_index") == row
+            and r.origin_port_name == origin
+            and r.destination_port_name == "USLGB"
+        ]
+        assert len(lax) == 1, f"{sheet} R{row} {origin}: USLAX count={len(lax)}"
+        assert len(lgb) == 1, f"{sheet} R{row} {origin}: USLGB count={len(lgb)}"
+        for fld in ("container_20gp", "container_40gp", "container_40hq", "container_45"):
+            assert getattr(lax[0], fld) == getattr(lgb[0], fld)
+
+
+def test_v_n_16_split_helper_unit() -> None:
+    # 多港形态 → 拆
+    assert _split_multi_port_dest("Los Angeles, Long Beach") == [
+        "Los Angeles",
+        "Long Beach",
+    ]
+    # 尾空格 / 多空格容忍
+    assert _split_multi_port_dest("Los Angeles, Long Beach ") == [
+        "Los Angeles",
+        "Long Beach",
+    ]
+    assert _split_multi_port_dest("  Los Angeles ,  Long Beach  ") == [
+        "Los Angeles",
+        "Long Beach",
+    ]
+    # 州缩写形态 → 不拆
+    assert _split_multi_port_dest("New York, NY") == ["New York, NY"]
+    assert _split_multi_port_dest("Oakland, CA") == ["Oakland, CA"]
+    assert _split_multi_port_dest("Tacoma, WA") == ["Tacoma, WA"]
+    assert _split_multi_port_dest("Vancouver, BC") == ["Vancouver, BC"]
+    assert _split_multi_port_dest("Salt Lake City, UT") == ["Salt Lake City, UT"]
+    # 无逗号 → 原值
+    assert _split_multi_port_dest("Honolulu") == ["Honolulu"]
+    # 空值
+    assert _split_multi_port_dest(None) == []
+    assert _split_multi_port_dest("") == []
+    assert _split_multi_port_dest("   ") == []
+
+
+def test_v_n_16_state_suffix_destinations_not_split(real_batch: ParsedRateBatch) -> None:
+    """州缩写 dest 形态（'New York, NY' / 'Oakland, CA' / 'Tacoma, WA' 等）
+    整体清洗为单一 LOCODE，不被错拆成两条 record。
+    """
+    # TPE R7 (KRPUS,KRKAN × 'Oakland, CA') → 2 record，全部 USOAK
+    r7 = [
+        r
+        for r in real_batch.records
+        if r.extras.get("sheet_name") == "TPE" and r.extras.get("row_index") == 7
+    ]
+    assert len(r7) == 2
+    assert all(r.destination_port_name == "USOAK" for r in r7)
+
+    # TPE R8 (KRPUS × 'Tacoma, WA') → 1 record USTAC（不被拆成 USTAC + WA）
+    r8 = [
+        r
+        for r in real_batch.records
+        if r.extras.get("sheet_name") == "TPE" and r.extras.get("row_index") == 8
+    ]
+    assert len(r8) == 1
+    assert r8[0].destination_port_name == "USTAC"
+
+    # TPE R9 (KRPUS × 'New York, NY') → 1 record USNYC
+    r9 = [
+        r
+        for r in real_batch.records
+        if r.extras.get("sheet_name") == "TPE" and r.extras.get("row_index") == 9
+    ]
+    assert len(r9) == 1
+    assert r9[0].destination_port_name == "USNYC"
+
+    # TPE R10 (KRPUS × 'Norfolk, VA') → 1 record USNOR
+    r10 = [
+        r
+        for r in real_batch.records
+        if r.extras.get("sheet_name") == "TPE" and r.extras.get("row_index") == 10
+    ]
+    assert len(r10) == 1
+    assert r10[0].destination_port_name == "USNOR"
 
 
 # ---------- pure-helper unit tests ----------
