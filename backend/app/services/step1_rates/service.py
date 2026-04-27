@@ -4,7 +4,13 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.services.step1_rates.adapters import AirAdapter, KmtcAdapter, OceanAdapter, OceanNgbAdapter
+from app.services.step1_rates.adapters import (
+    AirAdapter,
+    KmtcAdapter,
+    NvoFakAdapter,
+    OceanAdapter,
+    OceanNgbAdapter,
+)
 from app.services.step1_rates.entities import ParsedRateBatch, Step1FileType
 from app.services.step1_rates.normalizers import legacy_payload_to_parsed_batch
 from app.services.step1_rates.registry import RateAdapterRegistry
@@ -15,6 +21,7 @@ def build_default_registry() -> RateAdapterRegistry:
         adapters=[
             AirAdapter(),
             KmtcAdapter(),
+            NvoFakAdapter(),
             OceanAdapter(),
             OceanNgbAdapter(),
         ]

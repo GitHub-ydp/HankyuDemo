@@ -91,6 +91,10 @@ PORTS = [
     ("IDBTM", "Batam", "巴淡", "Indonesia", "Southeast Asia"),
     ("IDBJM", "Banjarmasin", "马辰港", "Indonesia", "Southeast Asia"),
     ("IDOKI", "Oki Mill Site Jetty", "OKI 米仓码头", "Indonesia", "Southeast Asia"),
+    ("PHCEB", "Cebu", "宿务", "Philippines", "Southeast Asia"),
+    ("PHMNL", "Manila", "马尼拉", "Philippines", "Southeast Asia"),
+    ("CNHUA", "Huangpu", "黄埔", "China", "East Asia"),
+    ("CNXIN", "Xingang", "新港", "China", "East Asia"),
 
     # 印度
     ("INNSA", "Nhava Sheva", "那瓦什瓦", "India", "South Asia"),
@@ -170,6 +174,11 @@ PORTS = [
     ("USSTL", "St. Louis", "圣路易斯", "USA", "North America"),
     ("USDEN", "Denver", "丹佛", "USA", "North America"),
     ("USSLC", "Salt Lake City", "盐湖城", "USA", "North America"),
+    ("USLDO", "Laredo", "拉雷多", "USA", "North America"),
+    ("USOMA", "Omaha", "奥马哈", "USA", "North America"),
+    ("USTPA", "Tampa", "坦帕", "USA", "North America"),
+    ("USCRA", "Crandall", "克兰德尔", "USA", "North America"),
+    ("USGRR", "Greer", "格里尔", "USA", "North America"),
 
     # 加拿大
     ("CAVAN", "Vancouver", "温哥华", "Canada", "North America"),

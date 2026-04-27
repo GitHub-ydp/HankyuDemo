@@ -129,6 +129,21 @@ PORT_ALIAS_MAP: dict[str, str] = {
     "vancouver": "CAVAN", "toronto": "CATOR", "montreal": "CAMTR",
     "halifax": "CAHAL", "calgary": "CACAL", "edmonton": "CAEDM",
     "winnipeg": "CAWNP", "saskatoon": "CASAS",
+    # NVO FAK 追加 alias（详见 docs/Step1_NVO_FAK_adapter_架构任务单_20260427.md §4.3）
+    "cebu": "PHCEB", "宿务": "PHCEB",
+    "dalian": "CNDLC", "大连": "CNDLC",
+    "huangpu": "CNHUA", "黄埔": "CNHUA",
+    "leam chabang": "THLCH",
+    "manila": "PHMNL", "manila (north)": "PHMNL", "马尼拉": "PHMNL",
+    "pusan": "KRPUS",
+    "taoyuan": "TWTPE",
+    "xingang": "CNXIN", "新港": "CNXIN",
+    "laredo": "USLDO",
+    "omaha": "USOMA",
+    "saint louis": "USSTL",
+    "tampa": "USTPA",
+    "crandall": "USCRA",
+    "greer": "USGRR",
 }
 
 # NVO FAK 中的 Origin code → UN/LOCODE
