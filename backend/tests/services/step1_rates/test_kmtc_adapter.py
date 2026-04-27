@@ -149,39 +149,20 @@ def test_v_k_08_transit_days_extraction(real_batch: ParsedRateBatch) -> None:
 
 # ------------- V-K09 -------------
 
-def test_v_k_09_unknown_port_soft_fail(monkeypatch) -> None:
-    """V-K09：db 端口字典缺某行港口时，整批不抛异常；warnings 含识别失败信息；records = total - 缺失数。
-
-    端口解析必须靠 db 才会触发软失败。本用例用一个 stub Session：除 'OKI MILL SITE JETTY' 外
-    其它港口均返回非 None；OKI 行返回 None，应只丢失 1 行 + 1 条 warning。
+def test_v_k_09_clean_resolve_unknown_fallback() -> None:
+    """V-K09：未在 alias 命中的港名走 fallback 返回清洗后纯英文，不返回 None；
+    db 软失败的语义已迁移到 activator 层（由 sqlite 端到端测试覆盖）。
     """
-    if not REAL_KMTC_FILE.exists():
-        pytest.skip(f"KMTC 真实样本不可用：{REAL_KMTC_FILE}")
+    from app.services.step1_rates.adapters.kmtc import _clean_and_resolve_port
 
-    class _StubPort:
-        def __init__(self, name: str) -> None:
-            self.name_en = name
-
-    class _StubSession:
-        pass
-
-    captured: dict[str, list[str]] = {"miss": []}
-
-    def fake_resolve_port(name_raw: str, db) -> object | None:
-        if "OKI MILL SITE JETTY" in (name_raw or ""):
-            captured["miss"].append(name_raw)
-            return None
-        return _StubPort(name_raw or "STUB")
-
-    monkeypatch.setattr(
-        "app.services.step1_rates.adapters.kmtc._resolve_port",
-        fake_resolve_port,
-    )
-
-    batch = KmtcAdapter().parse(REAL_KMTC_FILE, db=_StubSession())
-    assert len(captured["miss"]) >= 1
-    assert any("无法识别港口" in w and "OKI MILL SITE JETTY" in w for w in batch.warnings)
-    assert len(batch.records) == 89
+    # 命中 alias → 5 字符 LOCODE
+    assert _clean_and_resolve_port("BUSAN/釜山") == "KRPUS"
+    assert _clean_and_resolve_port("OKI MILL SITE JETTY") == "IDOKI"
+    # 未命中 alias → 清洗后纯英文（让 activator 走 ilike fallback）
+    assert _clean_and_resolve_port("NONEXISTENT PORT XYZ") == "NONEXISTENT PORT XYZ"
+    # 空/None
+    assert _clean_and_resolve_port(None) is None
+    assert _clean_and_resolve_port("   ") is None
 
 
 # ------------- V-K10 -------------

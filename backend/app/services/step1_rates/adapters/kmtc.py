@@ -365,11 +365,9 @@ class KmtcAdapter:
             warnings.append(f"KMTC row {row_index}: missing destination port name")
             return None, warnings
 
-        if db is not None:
-            resolved_port = _resolve_port(port_name_raw, db)
-            if resolved_port is None:
-                warnings.append(f"KMTC row {row_index}: 无法识别港口 '{port_name_raw}'")
-                return None, warnings
+        # adapter 阶段不做 db-aware 早期校验（旧逻辑会因 ports 表缺 seed 而 skip 整行）
+        # destination_port_name 由 _clean_and_resolve_port 清洗为 LOCODE/纯英文，
+        # 由 activator._resolve_port 统一做最终匹配 + 软失败
 
         of_20_idx = layout["of_20"] - 1
         of_40_idx = layout["of_40"] - 1
