@@ -515,7 +515,11 @@
     "continueImport": "Import More",
     "importErrors": "{{count}} import errors",
     "noRatesFound": "No rate information detected in this file. Please verify the content or use a fixed template (Ocean / Ocean-NGB / Air).",
-    "aiFallbackUsed": "AI fallback parsed {{rows}} rows"
+    "aiFallbackUsed": "AI fallback parsed {{rows}} rows",
+    "stepUploadDone": "Upload Complete",
+    "draftCreatedTitle": "Draft Batch Created",
+    "draftCreatedSubtitle": "{{rows}} rate records uploaded to a draft batch. Open it in the Rate Batches list below, review the rows, and click \"Apply\" to activate them into the rate database.",
+    "uploadAnother": "Upload Another"
   },
   "pkg": {
     "title": "Bid Package Auto Fill",

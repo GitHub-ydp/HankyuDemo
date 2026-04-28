@@ -515,7 +515,11 @@
     "continueImport": "続けて取り込む",
     "importErrors": "{{count}} 件の取込エラー",
     "noRatesFound": "このファイルから運賃情報は検出されませんでした。内容をご確認いただくか、固定テンプレート（Ocean / Ocean-NGB / Air）をご利用ください。",
-    "aiFallbackUsed": "AI 解析で {{rows}} 件を取り込みました"
+    "aiFallbackUsed": "AI 解析で {{rows}} 件を取り込みました",
+    "stepUploadDone": "アップロード完了",
+    "draftCreatedTitle": "下書きバッチを作成しました",
+    "draftCreatedSubtitle": "{{rows}} 件の運賃を下書きバッチにアップロードしました。下の「運賃バッチ」リストから該当バッチを開き、内容を確認のうえ「採用」を押して運賃データベースへ反映してください。",
+    "uploadAnother": "続けてアップロード"
   },
   "pkg": {
     "title": "入札パッケージ自動入力",

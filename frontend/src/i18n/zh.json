@@ -515,7 +515,11 @@
     "continueImport": "继续导入",
     "importErrors": "{{count}} 条导入错误",
     "noRatesFound": "该文件未识别到运价信息，请确认文件内容或改用固定模板（Ocean / Ocean-NGB / Air）。",
-    "aiFallbackUsed": "AI 兜底解析成功 · {{rows}} 条"
+    "aiFallbackUsed": "AI 兜底解析成功 · {{rows}} 条",
+    "stepUploadDone": "上传完成",
+    "draftCreatedTitle": "草稿批次已创建",
+    "draftCreatedSubtitle": "已上传 {{rows}} 条费率到草稿批次。请在下方「运价批次」列表中点击该批次，确认无误后选择「采用」激活到运价库。",
+    "uploadAnother": "继续上传"
   },
   "pkg": {
     "title": "投标包自动填表",

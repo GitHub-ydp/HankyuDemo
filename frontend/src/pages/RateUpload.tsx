@@ -48,6 +48,16 @@ interface ImportResult {
   errors: string[];
 }
 
+interface DraftBatchResult {
+  batch_id: string;
+  file_name: string;
+  total_rows: number;
+  source_type: string;
+  adapter_key?: string | null;
+  carrier_code?: string | null;
+  warnings: string[];
+}
+
 type SourceTab = 'excel' | 'inbox' | 'email' | 'wechat';
 
 // --- Drop zone helper ---
@@ -107,13 +117,12 @@ function DropZone({
 }
 
 // --- Steps ---
-function UploadSteps({ step }: { step: number }) {
+function UploadSteps({ step, mode }: { step: number; mode: 'parse' | 'draft' }) {
   const { t } = useTranslation();
-  const steps = [
-    t('upload.stepSelectSource'),
-    t('upload.stepPreview'),
-    t('upload.stepDone'),
-  ];
+  const steps =
+    mode === 'draft'
+      ? [t('upload.stepSelectSource'), t('upload.stepUploadDone')]
+      : [t('upload.stepSelectSource'), t('upload.stepPreview'), t('upload.stepDone')];
   return (
     <div className="steps">
       {steps.map((title, i) => (
@@ -228,6 +237,7 @@ export default function RateUpload() {
   const [activeTab, setActiveTab] = useState<SourceTab>('excel');
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [draftResult, setDraftResult] = useState<DraftBatchResult | null>(null);
   const [emailText, setEmailText] = useState('');
   const [imageContext, setImageContext] = useState('');
   const [inboxEmails, setInboxEmails] = useState<InboxEmailItem[]>([]);
@@ -283,6 +293,16 @@ export default function RateUpload() {
           t('batches.uploadSuccess', { rows: data.total_rows, parser: data.adapter_key || 'auto' })
         );
       }
+      setDraftResult({
+        batch_id: data.batch_id,
+        file_name: data.file_name,
+        total_rows: data.total_rows,
+        source_type: data.source_type,
+        adapter_key: data.adapter_key,
+        carrier_code: data.carrier_code,
+        warnings: data.warnings || [],
+      });
+      setStep(1);
       setFocusBatchId(data.batch_id);
       setBatchesReloadKey((k) => k + 1);
     } catch (error) {
@@ -424,6 +444,7 @@ export default function RateUpload() {
     setStep(0);
     setParseResult(null);
     setImportResult(null);
+    setDraftResult(null);
     setEmailText('');
     setImageContext('');
     setLocalMsgItem(null);
@@ -454,7 +475,7 @@ export default function RateUpload() {
 
       <div className="card" style={{ opacity: loading ? 0.75 : 1 }}>
         <div className="card-body">
-          <UploadSteps step={step} />
+          <UploadSteps step={step} mode={draftResult ? 'draft' : 'parse'} />
 
           {step === 0 && (
             <>
@@ -639,6 +660,70 @@ export default function RateUpload() {
                     disabled={loading}
                     onFile={handleImageUpload}
                   />
+                </div>
+              )}
+            </>
+          )}
+
+          {step === 1 && draftResult && (
+            <>
+              <div className="result-hero">
+                <div className="r-icon">
+                  <Icon name="check" size={28} />
+                </div>
+                <div className="r-title">{t('upload.draftCreatedTitle')}</div>
+                <div className="r-sub">
+                  {t('upload.draftCreatedSubtitle', { rows: draftResult.total_rows })}
+                </div>
+                <div
+                  className="alert-title"
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginTop: 12,
+                    justifyContent: 'center',
+                  }}
+                >
+                  <span className={`tag zh ${sourceTagClass(draftResult.source_type)}`}>
+                    {t(`rates.sources.${draftResult.source_type}`, draftResult.source_type)}
+                  </span>
+                  <span style={{ fontSize: 12.5, color: 'var(--ink-500)' }}>
+                    {t('upload.fileLabel')}: <strong>{draftResult.file_name}</strong>
+                  </span>
+                  {draftResult.carrier_code && (
+                    <span className="tag tag-teal">{draftResult.carrier_code}</span>
+                  )}
+                  {draftResult.adapter_key && (
+                    <span className="tag tag-info">{draftResult.adapter_key.toUpperCase()}</span>
+                  )}
+                </div>
+                <div className="r-actions">
+                  <button className="btn btn-secondary" onClick={handleReset}>
+                    {t('upload.uploadAnother')}
+                  </button>
+                </div>
+              </div>
+
+              {draftResult.warnings.length > 0 && (
+                <div className="alert alert-warn" style={{ marginTop: 10 }}>
+                  <div className="alert-icon">
+                    <Icon name="alert" size={16} />
+                  </div>
+                  <div className="alert-body">
+                    <div className="alert-title">
+                      {t('upload.warnings', { count: draftResult.warnings.length })}
+                    </div>
+                    <ul style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 12.5, color: 'var(--ink-700)' }}>
+                      {draftResult.warnings.slice(0, 8).map((warning, i) => (
+                        <li key={i}>{warning}</li>
+                      ))}
+                      {draftResult.warnings.length > 8 && (
+                        <li>{t('upload.moreWarnings', { count: draftResult.warnings.length - 8 })}</li>
+                      )}
+                    </ul>
+                  </div>
                 </div>
               )}
             </>
