@@ -17,11 +17,17 @@ def list_carriers(
     page_size: int = 20,
     type: CarrierType | None = None,
     keyword: str | None = None,
+    only_used: bool = False,
     db: Session = Depends(get_db),
 ):
-    """获取承运人列表"""
+    """获取承运人列表。only_used=true 只返回被运价引用过的船司（前端管理页默认值）。"""
     items, total = carrier_service.get_carriers(
-        db, page=page, page_size=page_size, carrier_type=type, keyword=keyword
+        db,
+        page=page,
+        page_size=page_size,
+        carrier_type=type,
+        keyword=keyword,
+        only_used=only_used,
     )
     return ApiResponse(data=PaginatedData(
         items=items,

@@ -29,7 +29,7 @@ export default function CarrierList() {
   const fetchData = async (page = 1) => {
     setLoading(true);
     try {
-      const params: Record<string, unknown> = { page, page_size: PAGE_SIZE };
+      const params: Record<string, unknown> = { page, page_size: PAGE_SIZE, only_used: true };
       if (keyword.trim()) params.keyword = keyword.trim();
       const res = await carrierApi.list(params);
       const payload = (res as { data?: PaginatedData<Carrier> }).data;
