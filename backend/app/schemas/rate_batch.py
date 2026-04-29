@@ -15,11 +15,13 @@ class RateBatchPreviewRow(BaseModel):
     """Preview row returned by the draft batch APIs."""
 
     row_index: int
+    record_kind: str | None = None
     carrier: str | None = None
     origin_port: str | None = None
     destination_port: str | None = None
     service_code: str | None = None
     currency: str | None = None
+    # 海运
     container_20gp: str | None = None
     container_40gp: str | None = None
     container_40hq: str | None = None
@@ -28,6 +30,28 @@ class RateBatchPreviewRow(BaseModel):
     baf_40: str | None = None
     lss_20: str | None = None
     lss_40: str | None = None
+    # 空运周价
+    airline_code: str | None = None
+    service_desc: str | None = None
+    effective_week_start: str | None = None
+    effective_week_end: str | None = None
+    price_day1: str | None = None
+    price_day2: str | None = None
+    price_day3: str | None = None
+    price_day4: str | None = None
+    price_day5: str | None = None
+    price_day6: str | None = None
+    price_day7: str | None = None
+    # 空运附加费
+    area: str | None = None
+    from_region: str | None = None
+    destination_scope: str | None = None
+    effective_date: str | None = None
+    myc_min: str | None = None
+    myc_fee_per_kg: str | None = None
+    msc_min: str | None = None
+    msc_fee_per_kg: str | None = None
+    # 通用
     valid_from: str | None = None
     valid_to: str | None = None
     transit_days: int | None = None

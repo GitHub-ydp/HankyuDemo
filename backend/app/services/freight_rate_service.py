@@ -241,14 +241,12 @@ def _list_air_weekly(
     page: int = 1,
     page_size: int = 20,
 ) -> tuple[list[AirFreightRate], int]:
-    """空运周价列表：仅返回 effective_week_end >= today 的在效行（业务需求 §3.7）。"""
-    today = date.today()
-    q = db.query(AirFreightRate).filter(
-        or_(
-            AirFreightRate.effective_week_end == None,  # noqa: E711
-            AirFreightRate.effective_week_end >= today,
-        )
-    )
+    """空运周价列表：返回所有已导入行（含已过周末的最近导入批次）。
+
+    与 Ocean 一致，不再按 effective_week_end >= today 过滤；
+    在效语义由 ImportBatch.status（active/superseded）在激活链路上保证。
+    """
+    q = db.query(AirFreightRate)
     if origin_text:
         q = q.filter(AirFreightRate.origin.ilike(f"%{origin_text}%"))
     if destination_text:
@@ -476,13 +474,9 @@ def _compare_air_weekly(
     origin_text: str | None,
     destination_text: str | None,
 ) -> dict:
-    today = date.today()
-    q = db.query(AirFreightRate).filter(
-        or_(
-            AirFreightRate.effective_week_end == None,  # noqa: E711
-            AirFreightRate.effective_week_end >= today,
-        )
-    )
+    # 与 _list_air_weekly 一致：不再按 effective_week_end >= today 过滤，
+    # 让最近一次导入（即便周末已过）也能在比价页面看到。
+    q = db.query(AirFreightRate)
     if origin_text:
         q = q.filter(AirFreightRate.origin.ilike(f"{origin_text}%"))
     if destination_text:
@@ -621,17 +615,10 @@ def get_rate_stats(db: Session) -> dict:
         or 0
     )
 
-    # 空运 AirFreightRate 侧 — 无 status 字段，仅统计在效行，与 _list_air_weekly 口径一致
-    today = date.today()
-    air_active_filter = or_(
-        AirFreightRate.effective_week_end == None,  # noqa: E711
-        AirFreightRate.effective_week_end >= today,
-    )
-    air_total = db.query(AirFreightRate).filter(air_active_filter).count()
+    # 空运 AirFreightRate 侧 — 与 _list_air_weekly 口径一致：统计全部已导入行
+    air_total = db.query(AirFreightRate).count()
     air_carriers = (
-        db.query(func.count(func.distinct(AirFreightRate.airline_code)))
-        .filter(air_active_filter)
-        .scalar()
+        db.query(func.count(func.distinct(AirFreightRate.airline_code))).scalar()
         or 0
     )
     air_routes = (
@@ -642,7 +629,6 @@ def get_rate_stats(db: Session) -> dict:
                 )
             )
         )
-        .filter(air_active_filter)
         .scalar()
         or 0
     )

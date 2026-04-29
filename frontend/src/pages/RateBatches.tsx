@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { message } from 'antd';
 import Icon from '../components/Icon';
+import RatePreviewTable from '../components/RatePreviewTable';
 import { rateBatchApi } from '../services/api';
 import type {
   PaginatedData,
@@ -336,57 +337,8 @@ function DetailDrawer({ batchId, onClose }: DetailDrawerProps) {
               </div>
 
               {section === 'preview' && (
-                <div className="table-scroll">
-                  <table className="rtable" style={{ minWidth: 720, fontSize: 12 }}>
-                    <thead>
-                      <tr>
-                        <th style={{ width: 40 }}>#</th>
-                        <th>{t('batches.col.carrier')}</th>
-                        <th>{t('batches.col.origin')}</th>
-                        <th>{t('batches.col.destination')}</th>
-                        <th className="c-right">20&apos;</th>
-                        <th className="c-right">40&apos;</th>
-                        <th className="c-right">40&apos;HC</th>
-                        <th className="c-center">{t('batches.col.transit')}</th>
-                        <th>{t('batches.col.valid')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detail.preview_rows.map((row) => (
-                        <tr key={row.row_index}>
-                          <td className="num" style={{ color: 'var(--ink-500)' }}>{row.row_index}</td>
-                          <td>
-                            {row.carrier ? (
-                              <span className="tag tag-teal">{row.carrier}</span>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                          <td>{row.origin_port || '—'}</td>
-                          <td>{row.destination_port || '—'}</td>
-                          <td className="c-right num">{row.container_20gp || '—'}</td>
-                          <td className="c-right num">
-                            <b>{row.container_40gp || '—'}</b>
-                          </td>
-                          <td className="c-right num">{row.container_40hq || '—'}</td>
-                          <td className="c-center num" style={{ color: 'var(--ink-500)' }}>
-                            {row.transit_days ? `${row.transit_days}d` : '—'}
-                          </td>
-                          <td className="num" style={{ color: 'var(--ink-500)', fontSize: 11 }}>
-                            {row.valid_from || '—'}
-                            {row.valid_to ? ` → ${row.valid_to}` : ''}
-                          </td>
-                        </tr>
-                      ))}
-                      {detail.preview_rows.length === 0 && (
-                        <tr>
-                          <td colSpan={9} style={{ textAlign: 'center', padding: 24, color: 'var(--ink-500)' }}>
-                            {t('common.noData')}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                <div>
+                  <RatePreviewTable rows={detail.preview_rows} />
                   {detail.preview_truncated && (
                     <div style={{ padding: 10, fontSize: 11.5, color: 'var(--ink-500)', textAlign: 'center' }}>
                       {t('batches.previewTruncated', { total: detail.total_rows, shown: detail.preview_rows.length })}

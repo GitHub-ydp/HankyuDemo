@@ -525,11 +525,13 @@ def _collect_rows(parse_result: dict[str, Any]) -> list[dict[str, Any]]:
 def _normalize_row(row: dict[str, Any], row_index: int) -> dict[str, Any]:
     preview = {
         "row_index": row_index,
+        "record_kind": row.get("record_kind"),
         "carrier": row.get("carrier_name"),
         "origin_port": row.get("origin_port_name"),
         "destination_port": row.get("destination_port_name"),
         "service_code": row.get("service_code"),
         "currency": row.get("currency"),
+        # 海运字段
         "container_20gp": _stringify(row.get("container_20gp")),
         "container_40gp": _stringify(row.get("container_40gp")),
         "container_40hq": _stringify(row.get("container_40hq")),
@@ -538,6 +540,28 @@ def _normalize_row(row: dict[str, Any], row_index: int) -> dict[str, Any]:
         "baf_40": _stringify(row.get("baf_40")),
         "lss_20": _stringify(row.get("lss_20")),
         "lss_40": _stringify(row.get("lss_40")),
+        # 空运周价字段
+        "airline_code": row.get("airline_code"),
+        "service_desc": row.get("service_desc"),
+        "effective_week_start": _stringify(row.get("effective_week_start")),
+        "effective_week_end": _stringify(row.get("effective_week_end")),
+        "price_day1": _stringify(row.get("price_day1")),
+        "price_day2": _stringify(row.get("price_day2")),
+        "price_day3": _stringify(row.get("price_day3")),
+        "price_day4": _stringify(row.get("price_day4")),
+        "price_day5": _stringify(row.get("price_day5")),
+        "price_day6": _stringify(row.get("price_day6")),
+        "price_day7": _stringify(row.get("price_day7")),
+        # 空运附加费字段（由 adapter 通过 extras 透传到 row）
+        "area": row.get("area"),
+        "from_region": row.get("from_region"),
+        "destination_scope": row.get("destination_scope"),
+        "effective_date": _stringify(row.get("valid_from")),
+        "myc_min": _stringify(row.get("myc_min_value")),
+        "myc_fee_per_kg": _stringify(row.get("myc_fee_per_kg")),
+        "msc_min": _stringify(row.get("msc_min_value")),
+        "msc_fee_per_kg": _stringify(row.get("msc_fee_per_kg")),
+        # 通用
         "valid_from": _stringify(row.get("valid_from")),
         "valid_to": _stringify(row.get("valid_to")),
         "transit_days": row.get("transit_days"),

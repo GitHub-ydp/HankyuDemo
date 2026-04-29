@@ -270,13 +270,23 @@ export interface RateBatchSheetSummary {
   rows: number;
 }
 
+export type RateBatchPreviewKind =
+  | 'fcl'
+  | 'ocean_ngb_fcl'
+  | 'lcl'
+  | 'ocean_ngb_lcl'
+  | 'air_weekly'
+  | 'air_surcharge';
+
 export interface RateBatchPreviewRow {
   row_index: number;
+  record_kind?: RateBatchPreviewKind | string | null;
   carrier?: string | null;
   origin_port?: string | null;
   destination_port?: string | null;
   service_code?: string | null;
   currency?: string | null;
+  // 海运
   container_20gp?: string | null;
   container_40gp?: string | null;
   container_40hq?: string | null;
@@ -285,6 +295,28 @@ export interface RateBatchPreviewRow {
   baf_40?: string | null;
   lss_20?: string | null;
   lss_40?: string | null;
+  // 空运周价
+  airline_code?: string | null;
+  service_desc?: string | null;
+  effective_week_start?: string | null;
+  effective_week_end?: string | null;
+  price_day1?: string | null;
+  price_day2?: string | null;
+  price_day3?: string | null;
+  price_day4?: string | null;
+  price_day5?: string | null;
+  price_day6?: string | null;
+  price_day7?: string | null;
+  // 空运附加费
+  area?: string | null;
+  from_region?: string | null;
+  destination_scope?: string | null;
+  effective_date?: string | null;
+  myc_min?: string | null;
+  myc_fee_per_kg?: string | null;
+  msc_min?: string | null;
+  msc_fee_per_kg?: string | null;
+  // 通用
   valid_from?: string | null;
   valid_to?: string | null;
   transit_days?: number | null;
