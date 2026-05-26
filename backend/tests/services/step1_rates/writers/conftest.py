@@ -21,6 +21,13 @@ REAL_OCEAN_FILE = REAL_RATE_DIR / "【Ocean】 Sea Net Rate_2026_Apr.21 - Apr.30
 REAL_OCEAN_NGB_FILE = (
     REAL_RATE_DIR / "【Ocean-NGB】 Ocean FCL rate sheet  HHENGB 2026 APR.xlsx"
 )
+# 5月起华东法人合集 HHECN（'SHA Rate' + 'NGB Rate' 多 sheet）
+REAL_OCEAN_SHA_NGB_FILE = (
+    Path(__file__).resolve().parents[5]
+    / "资料"
+    / "2026.05.26"
+    / "Ocean FCL LCL rate sheet HHECN(SHA+NGB) 20260430 updated.xlsx"
+)
 
 
 def _register_draft(batch, file_path: Path, adapter_key: str) -> str:
@@ -76,3 +83,14 @@ def ocean_ngb_batch_id() -> str:
         pytest.skip(f"Ocean-NGB 真实样本不可用：{REAL_OCEAN_NGB_FILE}")
     batch = OceanNgbAdapter().parse(REAL_OCEAN_NGB_FILE)
     return _register_draft(batch, REAL_OCEAN_NGB_FILE, "ocean_ngb")
+
+
+@pytest.fixture
+def ocean_sha_ngb_batch_id() -> str:
+    """函数级 fixture：每个测试拿到独立 draft，便于注入哨兵值验证回填路由。"""
+    from app.services.step1_rates.adapters.ocean_ngb import OceanNgbAdapter
+
+    if not REAL_OCEAN_SHA_NGB_FILE.exists():
+        pytest.skip(f"Ocean-SHA+NGB 真实样本不可用：{REAL_OCEAN_SHA_NGB_FILE}")
+    batch = OceanNgbAdapter().parse(REAL_OCEAN_SHA_NGB_FILE)
+    return _register_draft(batch, REAL_OCEAN_SHA_NGB_FILE, "ocean_ngb")

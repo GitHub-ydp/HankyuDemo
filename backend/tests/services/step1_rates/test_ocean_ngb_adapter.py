@@ -397,3 +397,70 @@ def test_v_n_24_detect_mutual_exclusion() -> None:
 def test_real_file_formula_fallback_count_zero(real_batch: ParsedRateBatch) -> None:
     """真实样本：metadata.formula_fallback_count == 0（Excel 缓存全部存在，data_only 路径成功）。"""
     assert real_batch.metadata["formula_fallback_count"] == 0
+
+
+# ============================================================================
+# Ocean-SHA+NGB 多 sheet（5月合并版 HHECN）——发现式 sheet 选择
+#
+# 5月起客户把 NGB 单口（单 'Rate' sheet）合并成华东法人合集 HHECN，数据拆到
+# 'SHA Rate' + 'NGB Rate' 两个数据 sheet（列布局与4月单 sheet 完全一致）。
+# adapter 不应再写死单 sheet 名 'Rate'，而应解析除 sample / Shipping line name
+# 外的全部数据 sheet。下列用例锁住该行为；旧的 V-N-* 用例同时充当4月单 sheet 回归护栏。
+# ============================================================================
+
+REAL_OCEAN_SHA_NGB_FILE = (
+    Path(__file__).resolve().parents[4]
+    / "资料"
+    / "2026.05.26"
+    / "Ocean FCL LCL rate sheet HHECN(SHA+NGB) 20260430 updated.xlsx"
+)
+
+
+@pytest.fixture(scope="module")
+def real_sha_ngb_batch() -> ParsedRateBatch:
+    if not REAL_OCEAN_SHA_NGB_FILE.exists():
+        pytest.skip(f"Ocean-SHA+NGB 真实样本不可用：{REAL_OCEAN_SHA_NGB_FILE}")
+    return OceanNgbAdapter().parse(REAL_OCEAN_SHA_NGB_FILE)
+
+
+def test_sha_ngb_records_nonzero(real_sha_ngb_batch: ParsedRateBatch) -> None:
+    """合并版必须解析出记录（旧逻辑写死 'Rate' sheet 时此处为 0）。"""
+    assert len(real_sha_ngb_batch.records) > 0
+    assert not any("Rate sheet missing" in w for w in real_sha_ngb_batch.warnings)
+
+
+def test_sha_ngb_both_data_sheets_parsed(real_sha_ngb_batch: ParsedRateBatch) -> None:
+    """两个数据 sheet 都被解析，sample / Shipping line name 被跳过。"""
+    sheets = {r.extras["sheet_name"] for r in real_sha_ngb_batch.records}
+    assert sheets == {"SHA Rate", "NGB Rate"}
+
+
+def test_sha_ngb_origin_ports(real_sha_ngb_batch: ParsedRateBatch) -> None:
+    """SHA sheet 起运地为 Shanghai、NGB sheet 为 NINGBO，两者都在。"""
+    origins = {r.origin_port_name for r in real_sha_ngb_batch.records}
+    assert "Shanghai" in origins
+    assert "NINGBO" in origins
+
+
+def test_sha_ngb_record_counts(real_sha_ngb_batch: ParsedRateBatch) -> None:
+    """逐 sheet 记录数：SHA=174(153 FCL+21 LCL) / NGB=114(93 FCL+21 LCL)，合计 288。"""
+    by_sheet: Counter = Counter(r.extras["sheet_name"] for r in real_sha_ngb_batch.records)
+    assert by_sheet["SHA Rate"] == 174
+    assert by_sheet["NGB Rate"] == 114
+    assert len(real_sha_ngb_batch.records) == 288
+    kind = Counter(r.record_kind for r in real_sha_ngb_batch.records)
+    assert kind["ocean_ngb_fcl"] == 246
+    assert kind["ocean_ngb_lcl"] == 42
+
+
+def test_sha_ngb_effective_range(real_sha_ngb_batch: ParsedRateBatch) -> None:
+    """批次有效期 = 2026-05-01 ~ 2026-05-31。"""
+    assert real_sha_ngb_batch.effective_from == date(2026, 5, 1)
+    assert real_sha_ngb_batch.effective_to == date(2026, 5, 31)
+
+
+def test_sha_ngb_metadata_sheets_summary(real_sha_ngb_batch: ParsedRateBatch) -> None:
+    """metadata.sheets 每个数据 sheet 一条 summary。"""
+    summaries = real_sha_ngb_batch.metadata.get("sheets") or []
+    names = {s.get("sheet_name") for s in summaries}
+    assert names == {"SHA Rate", "NGB Rate"}

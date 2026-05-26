@@ -18,16 +18,16 @@ class OceanNgbWriter:
     """Step1 Ocean-NGB 原格式回填 writer。
 
     Q-W4 纪律：
-      - 只触碰 `Rate` sheet 数据 cell；`sample` / `Shipping line name` 不写
-      - 每个写入走 `safe_set`，`is_formula_cell` 守卫让 1687 个 Lv.2/Lv.3 公式保留
-      - 当前 Ocean-NGB parser 尚是 stub（records 为空），writer 事实上不写任何 cell，
-        仅走 load → save 完成属性盖章；一旦 parser 交付，下面按 extras.column_index_map 驱动。
+      - 只触碰数据 sheet 的数据 cell；`sample` / `Shipping line name` 不写
+      - 每个写入走 `safe_set`，`is_formula_cell` 守卫让 Lv.2/Lv.3 公式保留
+      - 按记录自带的 `sheet_name` 把 `column_index_map` 回填到对应 sheet。
+        兼容 4 月单 'Rate' sheet 与 5 月起华东法人合集（'SHA Rate' + 'NGB Rate'）
+        多 sheet 合并版——sheet 数量不限，无需改码。
     """
 
     key = "ocean_ngb"
     file_type = Step1FileType.ocean_ngb
 
-    _DATA_SHEET = "Rate"
     _SKIP_SHEETS = frozenset({"sample", "Shipping line name"})
 
     def write(self, batch_id: str) -> tuple[bytes, str]:
@@ -37,24 +37,23 @@ class OceanNgbWriter:
         records = _extract_records(draft)
         workbook = load_workbook(template_path, data_only=False)
 
-        if self._DATA_SHEET in workbook.sheetnames:
-            ws = workbook[self._DATA_SHEET]
-            for record in records:
-                sheet_name = record.get("sheet_name")
-                if sheet_name in self._SKIP_SHEETS:
+        for record in records:
+            sheet_name = record.get("sheet_name")
+            if not sheet_name or sheet_name in self._SKIP_SHEETS:
+                continue
+            if sheet_name not in workbook.sheetnames:
+                continue
+            ws = workbook[sheet_name]
+            row_index = record.get("row_index")
+            if not row_index:
+                continue
+            column_map = record.get("column_index_map") or {}
+            for col_idx, value in column_map.items():
+                try:
+                    col = int(col_idx)
+                except (TypeError, ValueError):
                     continue
-                if sheet_name and sheet_name != self._DATA_SHEET:
-                    continue
-                row_index = record.get("row_index")
-                if not row_index:
-                    continue
-                column_map = record.get("column_index_map") or {}
-                for col_idx, value in column_map.items():
-                    try:
-                        col = int(col_idx)
-                    except (TypeError, ValueError):
-                        continue
-                    safe_set(ws.cell(row_index, col), value)
+                safe_set(ws.cell(row_index, col), value)
 
         stamp_document_properties(workbook, batch_id=batch_id)
         content = save_workbook_to_bytes(workbook)
