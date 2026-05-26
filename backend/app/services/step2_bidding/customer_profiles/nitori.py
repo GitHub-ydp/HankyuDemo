@@ -70,3 +70,31 @@ class NitoriProfile:
                              sections=[section], rows=rows, warnings=[])
         finally:
             wb.close()
+
+    def match(self, parsed: ParsedPkg) -> list[PerRowReport]:
+        assert self._cost is not None, "NitoriProfile.match 需要 cost_book"
+        reports: list[PerRowReport] = []
+        for row in parsed.rows:
+            if not row.extras.get("is_china"):
+                continue
+            lane = self._cost.lookup(pol=row.origin_code, pod=row.destination_code)
+            cost_field = _SIZE_TO_COST.get(row.extras.get("size", ""))
+            cost_price = None
+            if lane and not lane.no_service and cost_field:
+                cost_price = getattr(lane, f"rate_{cost_field}")
+            if cost_price is None:
+                reports.append(PerRowReport(
+                    row_idx=row.row_idx, section_code="GLOBAL",
+                    destination_code=row.destination_code, status=RowStatus.NO_RATE,
+                    cost_price=None, sell_price=None, markup_ratio=None,
+                    lead_time_text=None, carrier_text=None, remark_text=None,
+                    selected_candidate=None))
+                continue
+            sell = (cost_price * self._markup).quantize(Decimal("1"))
+            reports.append(PerRowReport(
+                row_idx=row.row_idx, section_code="GLOBAL",
+                destination_code=row.destination_code, status=RowStatus.FILLED,
+                cost_price=cost_price, sell_price=sell, markup_ratio=self._markup,
+                lead_time_text=lane.transit_time, carrier_text=lane.carrier,
+                remark_text=None, selected_candidate=None))
+        return reports
