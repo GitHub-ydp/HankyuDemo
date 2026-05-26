@@ -98,3 +98,39 @@ class NitoriProfile:
                 lead_time_text=lane.transit_time, carrier_text=lane.carrier,
                 remark_text=None, selected_candidate=None))
         return reports
+
+    def fill(self, source_path: Path, parsed: ParsedPkg,
+             row_reports: list[PerRowReport], variant: str, output_path: Path):
+        if variant not in ("cost", "sr"):
+            raise ValueError(f"variant 必须 cost/sr，实际 {variant!r}")
+        shutil.copy2(source_path, output_path)
+        wb = load_workbook(output_path, data_only=False, keep_vba=True)   # 保宏
+        try:
+            ws = wb[_QUOTE_SHEET]
+            for rep in row_reports:
+                if rep.status != RowStatus.FILLED:
+                    continue
+                price = rep.cost_price if variant == "cost" else rep.sell_price
+                self._set(ws, rep.row_idx, "of_cur", "USD")
+                self._set(ws, rep.row_idx, "of_amt", float(price))
+                self._set(ws, rep.row_idx, "lss_cur", "USD")
+                self._set(ws, rep.row_idx, "lss_amt", 0)          # Included→0（assumption）
+                if rep.lead_time_text:
+                    self._set(ws, rep.row_idx, "tt", rep.lead_time_text)
+                ft = self._cost.free_time_for(rep.destination_code) if self._cost else None
+                if ft:
+                    self._set(ws, rep.row_idx, "dem_free", ft.get("dem"))
+                    self._set(ws, rep.row_idx, "det_free", ft.get("det"))
+            stamp_document_properties(wb, batch_id=f"{parsed.bid_id}:nitori:{variant}")
+            wb.save(output_path)
+        finally:
+            wb.close()
+
+    @staticmethod
+    def _set(ws, row_idx: int, col_key: str, value):
+        if value is None:
+            return
+        cell = ws.cell(row_idx, _COL[col_key])
+        if is_formula_cell(cell):
+            return
+        safe_set(cell, value)

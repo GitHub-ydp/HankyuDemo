@@ -1,7 +1,10 @@
+import zipfile
 from decimal import Decimal
 from pathlib import Path
 
 import extract_msg
+import pytest
+from openpyxl import load_workbook
 
 from app.services.step2_bidding.customer_profiles.nitori import NitoriProfile
 from app.services.step2_bidding.entities import RowStatus
@@ -53,3 +56,30 @@ def test_nitori_match_filled_and_norate(tmp_path):
     assert by_row[120].status == RowStatus.NO_RATE
     # 非中国发行不进 report（如第 9 行 OSAKA）
     assert 9 not in by_row
+
+
+def test_nitori_fill_cost_and_sr(tmp_path):
+    prof = NitoriProfile(cost_book=_cost_book(tmp_path))
+    parsed = prof.parse(QUOTE_GLOBAL, bid_id="b1", period="2026Q2")
+    reports = prof.match(parsed)
+    cost_out = tmp_path / "cost.xlsm"
+    sr_out = tmp_path / "sr.xlsm"
+    prof.fill(QUOTE_GLOBAL, parsed, reports, "cost", cost_out)
+    prof.fill(QUOTE_GLOBAL, parsed, reports, "sr", sr_out)
+
+    wbc = load_workbook(cost_out, keep_vba=True)["Quotation (Global) Jul-Sep"]
+    wbs = load_workbook(sr_out, keep_vba=True)["Quotation (Global) Jul-Sep"]
+    assert wbc.cell(114, 19).value == 580        # 成本版 OCEAN FREIGHT amount
+    assert wbs.cell(114, 19).value == 667        # 报价版 = 580*1.15
+    assert wbc.cell(114, 18).value == "USD"      # cur
+    # no_rate 行(r120)不写运价
+    assert wbc.cell(120, 19).value in (None, 0, "")
+    # 宏保留
+    assert any("vbaProject" in n for n in zipfile.ZipFile(cost_out).namelist())
+
+
+def test_nitori_fill_rejects_bad_variant(tmp_path):
+    prof = NitoriProfile(cost_book=_cost_book(tmp_path))
+    parsed = prof.parse(QUOTE_GLOBAL, bid_id="b1", period="2026Q2")
+    with pytest.raises(ValueError):
+        prof.fill(QUOTE_GLOBAL, parsed, [], "bad", tmp_path / "x.xlsm")
