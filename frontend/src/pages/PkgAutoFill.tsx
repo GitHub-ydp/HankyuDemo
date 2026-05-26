@@ -89,7 +89,7 @@ function UploadZone({
       <input
         ref={fileRef}
         type="file"
-        accept=".xlsx"
+        accept=".xlsx,.zip"
         style={{ display: 'none' }}
         onChange={(e) => {
           const f = e.target.files?.[0];
@@ -558,7 +558,8 @@ export default function PkgAutoFill() {
   const reset = () => setUi({ kind: 'idle' });
 
   const handleFile = async (file: File) => {
-    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith('.xlsx') && !lower.endsWith('.zip')) {
       setUi({ kind: 'error', resp: null, code: 'F7_WRONG_EXTENSION', detail: file.name });
       return;
     }
