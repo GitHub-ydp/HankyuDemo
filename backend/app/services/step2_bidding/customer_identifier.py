@@ -17,6 +17,10 @@ from openpyxl.utils.exceptions import InvalidFileException
 _CUSTOMER_A = "customer_a"
 _UNKNOWN = "unknown"
 
+_NITORI = "nitori"
+_NITORI_SHEET_PREFIX_QUOTE = "Quotation"
+_NITORI_SHEET_PREFIX_GUIDE = "お客様案内"
+
 _SHEET_NAME_CUSTOMER_A = "見積りシート"      # 维度 B 等值匹配
 _HEADER_ORIGIN = "発地"                       # 维度 D - B 列等值
 _HEADER_DEST_KEYWORD = "着地"                 # 维度 D - C 列包含
@@ -58,6 +62,18 @@ def identify(xlsx_path: Path) -> IdentifierResult:
 
         normalized_names = [_normalize_sheet_name(n) for n in sheetnames]
         warnings_acc: list[str] = []
+
+        has_quote = any(n.startswith(_NITORI_SHEET_PREFIX_QUOTE) for n in normalized_names)
+        has_guide = any(n.startswith(_NITORI_SHEET_PREFIX_GUIDE) for n in normalized_names)
+        if has_quote and has_guide:
+            return IdentifierResult(
+                matched_customer=_NITORI,
+                matched_dimensions=("NITORI_SHEETS",),
+                source="auto",
+                confidence="high",
+                unmatched_reason=None,
+                warnings=(),
+            )
 
         # 维度 B：单 sheet 且 sheet 名等值
         dim_b = (
