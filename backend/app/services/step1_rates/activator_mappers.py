@@ -4,8 +4,10 @@
 """
 from __future__ import annotations
 
+import re
 import uuid
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -13,10 +15,12 @@ from app.models import (
     AirSurcharge,
     Carrier,
     FreightRate,
+    LclRate,
     Port,
     RateStatus,
     SourceType,
 )
+from app.services.rate_parser import _resolve_port as _rp_resolve_port
 from app.services.step1_rates.entities import ParsedRateRecord
 
 
@@ -191,6 +195,64 @@ def to_freight_rate_from_ngb(
     )
 
 
+def to_lcl_rate(
+    record: ParsedRateRecord,
+    batch_id: uuid.UUID,
+    db: Session,
+    *,
+    source_file: str | None = None,
+) -> LclRate:
+    """LCL record（kind=lcl / ocean_ngb_lcl）→ LclRate。
+
+    LclRate 无 carrier 概念，只解析起运/目的港（与 NGB FCL 同用 _resolve_port）。
+    """
+    # LCL 港名常含 "EN/中文" 或终端/别名变体，用 rate_parser 的强解析器（拆 "/"、别名表、
+    # 去括号、折叠空格），与 ocean adapter FCL 解析能力一致
+    origin_port = _rp_resolve_port(record.origin_port_name, db)
+    if origin_port is None:
+        raise ActivationError(
+            code="PORT_NOT_FOUND",
+            detail=f"origin port '{record.origin_port_name}' not found in ports dict",
+            row_index=_row_index(record),
+            record_kind=record.record_kind,
+        )
+    destination_port = _rp_resolve_port(record.destination_port_name, db)
+    if destination_port is None:
+        raise ActivationError(
+            code="PORT_NOT_FOUND",
+            detail=f"destination port '{record.destination_port_name}' not found in ports dict",
+            row_index=_row_index(record),
+            record_kind=record.record_kind,
+        )
+    extras = record.extras or {}
+    return LclRate(
+        origin_port_id=origin_port.id,
+        destination_port_id=destination_port.id,
+        freight_per_cbm=record.freight_per_cbm,
+        freight_per_ton=record.freight_per_ton,
+        currency=record.currency or "USD",
+        lss=_clip(extras.get("lss_raw") or extras.get("lss"), 50),
+        ebs=_clip(extras.get("ebs_raw") or extras.get("ebs"), 50),
+        cic=_clip(extras.get("cic_raw") or extras.get("cic"), 50),
+        ams_aci_ens=_clip(extras.get("ams_aci_ens") or extras.get("ams_raw"), 50),
+        sailing_day=_clip(record.sailing_day, 50),
+        via=_clip(record.via, 100),
+        transit_time_text=_clip(record.transit_time_text, 100),
+        remarks=record.remarks,
+        valid_from=record.valid_from,
+        valid_to=record.valid_to,
+        batch_id=batch_id,
+    )
+
+
+def _clip(value, maxlen: int):
+    """把可能超长 / 非字符串的值裁剪成 String(maxlen) 可存的文本；None 透传。"""
+    if value is None:
+        return None
+    s = str(value).strip()
+    return s[:maxlen] if s else None
+
+
 def _lookup_carrier(db: Session, carrier_name: str | None, record: ParsedRateRecord) -> int:
     if not carrier_name:
         raise ActivationError(
@@ -211,6 +273,21 @@ def _lookup_carrier(db: Session, carrier_name: str | None, record: ParsedRateRec
         carrier = (
             db.query(Carrier)
             .filter(Carrier.code.ilike(f"%{name}%"))
+            .first()
+        )
+    # 归一兜底：折叠空格，对 code / name_en(同样折叠空格)做包含匹配
+    # → 修 "XIN JIAN ZHEN"→XINJIANZHEN 等空格变体
+    norm = re.sub(r"\s+", "", name)
+    if carrier is None and len(norm) >= 2:
+        carrier = (
+            db.query(Carrier)
+            .filter(func.replace(Carrier.code, " ", "").ilike(f"%{norm}%"))
+            .first()
+        )
+    if carrier is None and len(norm) >= 2:
+        carrier = (
+            db.query(Carrier)
+            .filter(func.replace(Carrier.name_en, " ", "").ilike(f"%{norm}%"))
             .first()
         )
     if carrier is None:
@@ -238,4 +315,19 @@ def _resolve_port(db: Session, name_raw: str | None) -> Port | None:
     )
     if port is not None:
         return port
-    return db.query(Port).filter(Port.name_cn.ilike(f"%{name}%")).first()
+    port = db.query(Port).filter(Port.name_cn.ilike(f"%{name}%")).first()
+    if port is not None:
+        return port
+    # 归一兜底：去括号注解(如 "CHICAGO (via LAX)") + 折叠所有空格，
+    # 对 name_en(同样折叠空格)做包含匹配 → 修 "HAI PHONG"/"HONGKONG"/"PASIRGUDANG" 等空格变体
+    norm = re.sub(r"\(.*?\)", "", name)
+    norm = re.sub(r"\s+", "", norm)
+    if len(norm) >= 3:
+        port = (
+            db.query(Port)
+            .filter(func.replace(Port.name_en, " ", "").ilike(f"%{norm}%"))
+            .first()
+        )
+        if port is not None:
+            return port
+    return None

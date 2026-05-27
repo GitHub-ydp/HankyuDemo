@@ -19,6 +19,7 @@ from app.models import (
     ImportBatch,
     ImportBatchFileType,
     ImportBatchStatus,
+    LclRate,
 )
 from app.services.step1_rates.activator_mappers import (
     ActivationError,
@@ -26,6 +27,7 @@ from app.services.step1_rates.activator_mappers import (
     to_air_surcharge,
     to_freight_rate_from_ngb,
     to_freight_rate_from_ocean,
+    to_lcl_rate,
 )
 from app.services.step1_rates.entities import ParsedRateRecord
 
@@ -103,19 +105,12 @@ def activate(
     effective_from = (draft.legacy_payload or {}).get("effective_from")
     effective_to = (draft.legacy_payload or {}).get("effective_to")
 
-    lcl_skipped_count = sum(
-        1 for r in records if r.record_kind in {"lcl", "ocean_ngb_lcl"}
-    )
-    dispatchable = [
-        r for r in records if r.record_kind not in {"lcl", "ocean_ngb_lcl"}
-    ]
+    # LCL 已实装入库（lcl_rates 表），不再过滤跳过
+    lcl_skipped_count = 0
+    dispatchable = list(records)
 
     superseded_preview = _query_superseded_batch_ids(db, file_type_enum)
     warnings: list[str] = []
-    if lcl_skipped_count > 0:
-        warnings.append(
-            f"跳过 {lcl_skipped_count} 条 LCL records（v0.1 未实装 LCL 入库）"
-        )
 
     if dry_run:
         planned_rows = len(dispatchable)
@@ -165,6 +160,7 @@ def activate(
             air_objs: list[AirFreightRate] = []
             sur_objs: list[AirSurcharge] = []
             freight_objs: list[FreightRate] = []
+            lcl_objs: list[LclRate] = []
 
             for record in dispatchable:
                 kind = record.record_kind
@@ -183,6 +179,12 @@ def activate(
                     elif kind == "ocean_ngb_fcl":
                         freight_objs.append(
                             to_freight_rate_from_ngb(
+                                record, batch_uuid, db, source_file=source_file
+                            )
+                        )
+                    elif kind in ("lcl", "ocean_ngb_lcl"):
+                        lcl_objs.append(
+                            to_lcl_rate(
                                 record, batch_uuid, db, source_file=source_file
                             )
                         )
@@ -212,8 +214,13 @@ def activate(
             if freight_objs:
                 db.add_all(freight_objs)
                 imported_detail["freight_rates"] = len(freight_objs)
+            if lcl_objs:
+                db.add_all(lcl_objs)
+                imported_detail["lcl_rates"] = len(lcl_objs)
 
-            imported_rows = len(air_objs) + len(sur_objs) + len(freight_objs)
+            imported_rows = (
+                len(air_objs) + len(sur_objs) + len(freight_objs) + len(lcl_objs)
+            )
             db.execute(
                 update(ImportBatch)
                 .where(ImportBatch.batch_id == batch_uuid)
@@ -346,6 +353,9 @@ def _plan_imported_detail(
     ocean_count = kind_counts.get("fcl", 0) + kind_counts.get("ocean_ngb_fcl", 0)
     if ocean_count:
         detail["freight_rates"] = ocean_count
+    lcl_count = kind_counts.get("lcl", 0) + kind_counts.get("ocean_ngb_lcl", 0)
+    if lcl_count:
+        detail["lcl_rates"] = lcl_count
     return detail
 
 
