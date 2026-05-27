@@ -1,0 +1,90 @@
+"""配置驱动的模板填充器。
+
+输入统一的 normalized rate dict 列表，按 template_registry 的列映射，从数据起始行
+逐行写进空白模板（保留表头/格式/公式）。复用 writers/base.safe_set 的写入守卫
+（None 不写、公式格不覆盖）。不入库——产物就是填好的 xlsx。
+
+空白模板的数据区预设了合并单元格（如目的港/船司列每 2 行合并），其从属格 value 只读。
+填充前先解除「数据起始行及以后」的合并（表头区合并保留），再逐格写。
+
+normalized rate dict 字段约定：
+  通用:  destination, carrier, remark
+  sea :  freight_20, freight_40, lss_cic, baf, ebs, yas_caf, sailing, via, transit, booking
+  air :  service, day1..day7
+"""
+from __future__ import annotations
+
+from io import BytesIO
+from typing import Any
+
+from openpyxl import load_workbook
+
+from app.services.step1_rates.sheet_builder.entities import SheetFillConfig
+from app.services.step1_rates.sheet_builder.template_registry import get_template_config
+from app.services.step1_rates.writers.base import safe_set
+
+# Sea FCL 一条运价展开为两行：(箱型标签, 取运费用的字段名)
+_SEA_CONTAINER_ROWS = (("20FT", "freight_20"), ("40FT/40HQ", "freight_40"))
+
+
+def fill_template(template_type: str, rows: list[dict[str, Any]]) -> tuple[bytes, str]:
+    """把 rows 填进对应空白模板，返回 (xlsx_bytes, 建议文件名)。"""
+    cfg = get_template_config(template_type)
+    workbook = load_workbook(cfg.template_path, data_only=False)
+
+    if template_type == "air":
+        _fill_air(workbook, cfg.sheets[0], rows)
+    elif template_type == "sea":
+        _fill_sea(workbook, cfg.sheets[0], rows)
+    else:  # pragma: no cover — registry 已保证只有 air/sea
+        raise ValueError(f"unsupported template_type {template_type!r}")
+
+    buffer = BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue(), f"{template_type}_rate_sheet_filled.xlsx"
+
+
+def _unmerge_data_area(ws, data_start_row: int) -> None:
+    """解除「数据起始行及以后」的合并单元格，让数据区每格可写。表头合并保留。"""
+    targets = [
+        str(rng) for rng in ws.merged_cells.ranges if rng.min_row >= data_start_row
+    ]
+    for rng in targets:
+        ws.unmerge_cells(rng)
+
+
+def _fill_air(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) -> None:
+    ws = workbook[sheet_cfg.sheet_name]
+    _unmerge_data_area(ws, sheet_cfg.data_start_row)
+    col = sheet_cfg.columns
+    r = sheet_cfg.data_start_row
+    for row in rows:
+        safe_set(ws.cell(r, col["destination"]), row.get("destination"))
+        safe_set(ws.cell(r, col["service"]), row.get("service"))
+        for day in range(1, 8):
+            safe_set(ws.cell(r, col[f"day{day}"]), row.get(f"day{day}"))
+        safe_set(ws.cell(r, col["remark"]), row.get("remark"))
+        r += 1
+
+
+def _fill_sea(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) -> None:
+    ws = workbook[sheet_cfg.sheet_name]
+    _unmerge_data_area(ws, sheet_cfg.data_start_row)
+    col = sheet_cfg.columns
+    r = sheet_cfg.data_start_row
+    for row in rows:
+        for container_label, freight_key in _SEA_CONTAINER_ROWS:
+            safe_set(ws.cell(r, col["destination"]), row.get("destination"))
+            safe_set(ws.cell(r, col["carrier"]), row.get("carrier"))
+            safe_set(ws.cell(r, col["container"]), container_label)
+            safe_set(ws.cell(r, col["freight"]), row.get(freight_key))
+            safe_set(ws.cell(r, col["lss_cic"]), row.get("lss_cic"))
+            safe_set(ws.cell(r, col["baf"]), row.get("baf"))
+            safe_set(ws.cell(r, col["ebs"]), row.get("ebs"))
+            safe_set(ws.cell(r, col["yas_caf"]), row.get("yas_caf"))
+            safe_set(ws.cell(r, col["sailing"]), row.get("sailing"))
+            safe_set(ws.cell(r, col["via"]), row.get("via"))
+            safe_set(ws.cell(r, col["transit"]), row.get("transit"))
+            safe_set(ws.cell(r, col["booking"]), row.get("booking"))
+            safe_set(ws.cell(r, col["rmks"]), row.get("remark"))
+            r += 1
