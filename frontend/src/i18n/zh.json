@@ -577,9 +577,9 @@
     "title": "投标包自动填表",
     "subtitle": "上传空白投标模板，自动识别客户、解析航线、匹配费率并产出成本价 / 销售价两版 Excel。",
     "upload": {
-      "dragText": "点击或拖拽上传投标模板 (.xlsx)",
-      "hint": "仅支持 Customer A 的 2-①.xlsx 黄金样本；其它客户将被识别为 unknown 并阻断。",
-      "limitExt": "仅限 .xlsx",
+      "dragText": "点击或拖拽上传：投标整包 (.zip) 或模板 (.xlsx)",
+      "hint": "支持 Nitori 投标整包（.zip，含 TO GLOBAL 报价表 + 成本）与 Customer A 模板（.xlsx）；其它客户识别为 unknown 并阻断。",
+      "limitExt": "支持 .xlsx / .zip",
       "limitSize": "单文件最大 10 MB",
       "uploading": "上传中 {{progress}}%",
       "processing": "AI 处理中：识别客户 → 解析段 → 匹配费率 → 生成两版 Excel..."

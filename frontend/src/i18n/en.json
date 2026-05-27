@@ -576,9 +576,9 @@
     "title": "Tender PKG Auto-Fill",
     "subtitle": "Upload a blank tender template. The system will identify the customer, parse lanes, match rates, and produce cost / S-R variants in one go.",
     "upload": {
-      "dragText": "Click or drag to upload (.xlsx)",
-      "hint": "This version only supports Customer A's 2-①.xlsx golden sample. Other customers are flagged as unknown and processing is blocked.",
-      "limitExt": ".xlsx only",
+      "dragText": "Click or drag to upload: bid package (.zip) or template (.xlsx)",
+      "hint": "Supports Nitori bid package (.zip with TO GLOBAL quote + cost) and Customer A template (.xlsx). Other customers are flagged as unknown and blocked.",
+      "limitExt": ".xlsx / .zip",
       "limitSize": "Max file size 10 MB",
       "uploading": "Uploading {{progress}}%",
       "processing": "AI processing: identify → parse → match rates → generate two variants..."

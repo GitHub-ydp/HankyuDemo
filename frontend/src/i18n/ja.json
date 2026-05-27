@@ -576,9 +576,9 @@
     "title": "入札 PKG 自動入力",
     "subtitle": "空の見積テンプレートをアップロードすると、顧客識別・明細解析・運賃マッチング・原価版／S/R 版 2 ファイル生成を一括で行います。",
     "upload": {
-      "dragText": "クリックまたはドラッグして .xlsx をアップロード",
-      "hint": "現バージョンは Customer A の 2-①.xlsx のみ対応。他社は unknown 判定となり処理を中断します。",
-      "limitExt": ".xlsx のみ",
+      "dragText": "クリックまたはドラッグ：入札パッケージ (.zip) またはテンプレート (.xlsx)",
+      "hint": "Nitori 入札パッケージ（.zip、TO GLOBAL 見積書＋コスト同梱）と Customer A テンプレート（.xlsx）に対応。他社は unknown 判定となり処理を中断します。",
+      "limitExt": ".xlsx / .zip 対応",
       "limitSize": "ファイルサイズ 10 MB 以下",
       "uploading": "アップロード中 {{progress}}%",
       "processing": "AI 処理中：顧客識別 → 段解析 → 運賃照合 → 2 バリアント生成..."
