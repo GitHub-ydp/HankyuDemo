@@ -14,6 +14,7 @@ import RateCompare from './pages/RateCompare';
 import CarrierList from './pages/CarrierList';
 import EmailSearch from './pages/EmailSearch';
 import PkgAutoFill from './pages/PkgAutoFill';
+import RateSheetBuilder from './pages/RateSheetBuilder';
 import Settings from './pages/Settings';
 import LoginPage from './pages/Login';
 import RegisterPage from './pages/Register';
@@ -39,6 +40,7 @@ const router = createBrowserRouter(
           children: [
             { path: '/', element: <Dashboard /> },
             { path: '/pkg', element: <PkgAutoFill /> },
+            { path: '/rate-sheet', element: <RateSheetBuilder /> },
             { path: '/rates', element: <RateList /> },
             { path: '/batches', element: <Navigate to="/upload" replace /> },
             { path: '/upload', element: <RateUpload /> },
