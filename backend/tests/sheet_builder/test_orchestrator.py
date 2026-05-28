@@ -91,6 +91,26 @@ def test_legacy_xls_routed_to_excel_parser(monkeypatch):
     assert fr.row_count == 1
 
 
+def test_unrecognized_format_surfaces_reason(monkeypatch):
+    """parser 跑通但识别不了格式(返回 error)时，应把原因透传给用户，而非静默显示 0 行。"""
+    monkeypatch.setattr(
+        rate_parser,
+        "detect_and_parse",
+        lambda p, db: {
+            "error": "无法识别的 Excel 格式，支持 KMTC 运价表和 NVO FAK 格式",
+            "parsed_rows": [],
+        },
+    )
+
+    s = orchestrator.create_session("sea")
+    fr = orchestrator.add_file(s.session_id, "air_quote.xls", "/tmp/air_quote.xls", db=None)
+
+    assert fr.status == "skipped", "识别不了应标 skipped，而非 parsed"
+    assert "无法识别" in fr.message, "应把 parser 的原因透传到 message"
+    assert fr.row_count == 0
+    assert s.rows == []
+
+
 def test_parser_error_marked_not_crash(monkeypatch):
     def boom(p, db):
         raise RuntimeError("解析炸了")

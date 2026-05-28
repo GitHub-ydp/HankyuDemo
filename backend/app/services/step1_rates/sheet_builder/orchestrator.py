@@ -112,6 +112,19 @@ def add_file(
         return result
 
     raw_rows = _extract_rows(parsed)
+
+    # parser 跑通但识别不了格式(返回 error 且无行)：标 skipped 并把原因透传给用户，
+    # 不要静默显示 0 行让人对着空表猜。
+    if not raw_rows and parsed.get("error"):
+        result = FileResult(
+            name=file_name,
+            source_type=source_type,
+            status="skipped",
+            message=str(parsed["error"]),
+        )
+        session.files.append(result)
+        return result
+
     carrier_fallback = parsed.get("carrier_code", "") or ""
     normalized = [
         _normalize(session.template_type, r, carrier_fallback) for r in raw_rows
