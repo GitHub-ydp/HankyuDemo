@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Card,
   Segmented,
@@ -45,7 +45,7 @@ interface ApiLike {
 
 export default function RateSheetBuilder() {
   const { t } = useTranslation();
-  const [templateType, setTemplateType] = useState<string | null>(null);
+  const [templateType, setTemplateType] = useState<string | null>('air');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [fileResults, setFileResults] = useState<FileResult[]>([]);
@@ -76,6 +76,12 @@ export default function RateSheetBuilder() {
       setSessionId(null);
     }
   };
+
+  // 默认就选中 Air：挂载时建好会话，让上传立刻可用，避免「看着选中却要再点一下」的割裂。
+  useEffect(() => {
+    onSelectTemplate('air');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleUpload = async () => {
     if (!sessionId) {
