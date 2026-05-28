@@ -5,7 +5,7 @@ parser 一律 mock（不打真实 AI / 不读真实文件），只验证编排�
 import pytest
 
 from app.services import rate_parser
-from app.services.step1_rates.sheet_builder import orchestrator
+from app.services.step1_rates.sheet_builder import air_extractor, orchestrator
 
 
 def test_create_session_validates_type():
@@ -62,6 +62,77 @@ def test_multi_quote_same_lane_marks_needs_review(monkeypatch):
 
     assert len(s.rows) == 2
     assert all(r["needs_review"] for r in s.rows), "同目的港+船司的多条应全部标 needs_review"
+
+
+def test_air_template_extracts_daily_prices(monkeypatch):
+    """选 air 模板时 Excel 走 air 抽取，price_dayN 归一为 dayN，service 用 service_desc。"""
+    fake = {
+        "parsed_rows": [
+            {
+                "destination_port_name": "NRT",
+                "service_desc": "CK 2 days service",
+                "airline_code": "CK",
+                "price_day1": 14, "price_day2": 14, "price_day3": 15,
+                "price_day4": 14, "price_day5": 14, "price_day6": 13, "price_day7": 14,
+            }
+        ],
+        "warnings": [],
+    }
+    monkeypatch.setattr(air_extractor, "extract_air_rates", lambda p, db: fake)
+
+    s = orchestrator.create_session("air")
+    fr = orchestrator.add_file(s.session_id, "Market Price (Air).xlsx", "/tmp/air.xlsx", db=None)
+
+    assert fr.status == "parsed"
+    assert fr.source_type == "excel"
+    assert fr.row_count == 1
+    row = s.rows[0]
+    assert row["destination"] == "NRT"
+    assert row["service"] == "CK 2 days service"
+    assert row["day1"] == 14
+    assert row["day3"] == 15
+    assert row["day7"] == 14
+
+
+def test_air_same_dest_different_service_not_marked_review(monkeypatch):
+    """air 同目的港不同 service 是不同行，不应被当成重复多报价。"""
+    fake = {
+        "parsed_rows": [
+            {"destination_port_name": "NRT", "service_desc": "CK 2 days", "airline_code": "CK", "price_day1": 14},
+            {"destination_port_name": "NRT", "service_desc": "HO 2 days", "airline_code": "HO", "price_day1": 15},
+        ],
+        "warnings": [],
+    }
+    monkeypatch.setattr(air_extractor, "extract_air_rates", lambda p, db: fake)
+
+    s = orchestrator.create_session("air")
+    orchestrator.add_file(s.session_id, "air.xlsx", "/tmp/air.xlsx", db=None)
+
+    assert len(s.rows) == 2
+    assert all(not r["needs_review"] for r in s.rows), "不同 service 不算重复多报价"
+
+
+def test_air_weight_break_same_dest_multi_flight_marked_review(monkeypatch):
+    """重量档报价：同目的港多航班(multi_flight_pick) → 全标 needs_review 供人工选一条；单航班不标。"""
+    days = {f"price_day{d}": 13 for d in range(1, 8)}
+    fake = {
+        "parsed_rows": [
+            {"destination_port_name": "NRT", "service_desc": "KZ226", "multi_flight_pick": True, **days},
+            {"destination_port_name": "NRT", "service_desc": "KZ228", "multi_flight_pick": True, **days},
+            {"destination_port_name": "KIX", "service_desc": "CK247", "multi_flight_pick": True, **days},
+        ],
+        "warnings": [],
+    }
+    monkeypatch.setattr(air_extractor, "extract_air_rates", lambda p, db: fake)
+
+    s = orchestrator.create_session("air")
+    orchestrator.add_file(s.session_id, "weightbreak.xls", "/tmp/wb.xls", db=None)
+
+    nrt = [r for r in s.rows if r["destination"] == "NRT"]
+    kix = [r for r in s.rows if r["destination"] == "KIX"]
+    assert len(nrt) == 2 and all(r["needs_review"] for r in nrt), "NRT 两航班应标 needs_review"
+    assert not kix[0]["needs_review"], "KIX 单航班不必标"
+    assert nrt[0]["day1"] == 13 and nrt[0]["day7"] == 13, "+100KG 价应填满 day1-7"
 
 
 def test_unsupported_extension_skipped():

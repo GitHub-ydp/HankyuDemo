@@ -16,12 +16,14 @@ from __future__ import annotations
 import os
 import uuid
 from collections import Counter
+from decimal import Decimal
 from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from app.services import rate_parser, wechat_image_parser
+from app.services.step1_rates.sheet_builder import air_extractor
 from app.services.step1_rates.sheet_builder.template_registry import get_template_config
 
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
@@ -89,7 +91,11 @@ def add_file(
 
     try:
         if ext in _EXCEL_EXTS:
-            parsed = rate_parser.detect_and_parse(file_path, db)
+            if session.template_type == "air":
+                # Air 走专用抽取器(复用 AirAdapter 的每日价解析)；Sea 走结构化 Excel 解析。
+                parsed = air_extractor.extract_air_rates(file_path, db)
+            else:
+                parsed = rate_parser.detect_and_parse(file_path, db)
             source_type = "excel"
         elif ext in _IMAGE_EXTS:
             parsed = wechat_image_parser.parse_wechat_image(file_path, db)
@@ -176,18 +182,45 @@ def _normalize_sea(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]
 
 
 def _normalize_air(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]:
-    # 现有 parser 主产海运字段；Air 的每日价结构需专门抽取 prompt（见计划"未完成项"）。
-    # 这里尽力映射通用字段，缺失留空，保证编排不崩。
-    return {
+    """air_extractor(AirAdapter) 产 destination_port_name / service_desc / price_dayN。
+    映射到模板字段 destination / service / day1..day7；Decimal 转 float 便于写表与 JSON。
+    """
+    normalized: dict[str, Any] = {
         "destination": row.get("destination_port_name") or row.get("destination"),
-        "service": row.get("service_code") or row.get("service") or carrier_fallback,
-        "remark": row.get("remarks"),
+        "service": (
+            row.get("service_desc")
+            or row.get("airline_code")
+            or row.get("service_code")
+            or row.get("service")
+            or carrier_fallback
+        ),
+        "remark": row.get("remarks") or row.get("remark"),
         "source_file": row.get("source_file"),
+        # 重量档报价(联运商)同港多航班 → 按目的港标 needs_review，交审核台人工选一条。
+        "needs_review_by_destination": bool(row.get("multi_flight_pick")),
     }
+    for day in range(1, 8):
+        normalized[f"day{day}"] = _to_number(row.get(f"price_day{day}"))
+    return normalized
+
+
+def _to_number(value: Any) -> Any:
+    """Decimal → float（None 保持 None），便于 openpyxl 写入与 JSON 序列化。"""
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
+
+
+def _review_key(row: dict[str, Any]) -> tuple[Any, ...]:
+    # 重量档报价(联运商)：同目的港多航班需人工选一条 → 仅按目的港聚合。
+    if row.get("needs_review_by_destination"):
+        return (row.get("destination"),)
+    # sea 用船司、air 周报用 service 作为同目的港下的区分键。
+    return (row.get("destination"), row.get("carrier") or row.get("service"))
 
 
 def _mark_needs_review(rows: list[dict[str, Any]]) -> None:
-    """同 (目的港, 船司) 出现多条 → 全部标 needs_review，供审核台人工选。"""
-    keys = Counter((r.get("destination"), r.get("carrier")) for r in rows)
+    """同 (目的港, 船司/service) 出现多条 → 全部标 needs_review，供审核台人工选。"""
+    keys = Counter(_review_key(r) for r in rows)
     for r in rows:
-        r["needs_review"] = keys[(r.get("destination"), r.get("carrier"))] > 1
+        r["needs_review"] = keys[_review_key(r)] > 1
