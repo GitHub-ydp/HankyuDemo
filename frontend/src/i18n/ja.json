@@ -30,6 +30,7 @@
     "colRemark": "備考",
     "needsReview": "要確認",
     "download": "作成したレート表をダウンロード",
+    "downloadFailed": "ダウンロード失敗",
     "createFailed": "セッション作成に失敗",
     "uploadFailed": "アップロード失敗",
     "noFiles": "先にファイルを選択してください",

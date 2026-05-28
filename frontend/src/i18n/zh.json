@@ -30,6 +30,7 @@
     "colRemark": "备注",
     "needsReview": "待确认",
     "download": "下载填好的运价表",
+    "downloadFailed": "下载失败",
     "createFailed": "创建会话失败",
     "uploadFailed": "上传失败",
     "noFiles": "请先选择文件",
