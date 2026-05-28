@@ -189,6 +189,31 @@ PORTS = [
     ("CAEDM", "Edmonton", "埃德蒙顿", "Canada", "North America"),
     ("CAWNP", "Winnipeg", "温尼伯", "Canada", "North America"),
     ("CASAS", "Saskatoon", "萨斯卡通", "Canada", "North America"),
+
+    # === 2026-05 真实运价表（Ocean / SHA+NGB）字典缺口补充 ===
+    ("CNTAC", "Taicang", "太仓", "China", "East Asia"),
+    ("JPTAK", "Takamatsu", "高松", "Japan", "East Asia"),
+    ("JPTMK", "Tomakomai", "苫小牧", "Japan", "East Asia"),
+    ("JPSDJ", "Sendai", "仙台", "Japan", "East Asia"),
+    ("MMRGN", "Yangon", "仰光", "Myanmar", "Southeast Asia"),
+    ("DEHAM", "Hamburg", "汉堡", "Germany", "Europe"),
+    ("GBFXT", "Felixstowe", "费利克斯托", "United Kingdom", "Europe"),
+    ("BEANR", "Antwerp", "安特卫普", "Belgium", "Europe"),
+    ("FRLEH", "Le Havre", "勒阿弗尔", "France", "Europe"),
+    ("NLRTM", "Rotterdam", "鹿特丹", "Netherlands", "Europe"),
+
+    # === 组合/多港标签（真实运价表 1 行覆盖多港，沿用 JPTYOYOK 组合港先例）===
+    ("JPOSAKOB", "OSAKA KOBE", "大阪神户(组合)", "Japan", "East Asia"),
+    ("JPOSKB2", "OSA/KOB", "大阪神户(简写组合)", "Japan", "East Asia"),
+    ("JPHKTMOJ", "HAKATA MOJI", "博多门司(组合)", "Japan", "East Asia"),
+    ("USLGBLAX", "LONG BEACH LOS ANGELES", "长滩洛杉矶(组合)", "USA", "North America"),
+    ("INMADCHN", "MADRAS / CHENNAI", "马德拉斯/钦奈(组合)", "India", "South Asia"),
+    ("JPFEROSK", "Ferry (OSA/KOB)", "轮渡(大阪/神户)", "Japan", "East Asia"),
+    ("JPFERTAG", "Ferry (TAG to SHIMONOSEKI)", "轮渡(太仓至下关)", "Japan", "East Asia"),
+    ("BDCGP", "Chattogram", "吉大港", "Bangladesh", "South Asia"),
+    ("GBFXTSOU", "FELIXSTOWE SOUTHAMPTON", "费利克斯托/南安普顿(组合)", "United Kingdom", "Europe"),
+    ("USLAXLGB", "LOS ANGELES LONG BEACH", "洛杉矶/长滩(组合)", "USA", "North America"),
+    ("USOAKSFO", "OAKLAND SAN FRANCISCO", "奥克兰/旧金山(组合)", "USA", "North America"),
 ]
 
 
@@ -230,6 +255,12 @@ CARRIERS = [
     ("SSF", "SSF Shipping", "SSF 航运", CarrierType.shipping_line, "China"),
     ("TCLC", "Tokyo Container Line", "东京货柜", CarrierType.shipping_line, "Japan"),
     ("XINJIANZHEN", "Xinjianzhen Shipping", "新鉴真轮船", CarrierType.shipping_line, "China"),
+
+    # === 2026-05 真实运价表（Ocean）字典缺口补充 ===
+    ("NAMSUNG", "Namsung Shipping", "南星海运", CarrierType.shipping_line, "South Korea"),
+    ("SEALAND", "Sealand Maersk", "海陆马士基", CarrierType.shipping_line, "Denmark"),
+    ("IAL", "Interasia Lines", "亚洲航运", CarrierType.shipping_line, "Singapore"),
+    ("OOCL/IAL", "OOCL / IAL (combined)", "东方海外/亚洲航运(组合)", CarrierType.shipping_line, "Hong Kong"),
 ]
 
 

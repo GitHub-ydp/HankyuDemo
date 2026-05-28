@@ -80,7 +80,7 @@ def test_v_t_b8_03_customer_a_sample_4():
     assert result.unmatched_reason is None
 
 
-# ---------- V-T-B8-04..06 反例（B/E/Nitori → unknown） ----------
+# ---------- V-T-B8-04..05 反例（B/E → unknown）；06: Nitori 现已受支持 ----------
 
 
 def test_v_t_b8_04_customer_b_unknown():
@@ -106,12 +106,14 @@ def test_v_t_b8_05_customer_e_unknown():
         assert not w.startswith("MULTI_SHEET")
 
 
-def test_v_t_b8_06_nitori_unknown():
+def test_v_t_b8_06_nitori_recognized():
+    # v1.1: Nitori 已实装为受支持客户（feature/step2-nitori-demo），
+    # 推翻 v1.0「Nitori → unknown」旧判定（原 test_v_t_b8_06_nitori_unknown）。
     _require(NITORI_SAMPLE)
     result = identify(NITORI_SAMPLE)
-    assert result.matched_customer == "unknown"
-    assert result.matched_dimensions == ()
-    assert result.confidence == "low"
+    assert result.matched_customer == "nitori"
+    assert result.matched_dimensions == ("NITORI_SHEETS",)
+    assert result.confidence == "high"
 
 
 # ---------- V-T-B8-07 损坏文件 ----------

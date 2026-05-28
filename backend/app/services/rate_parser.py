@@ -221,6 +221,18 @@ def _resolve_port(name_raw: str, db: Session) -> Port | None:
         return port
     if cn_clean:
         port = db.query(Port).filter(Port.name_cn.ilike(f"%{cn_clean}%")).first()
+    # 5. 归一兜底：折叠所有空格后对 name_en(同样折叠空格)包含匹配
+    #    修 "PASIRGUDANG"↔"Pasir Gudang"、"HONGKONG"↔"Hong Kong" 等无空格变体
+    if port is None and clean:
+        from sqlalchemy import func
+
+        norm = re.sub(r"\s+", "", clean)
+        if len(norm) >= 3:
+            port = (
+                db.query(Port)
+                .filter(func.replace(Port.name_en, " ", "").ilike(f"%{norm}%"))
+                .first()
+            )
     return port
 
 

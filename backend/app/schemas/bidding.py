@@ -29,7 +29,7 @@ class BiddingErrorBlock(BaseModel):
 
 
 class IdentifyBlock(BaseModel):
-    matched_customer: Literal["customer_a", "unknown"]
+    matched_customer: Literal["customer_a", "nitori", "unknown"]
     matched_dimensions: list[str]
     confidence: Literal["high", "medium", "low"]
     unmatched_reason: str | None = None

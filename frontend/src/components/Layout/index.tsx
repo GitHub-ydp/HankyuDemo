@@ -20,6 +20,7 @@ const OPS_NAV: NavEntry[] = [
   { to: '/rates', icon: 'rates', labelKey: 'menu.rates' },
   { to: '/compare', icon: 'compare', labelKey: 'menu.compare' },
   { to: '/pkg', icon: 'package', labelKey: 'menu.pkg' },
+  { to: '/rate-sheet', icon: 'import', labelKey: 'rateSheet.menuLabel' },
 ];
 
 const DATA_NAV: NavEntry[] = [{ to: '/carriers', icon: 'carriers', labelKey: 'menu.carriers' }];
@@ -31,6 +32,7 @@ const BREADCRUMBS: Record<string, string[]> = {
   '/upload': ['breadcrumb.rateGroup', 'breadcrumb.upload'],
   '/compare': ['breadcrumb.rateGroup', 'breadcrumb.compare'],
   '/pkg': ['breadcrumb.pkg'],
+  '/rate-sheet': ['rateSheet.menuLabel'],
   '/emails': ['breadcrumb.emails'],
   '/carriers': ['breadcrumb.dataGroup', 'breadcrumb.carriers'],
   '/settings': ['breadcrumb.settings'],

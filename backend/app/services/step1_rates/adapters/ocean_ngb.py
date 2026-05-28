@@ -117,54 +117,47 @@ class OceanNgbAdapter:
         workbook = load_workbook(path, data_only=True)
         warnings: list[str] = []
         records: list[ParsedRateRecord] = []
-        sheet_summary: dict[str, Any] = {
-            "sheet_name": self._RATE_SHEET,
-            "total_rows": 0,
-            "effective_from": None,
-            "effective_to": None,
-        }
+        sheet_summaries: list[dict[str, Any]] = []
+        all_date_pairs: list[tuple[date | None, date | None]] = []
         formula_fallback_count = 0
 
-        if self._RATE_SHEET not in workbook.sheetnames:
-            warnings.append("Rate sheet missing in NGB workbook; nothing to parse")
-            return ParsedRateBatch(
-                file_type=self.file_type,
-                source_file=path.name,
-                effective_from=None,
-                effective_to=None,
-                records=[],
-                warnings=warnings,
-                adapter_key=self.key,
-                metadata={
-                    "file_name": path.name,
-                    "source_type": "excel",
-                    "parser_version": "ocean_ngb_v1",
-                    "ngb_origin_assumption": "default origin = NINGBO when I column is empty",
-                    "formula_fallback_count": 0,
-                    "sheets": [sheet_summary],
-                    "record_kind_distribution": {"ocean_ngb_fcl": 0, "ocean_ngb_lcl": 0},
-                },
+        # 发现式 sheet 选择：除 sample / Shipping line name 外的全部数据 sheet 都解析。
+        # 兼容 4 月单 'Rate' sheet 与 5 月起华东法人合集（'SHA Rate' + 'NGB Rate'）多 sheet
+        # 合并版；sheet 数量不限，未来再加子公司 sheet 自动纳入，无需改码。
+        data_sheets = [name for name in workbook.sheetnames if name not in self._SKIP_SHEETS]
+        if not data_sheets:
+            warnings.append("no data sheet found in NGB workbook; nothing to parse")
+
+        for sheet_name in data_sheets:
+            ws = workbook[sheet_name]
+            sheet_records, sheet_warnings, sheet_fallback_count, date_pairs = self._parse_rate_sheet(
+                ws, source_file=path.name, sheet_name=sheet_name
+            )
+            records.extend(sheet_records)
+            warnings.extend(sheet_warnings)
+            formula_fallback_count += sheet_fallback_count
+            all_date_pairs.extend(date_pairs)
+            sheet_summaries.append(
+                {
+                    "sheet_name": sheet_name,
+                    "total_rows": len(sheet_records),
+                    "effective_from": None,
+                    "effective_to": None,
+                }
             )
 
-        ws = workbook[self._RATE_SHEET]
-        sheet_records, sheet_warnings, sheet_fallback_count, date_pairs = self._parse_rate_sheet(
-            ws, source_file=path.name
-        )
-        records.extend(sheet_records)
-        warnings.extend(sheet_warnings)
-        formula_fallback_count += sheet_fallback_count
-
-        # 批次有效期：从 Lv.1 行 (C, D) 集合取
-        effective_from, effective_to, range_warning = self._resolve_batch_range(date_pairs)
+        # 批次有效期：从所有数据 sheet 的 Lv.1 行 (C, D) 集合取
+        effective_from, effective_to, range_warning = self._resolve_batch_range(all_date_pairs)
         if range_warning:
             warnings.append(range_warning)
 
-        sheet_summary["total_rows"] = len(sheet_records)
-        sheet_summary["effective_from"] = effective_from
-        sheet_summary["effective_to"] = effective_to
+        # sheet summary 的有效期统一回填为批次级（保持字段结构稳定）
+        for summary in sheet_summaries:
+            summary["effective_from"] = effective_from
+            summary["effective_to"] = effective_to
 
-        if not records:
-            warnings.append("NGB workbook produced 0 records; check Rate sheet structure")
+        if not records and data_sheets:
+            warnings.append("NGB workbook produced 0 records; check rate sheet structure")
 
         kind_dist = {"ocean_ngb_fcl": 0, "ocean_ngb_lcl": 0}
         for r in records:
@@ -185,7 +178,7 @@ class OceanNgbAdapter:
                 "parser_version": "ocean_ngb_v1",
                 "ngb_origin_assumption": "default origin = NINGBO when I column is empty",
                 "formula_fallback_count": formula_fallback_count,
-                "sheets": [sheet_summary],
+                "sheets": sheet_summaries,
                 "record_kind_distribution": kind_dist,
             },
         )
@@ -195,6 +188,7 @@ class OceanNgbAdapter:
         ws,
         *,
         source_file: str,
+        sheet_name: str,
     ) -> tuple[list[ParsedRateRecord], list[str], int, list[tuple[date | None, date | None]]]:
         warnings: list[str] = []
         records: list[ParsedRateRecord] = []
@@ -227,6 +221,7 @@ class OceanNgbAdapter:
                 row,
                 row_index,
                 source_file=source_file,
+                sheet_name=sheet_name,
                 last_lv1_rates=last_lv1_rates,
             )
             warnings.extend(row_warnings)
@@ -253,6 +248,7 @@ class OceanNgbAdapter:
         row_index: int,
         *,
         source_file: str,
+        sheet_name: str,
         last_lv1_rates: dict[int, Decimal | None] | None,
     ) -> tuple[ParsedRateRecord | None, list[str], int, dict[int, Decimal | None] | None]:
         warnings: list[str] = []
@@ -347,7 +343,7 @@ class OceanNgbAdapter:
 
         # extras（通用）
         extras: dict[str, Any] = {
-            "sheet_name": self._RATE_SHEET,
+            "sheet_name": sheet_name,
             "row_index": row_index,
             "agent": agent,
             "pod_code": pod_code,

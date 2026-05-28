@@ -81,6 +81,9 @@ def run_auto_fill(
             detail=identify_result.unmatched_reason or "identify returned unknown",
         )
 
+    if identify_result.matched_customer == "nitori":
+        return _run_nitori(input_path, bid_id, bid_dir, identify_block)
+
     profile = CustomerAProfile(markup_fn=default_markup_fn)
 
     try:
@@ -147,9 +150,51 @@ def run_auto_fill(
 # ---------- internal helpers ----------
 
 
+def _run_nitori(input_path, bid_id, bid_dir, identify_block):
+    from app.services.step2_bidding.nitori_bundle import resolve_bundle
+    from app.services.step2_bidding.nitori_cost_book import NitoriCostBook
+    from app.services.step2_bidding.customer_profiles.nitori import NitoriProfile
+
+    quote_path, cost_path = resolve_bundle(Path(bid_dir))
+    profile = NitoriProfile(cost_book=NitoriCostBook.from_xlsx(cost_path))
+    parsed = profile.parse(quote_path, bid_id=bid_id, period="2026Q2")
+    parse_block = _to_parse_block(parsed, sample_limit=5)
+    reports = profile.match(parsed)
+
+    cost_out = Path(bid_dir) / f"cost_nitori_{bid_id}.xlsm"
+    sr_out = Path(bid_dir) / f"sr_nitori_{bid_id}.xlsm"
+    profile.fill(quote_path, parsed, reports, "cost", cost_out)
+    profile.fill(quote_path, parsed, reports, "sr", sr_out)
+
+    fill_block = _to_fill_block(
+        row_reports=reports,
+        fr_warnings=list(parsed.warnings),
+        markup_ratio=_MARKUP_RATIO,
+    )
+    cost_token = TOKEN_STORE.put(cost_out, cost_out.name, ttl=_TOKEN_TTL_SECONDS)
+    sr_token = TOKEN_STORE.put(sr_out, sr_out.name, ttl=_TOKEN_TTL_SECONDS)
+    expires_at = datetime.utcnow() + timedelta(seconds=_TOKEN_TTL_SECONDS)
+    return BiddingAutoFillResponse(
+        bid_id=bid_id,
+        ok=True,
+        error=None,
+        identify=identify_block,
+        parse=parse_block,
+        fill=fill_block,
+        download=DownloadTokens(
+            cost_token=cost_token,
+            sr_token=sr_token,
+            cost_filename=cost_out.name,
+            sr_filename=sr_out.name,
+            expires_at=expires_at,
+            one_time_use=True,
+        ),
+    )
+
+
 def _to_identify_block(result: IdentifierResult) -> IdentifyBlock:
     matched: str = result.matched_customer
-    if matched not in ("customer_a", "unknown"):
+    if matched not in ("customer_a", "nitori", "unknown"):
         matched = "unknown"
     conf = result.confidence if result.confidence in ("high", "medium", "low") else "low"
     return IdentifyBlock(

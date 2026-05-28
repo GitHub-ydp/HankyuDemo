@@ -227,4 +227,27 @@ export const biddingApi = {
     `${api.defaults.baseURL}/bidding/download/${token}`,
 };
 
+// --- Rate Sheet Builder (Step1 运价表生成: 多源杂料 → AI 抽取 → 填空白模板) ---
+export const rateSheetApi = {
+  createSession: (templateType: string): Promise<ApiResponse> => {
+    const fd = new FormData();
+    fd.append('template_type', templateType);
+    return api.post<unknown, ApiResponse>('/rate-sheet/session', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  uploadFiles: (sessionId: string, files: File[]): Promise<ApiResponse> => {
+    const fd = new FormData();
+    files.forEach((f) => fd.append('files', f));
+    return api.post<unknown, ApiResponse>(`/rate-sheet/${sessionId}/files`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 180000,
+    });
+  },
+  preview: (sessionId: string): Promise<ApiResponse> =>
+    api.get<unknown, ApiResponse>(`/rate-sheet/${sessionId}/preview`),
+  downloadUrl: (sessionId: string) =>
+    `${api.defaults.baseURL}/rate-sheet/${sessionId}/download`,
+};
+
 export default api;
