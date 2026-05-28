@@ -4,9 +4,11 @@
 """
 import os
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -119,6 +121,26 @@ def download_rate_sheet(session_id: str):
         return ApiResponse(code=404, message="会话不存在或已过期，请重新创建")
 
     content, filename = fill_template(session.template_type, session.rows)
+    return StreamingResponse(
+        iter([content]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+class DownloadRequest(BaseModel):
+    rows: list[dict[str, Any]]
+
+
+@router.post("/{session_id}/download")
+def download_rate_sheet_post(session_id: str, body: DownloadRequest):
+    """按前端传来的「勾选+编辑后」最终行填模板并返回 xlsx（不读 session.rows）。"""
+    try:
+        session = orchestrator.get_session(session_id)
+    except KeyError:
+        return ApiResponse(code=404, message="会话不存在或已过期，请重新创建")
+
+    content, filename = fill_template(session.template_type, body.rows)
     return StreamingResponse(
         iter([content]),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
