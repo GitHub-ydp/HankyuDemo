@@ -14,6 +14,7 @@ normalized rate dict 字段约定：
 """
 from __future__ import annotations
 
+from datetime import date, timedelta
 from io import BytesIO
 from typing import Any
 
@@ -53,9 +54,38 @@ def _unmerge_data_area(ws, data_start_row: int) -> None:
         ws.unmerge_cells(rng)
 
 
+def _first_week_start(rows: list[dict[str, Any]]) -> date | None:
+    """取第一条带 effective_week_start 的行的周起始日（ISO 字符串 / date 均可）；无则 None。"""
+    for row in rows:
+        value = row.get("effective_week_start")
+        if not value:
+            continue
+        try:
+            return date.fromisoformat(str(value)[:10])
+        except ValueError:
+            return None
+    return None
+
+
+def _apply_week_headers(ws, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) -> None:
+    """有周信息时，按该周改写 day1-7 日期表头 + sheet 名（一份模板通吃任意周）；无则不动。"""
+    week_start = _first_week_start(rows)
+    if week_start is None:
+        return
+    col = sheet_cfg.columns
+    for i in range(7):
+        d = week_start + timedelta(days=i)
+        ws.cell(sheet_cfg.header_row, col[f"day{i + 1}"]).value = (
+            f"{d.year}/{d.month}/{d.day} ({d:%a})"
+        )
+    week_end = week_start + timedelta(days=6)
+    ws.title = f"{week_start:%b} {week_start.day} to {week_end:%b} {week_end.day}"
+
+
 def _fill_air(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) -> None:
     ws = workbook[sheet_cfg.sheet_name]
     _unmerge_data_area(ws, sheet_cfg.data_start_row)
+    _apply_week_headers(ws, sheet_cfg, rows)
     col = sheet_cfg.columns
     r = sheet_cfg.data_start_row
     for row in rows:

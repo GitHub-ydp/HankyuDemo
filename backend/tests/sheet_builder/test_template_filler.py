@@ -72,3 +72,29 @@ def test_fill_empty_rows_keeps_header_and_blank_body():
     ws = _reload(content)["JP N RATE FCL & LCL"]
     assert ws.cell(8, 1).value == "To"            # 表头还在
     assert ws.cell(9, 1).value in (None, "")      # 数据区仍空
+
+
+def test_fill_air_rewrites_week_headers_from_data():
+    """行带 effective_week_start 时，按该周改写 day1-7 日期表头 + sheet 名。"""
+    rows = [
+        {"destination": "NRT", "service": "CK", "day1": 14, "day7": 14,
+         "effective_week_start": "2026-06-01"},
+    ]
+    content, _ = fill_template("air", rows)
+    wb = _reload(content)
+
+    assert wb.sheetnames == ["Jun 1 to Jun 7"], "sheet 名应按周改写"
+    ws = wb["Jun 1 to Jun 7"]
+    assert str(ws.cell(1, 3).value).startswith("2026/6/1"), "day1 表头应为该周起始日"
+    assert str(ws.cell(1, 9).value).startswith("2026/6/7"), "day7 表头应为该周第7日"
+    assert ws.cell(2, 1).value == "NRT"  # 数据照填
+
+
+def test_fill_air_without_week_keeps_template():
+    """无 effective_week_start（如重量档报价）→ 保留模板原日期/名，不乱改。"""
+    rows = [{"destination": "NRT", "service": "CK", "day1": 14}]
+    content, _ = fill_template("air", rows)
+    wb = _reload(content)
+
+    assert wb.sheetnames == ["May 25 to May 31"], "无周信息应保留模板原样"
+    assert str(wb["May 25 to May 31"].cell(1, 3).value).startswith("2026/5/25")

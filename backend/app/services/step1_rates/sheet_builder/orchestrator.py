@@ -196,12 +196,23 @@ def _normalize_air(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]
         ),
         "remark": row.get("remarks") or row.get("remark"),
         "source_file": row.get("source_file"),
+        # 周起始日：随行带到填充器，按该周动态改写模板的 day1-7 日期表头/sheet 名（ISO 字符串便于 JSON 往返）。
+        "effective_week_start": _to_week_str(row.get("effective_week_start")),
         # 重量档报价(联运商)同港多航班 → 按目的港标 needs_review，交审核台人工选一条。
         "needs_review_by_destination": bool(row.get("multi_flight_pick")),
     }
     for day in range(1, 8):
         normalized[f"day{day}"] = _to_number(row.get(f"price_day{day}"))
     return normalized
+
+
+def _to_week_str(value: Any) -> str | None:
+    """date/datetime → 'YYYY-MM-DD' ISO 字符串；已是字符串则取前 10 位；None 保持 None。"""
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()[:10]
+    return str(value)[:10] or None
 
 
 def _to_number(value: Any) -> Any:
