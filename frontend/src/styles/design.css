@@ -1558,3 +1558,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
 }
 .chip-link:hover { background: var(--teal-100); color: var(--teal-600); border-color: var(--teal-500); }
 .chip-link.disabled { opacity: .5; cursor: not-allowed; }
+
+/* 运价表生成审核台：未勾选行置灰、待确认行底色 */
+.row-excluded td { opacity: 0.4; }
+.row-needs-review td { background: #fffbe6; }

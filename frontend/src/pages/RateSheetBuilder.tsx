@@ -4,6 +4,8 @@ import {
   Segmented,
   Upload,
   Button,
+  Input,
+  InputNumber,
   Table,
   Tag,
   message,
@@ -28,6 +30,7 @@ interface FileResult {
 }
 
 interface PreviewRow {
+  _rid?: number;
   destination?: string;
   carrier?: string;
   freight_20?: number | string | null;
@@ -59,6 +62,8 @@ export default function RateSheetBuilder() {
   const [rows, setRows] = useState<PreviewRow[]>([]);
   const [summary, setSummary] = useState<{ total_rows: number; needs_review: number } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
+  const [editedRows, setEditedRows] = useState<Record<number, Partial<PreviewRow>>>({});
 
   const resetSession = () => {
     setFileList([]);
@@ -111,7 +116,10 @@ export default function RateSheetBuilder() {
         setSummary(data.summary);
         const pv = (await rateSheetApi.preview(sessionId)) as ApiLike;
         if (pv.code === 0) {
-          setRows((pv.data as { rows: PreviewRow[] }).rows);
+          const pvRows = (pv.data as { rows: PreviewRow[] }).rows.map((r, i) => ({ ...r, _rid: i }));
+          setRows(pvRows);
+          setSelectedRowKeys(pvRows.map((r) => r._rid as number));
+          setEditedRows({});
         }
       } else {
         message.error(res.message || t('rateSheet.uploadFailed'));
@@ -123,9 +131,31 @@ export default function RateSheetBuilder() {
     }
   };
 
-  const handleDownload = () => {
+  const keptCount = selectedRowKeys.length;
+  const keptReview = rows.filter(
+    (r) => selectedRowKeys.includes(r._rid as number) && r.needs_review,
+  ).length;
+
+  const handleDownload = async () => {
     if (!sessionId) return;
-    window.open(rateSheetApi.downloadUrl(sessionId), '_blank');
+    const finalRows = rows
+      .filter((r) => selectedRowKeys.includes(r._rid as number))
+      .map((r) => {
+        const merged = { ...r, ...editedRows[r._rid as number] };
+        delete (merged as { _rid?: number })._rid;
+        return merged;
+      });
+    try {
+      const blob = await rateSheetApi.downloadFilled(sessionId, finalRows);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${templateType ?? 'rate'}_rate_sheet_filled.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      message.error(t('rateSheet.downloadFailed'));
+    }
   };
 
   const statusTag = (status: string) => {
@@ -150,38 +180,60 @@ export default function RateSheetBuilder() {
     },
   ];
 
-  const baseCols = [
-    { title: t('rateSheet.colDestination'), dataIndex: 'destination', key: 'destination' },
-    { title: t('rateSheet.colCarrier'), dataIndex: 'carrier', key: 'carrier' },
-  ];
+  const valueOf = (r: PreviewRow, field: keyof PreviewRow) =>
+    ({ ...r, ...editedRows[r._rid as number] })[field];
+
+  const editCell = (rid: number, field: keyof PreviewRow, value: unknown) =>
+    setEditedRows((prev) => ({ ...prev, [rid]: { ...prev[rid], [field]: value } }));
+
+  const textCol = (title: string, field: keyof PreviewRow) => ({
+    title,
+    key: field as string,
+    render: (_: unknown, r: PreviewRow) => (
+      <Input
+        size="small"
+        value={(valueOf(r, field) as string) ?? ''}
+        onChange={(e) => editCell(r._rid as number, field, e.target.value)}
+      />
+    ),
+  });
+
+  const numCol = (title: string, field: keyof PreviewRow) => ({
+    title,
+    key: field as string,
+    render: (_: unknown, r: PreviewRow) => (
+      <InputNumber
+        size="small"
+        style={{ width: '100%' }}
+        value={valueOf(r, field) as number | null | undefined}
+        onChange={(v) => editCell(r._rid as number, field, v)}
+      />
+    ),
+  });
+
+  const reviewCol = {
+    title: t('rateSheet.needsReview'),
+    key: 'needs_review',
+    render: (_: unknown, r: PreviewRow) =>
+      r.needs_review ? <Tag color="orange">{t('rateSheet.needsReview')}</Tag> : null,
+  };
+
   const seaCols = [
-    ...baseCols,
-    { title: t('rateSheet.colFreight20'), dataIndex: 'freight_20', key: 'freight_20' },
-    { title: t('rateSheet.colFreight40'), dataIndex: 'freight_40', key: 'freight_40' },
-    { title: t('rateSheet.colRemark'), dataIndex: 'remark', key: 'remark' },
-    {
-      title: t('rateSheet.needsReview'),
-      key: 'needs_review',
-      render: (_: unknown, r: PreviewRow) =>
-        r.needs_review ? <Tag color="orange">{t('rateSheet.needsReview')}</Tag> : null,
-    },
+    textCol(t('rateSheet.colDestination'), 'destination'),
+    textCol(t('rateSheet.colCarrier'), 'carrier'),
+    numCol(t('rateSheet.colFreight20'), 'freight_20'),
+    numCol(t('rateSheet.colFreight40'), 'freight_40'),
+    textCol(t('rateSheet.colRemark'), 'remark'),
+    reviewCol,
   ];
-  const airDayCols = Array.from({ length: 7 }, (_, i) => ({
-    title: t('rateSheet.colDay', { n: i + 1 }),
-    dataIndex: `day${i + 1}`,
-    key: `day${i + 1}`,
-  }));
   const airCols = [
-    { title: t('rateSheet.colDestination'), dataIndex: 'destination', key: 'destination' },
-    { title: t('rateSheet.colService'), dataIndex: 'service', key: 'service' },
-    ...airDayCols,
-    { title: t('rateSheet.colRemark'), dataIndex: 'remark', key: 'remark' },
-    {
-      title: t('rateSheet.needsReview'),
-      key: 'needs_review',
-      render: (_: unknown, r: PreviewRow) =>
-        r.needs_review ? <Tag color="orange">{t('rateSheet.needsReview')}</Tag> : null,
-    },
+    textCol(t('rateSheet.colDestination'), 'destination'),
+    textCol(t('rateSheet.colService'), 'service'),
+    ...Array.from({ length: 7 }, (_, i) =>
+      numCol(t('rateSheet.colDay', { n: i + 1 }), `day${i + 1}` as keyof PreviewRow),
+    ),
+    textCol(t('rateSheet.colRemark'), 'remark'),
+    reviewCol,
   ];
   const previewCols = templateType === 'air' ? airCols : seaCols;
 
@@ -242,7 +294,7 @@ export default function RateSheetBuilder() {
       <Card
         title={t('rateSheet.step3')}
         extra={
-          <Button type="primary" disabled={!summary || summary.total_rows === 0} onClick={handleDownload}>
+          <Button type="primary" disabled={!summary || keptCount === 0} onClick={handleDownload}>
             {t('rateSheet.download')}
           </Button>
         }
@@ -251,22 +303,32 @@ export default function RateSheetBuilder() {
           <>
             <Row gutter={24} style={{ marginBottom: 16 }}>
               <Col>
-                <Statistic title={t('rateSheet.summaryTotal')} value={summary.total_rows} />
+                <Statistic title={t('rateSheet.summaryTotal')} value={`${keptCount} / ${summary.total_rows}`} />
               </Col>
               <Col>
                 <Statistic
                   title={t('rateSheet.summaryReview')}
-                  value={summary.needs_review}
-                  valueStyle={{ color: summary.needs_review > 0 ? '#F79009' : undefined }}
+                  value={`${keptReview} / ${summary.needs_review}`}
+                  valueStyle={{ color: keptReview > 0 ? '#F79009' : undefined }}
                 />
               </Col>
             </Row>
             <Table
               size="small"
-              rowKey={(_, i) => String(i)}
+              rowKey={(r: PreviewRow) => r._rid as number}
+              rowSelection={{
+                selectedRowKeys,
+                onChange: (keys) => setSelectedRowKeys(keys as number[]),
+              }}
               columns={previewCols}
               dataSource={rows}
-              rowClassName={(r: PreviewRow) => (r.needs_review ? 'row-needs-review' : '')}
+              rowClassName={(r: PreviewRow) =>
+                !selectedRowKeys.includes(r._rid as number)
+                  ? 'row-excluded'
+                  : r.needs_review
+                    ? 'row-needs-review'
+                    : ''
+              }
               pagination={{ pageSize: 20 }}
             />
           </>
