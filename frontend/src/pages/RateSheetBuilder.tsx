@@ -33,6 +33,13 @@ interface PreviewRow {
   freight_20?: number | string | null;
   freight_40?: number | string | null;
   service?: string;
+  day1?: number | string | null;
+  day2?: number | string | null;
+  day3?: number | string | null;
+  day4?: number | string | null;
+  day5?: number | string | null;
+  day6?: number | string | null;
+  day7?: number | string | null;
   remark?: string | null;
   needs_review?: boolean;
 }
@@ -136,7 +143,11 @@ export default function RateSheetBuilder() {
     { title: t('rateSheet.sourceType'), dataIndex: 'source_type', key: 'source_type' },
     { title: t('rateSheet.status'), dataIndex: 'status', key: 'status', render: statusTag },
     { title: t('rateSheet.rowCount'), dataIndex: 'row_count', key: 'row_count' },
-    { title: t('rateSheet.colRemark'), dataIndex: 'message', key: 'message' },
+    {
+      title: t('rateSheet.colRemark'),
+      key: 'message',
+      render: (_: unknown, r: FileResult) => r.message || (r.warnings || []).join('；'),
+    },
   ];
 
   const baseCols = [
@@ -155,10 +166,22 @@ export default function RateSheetBuilder() {
         r.needs_review ? <Tag color="orange">{t('rateSheet.needsReview')}</Tag> : null,
     },
   ];
+  const airDayCols = Array.from({ length: 7 }, (_, i) => ({
+    title: t('rateSheet.colDay', { n: i + 1 }),
+    dataIndex: `day${i + 1}`,
+    key: `day${i + 1}`,
+  }));
   const airCols = [
-    ...baseCols,
+    { title: t('rateSheet.colDestination'), dataIndex: 'destination', key: 'destination' },
     { title: t('rateSheet.colService'), dataIndex: 'service', key: 'service' },
+    ...airDayCols,
     { title: t('rateSheet.colRemark'), dataIndex: 'remark', key: 'remark' },
+    {
+      title: t('rateSheet.needsReview'),
+      key: 'needs_review',
+      render: (_: unknown, r: PreviewRow) =>
+        r.needs_review ? <Tag color="orange">{t('rateSheet.needsReview')}</Tag> : null,
+    },
   ];
   const previewCols = templateType === 'air' ? airCols : seaCols;
 

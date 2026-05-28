@@ -26,6 +26,7 @@
     "colFreight20": "20FT 运费",
     "colFreight40": "40FT 运费",
     "colService": "服务 / 重量档",
+    "colDay": "第{{n}}日",
     "colRemark": "备注",
     "needsReview": "待确认",
     "download": "下载填好的运价表",

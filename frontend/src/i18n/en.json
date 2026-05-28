@@ -26,6 +26,7 @@
     "colFreight20": "20FT freight",
     "colFreight40": "40FT freight",
     "colService": "Service / weight tier",
+    "colDay": "Day {{n}}",
     "colRemark": "Remark",
     "needsReview": "Review",
     "download": "Download filled rate sheet",

@@ -26,6 +26,7 @@
     "colFreight20": "20FT 運賃",
     "colFreight40": "40FT 運賃",
     "colService": "サービス / 重量帯",
+    "colDay": "{{n}}日目",
     "colRemark": "備考",
     "needsReview": "要確認",
     "download": "作成したレート表をダウンロード",
