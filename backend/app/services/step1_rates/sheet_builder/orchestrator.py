@@ -25,7 +25,7 @@ from app.services import rate_parser, wechat_image_parser
 from app.services.step1_rates.sheet_builder.template_registry import get_template_config
 
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
-_EXCEL_EXTS = {".xlsx", ".xlsm"}  # .xls 无 xlrd → 暂不支持
+_EXCEL_EXTS = {".xlsx", ".xlsm", ".xls"}  # .xls(老二进制)经 xlrd 读取，见 requirements
 _TEXT_EXTS = {".txt", ".md", ".eml"}
 
 

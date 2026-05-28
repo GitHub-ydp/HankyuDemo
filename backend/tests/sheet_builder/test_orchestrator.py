@@ -72,6 +72,25 @@ def test_unsupported_extension_skipped():
     assert s.rows == []
 
 
+def test_legacy_xls_routed_to_excel_parser(monkeypatch):
+    """老 .xls(Excel 97-2003) 应走 excel 解析器，不再被当作 unsupported 跳过。"""
+    fake = {
+        "parsed_rows": [
+            {"destination_port_name": "BUSAN/釜山", "carrier_name": "KMTC", "container_20gp": 130}
+        ],
+        "carrier_code": "KMTC",
+        "warnings": [],
+    }
+    monkeypatch.setattr(rate_parser, "detect_and_parse", lambda p, db: fake)
+
+    s = orchestrator.create_session("sea")
+    fr = orchestrator.add_file(s.session_id, "old_rates.xls", "/tmp/old_rates.xls", db=None)
+
+    assert fr.source_type == "excel", "应路由到 excel 解析器，而非 unsupported"
+    assert fr.status == "parsed"
+    assert fr.row_count == 1
+
+
 def test_parser_error_marked_not_crash(monkeypatch):
     def boom(p, db):
         raise RuntimeError("解析炸了")
