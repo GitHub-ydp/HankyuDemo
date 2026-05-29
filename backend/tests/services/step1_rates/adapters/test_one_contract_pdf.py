@@ -1,4 +1,5 @@
 """ONE 服务合约 PDF 适配器单元测试。"""
+import app.services.step1_rates.adapters.one_contract_pdf as ocp
 from app.services.step1_rates.adapters.one_contract_pdf import (
     _clean_port_name,
     parse_rate_blocks,
@@ -90,9 +91,8 @@ def test_parse_coded_row_flagged_needs_review():
     assert r["rate_level"] == "R2/2400"      # 编码原文保留
     assert r["container_40gp"] is None        # 非数字 → 不当价
     assert r["origin_port_name"] == "TAIPEI"
-
-
-import app.services.step1_rates.adapters.one_contract_pdf as ocp
+    assert r["valid_from"] is None
+    assert r["valid_to"] is None
 
 
 def test_parse_one_contract_pdf_wraps_blocks(monkeypatch):

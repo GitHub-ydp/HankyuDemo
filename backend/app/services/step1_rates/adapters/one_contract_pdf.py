@@ -7,7 +7,12 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+import pdfplumber
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 _CARRIER = "ONE"
 
@@ -55,7 +60,7 @@ def _word_at(line: list[dict], x: float, tol: float = _TOL) -> dict | None:
     best, best_d = None, tol
     for w in line:
         d = abs(w["x0"] - x)
-        if d <= best_d:
+        if d <= best_d:  # 等距时取靠后的词，当前行为可接受
             best, best_d = w, d
     return best
 
@@ -120,6 +125,9 @@ def _parse_data_row(line: list[dict], price_cols: dict, dest_right: float | None
             row[key] = _to_float(w["text"])
             has_price = True
         else:
+            # 一行有多个编码格子时 rate_level 只保留最后一个；
+            # FreightRate.rate_level 是 String(10) 容不下多个，且该行已
+            # needs_review=True 交人工复核，故 v1 接受此限制。
             row["rate_level"] = w["text"]      # 编码格子(如 R5/2400)
             row["needs_review"] = True
     if not has_price and not row["needs_review"]:
@@ -190,10 +198,6 @@ def parse_rate_blocks(lines: list[list[dict]]) -> list[dict]:
     return results
 
 
-import pdfplumber
-from sqlalchemy.orm import Session
-
-
 def _extract_word_lines(file_path: str) -> list[list[dict]]:
     """pdfplumber 抽词 → 按页、按行(top 聚类)分组，每行按 x0 升序。"""
     lines: list[list[dict]] = []
@@ -210,7 +214,7 @@ def _extract_word_lines(file_path: str) -> list[list[dict]]:
 
 
 def parse_one_contract_pdf(file_path: str, db: "Session | None" = None) -> dict:
-    """ONE 合约 PDF → parsed_rows(kmtc 兼容形态)。db 仅为签名一致,本层不解析港口。"""
+    """ONE 合约 PDF → parsed_rows(符合 plan 约定的 parsed_row 契约)。db 仅为签名一致,本层不解析港口。"""
     lines = _extract_word_lines(file_path)
     rows = parse_rate_blocks(lines)
     warnings: list[str] = []
