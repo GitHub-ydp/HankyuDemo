@@ -23,6 +23,7 @@ from app.api.deps import get_db
 from app.models import Carrier, FreightRate, Port, UploadLog
 from app.models.air_freight_rate import AirFreightRate
 from app.models.air_surcharge import AirSurcharge
+from app.models.air_tier_rate import AirTierRate
 from app.models.import_batch import ImportBatch
 from app.models.lcl_rate import LclRate
 from app.schemas.common import ApiResponse
@@ -47,6 +48,7 @@ def reset_rates(db: Session = Depends(get_db)):
     # 统计清理前数量
     air_freight_count = db.query(AirFreightRate).count()
     air_surcharge_count = db.query(AirSurcharge).count()
+    air_tier_count = db.query(AirTierRate).count()
     lcl_count = db.query(LclRate).count()
     freight_count = db.query(FreightRate).count()
     batch_count = db.query(ImportBatch).count()
@@ -58,6 +60,7 @@ def reset_rates(db: Session = Depends(get_db)):
     # → 字典（carriers / ports），最后由 reseed_dictionaries 重灌
     db.query(AirFreightRate).delete(synchronize_session=False)
     db.query(AirSurcharge).delete(synchronize_session=False)
+    db.query(AirTierRate).delete(synchronize_session=False)
     db.query(LclRate).delete(synchronize_session=False)
     db.query(FreightRate).delete(synchronize_session=False)
     db.query(ImportBatch).delete(synchronize_session=False)
@@ -90,7 +93,9 @@ def reset_rates(db: Session = Depends(get_db)):
     tokens_cleared = TOKEN_STORE.clear()
 
     # 向后兼容字段：rates_deleted 聚合所有 rate 类表，前端原有消息模板不破
-    total_rates_deleted = air_freight_count + air_surcharge_count + lcl_count + freight_count
+    total_rates_deleted = (
+        air_freight_count + air_surcharge_count + air_tier_count + lcl_count + freight_count
+    )
 
     # 净清掉的临时船司/港口 = 清前总数 - reseed 重灌数。
     # carriers_deleted 字段历史返回的是「清前总数」，前端拿它直接显示「已清空 X 条船司」
@@ -117,6 +122,7 @@ def reset_rates(db: Session = Depends(get_db)):
         "tokens_cleared": tokens_cleared,
         "air_freight_rates_deleted": air_freight_count,
         "air_surcharges_deleted": air_surcharge_count,
+        "air_tier_rates_deleted": air_tier_count,
         "lcl_rates_deleted": lcl_count,
         "freight_rates_deleted": freight_count,
     }, message=(
