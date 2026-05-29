@@ -1,23 +1,8 @@
-import { useEffect, useState } from 'react';
-import {
-  Card,
-  Segmented,
-  Upload,
-  Button,
-  Input,
-  InputNumber,
-  Table,
-  Tag,
-  message,
-  Space,
-  Row,
-  Col,
-  Statistic,
-  Empty,
-  Typography,
-} from 'antd';
+import { Fragment, useEffect, useState } from 'react';
+import { Upload, Input, InputNumber, Table, Tooltip, message } from 'antd';
 import type { UploadFile } from 'antd';
 import { useTranslation } from 'react-i18next';
+import Icon from '../components/Icon';
 import { rateSheetApi } from '../services/api';
 
 interface FileResult {
@@ -31,6 +16,7 @@ interface FileResult {
 
 interface PreviewRow {
   _rid?: number;
+  origin?: string;
   destination?: string;
   carrier?: string;
   freight_20?: number | string | null;
@@ -43,6 +29,8 @@ interface PreviewRow {
   day5?: number | string | null;
   day6?: number | string | null;
   day7?: number | string | null;
+  // 档位源(EES/唯凯)：稀疏档位 dict(KG→价)。JSON 往返后键是字符串('45')。
+  tier_prices?: Record<string, number | null>;
   remark?: string | null;
   needs_review?: boolean;
 }
@@ -136,17 +124,20 @@ export default function RateSheetBuilder() {
     (r) => selectedRowKeys.includes(r._rid as number) && r.needs_review,
   ).length;
 
-  const handleDownload = async () => {
-    if (!sessionId) return;
-    const finalRows = rows
+  // 勾选保留 + 行内编辑后的最终行（下载与入库共用）
+  const buildFinalRows = () =>
+    rows
       .filter((r) => selectedRowKeys.includes(r._rid as number))
       .map((r) => {
         const merged = { ...r, ...editedRows[r._rid as number] };
         delete (merged as { _rid?: number })._rid;
         return merged;
       });
+
+  const handleDownload = async () => {
+    if (!sessionId) return;
     try {
-      const blob = await rateSheetApi.downloadFilled(sessionId, finalRows);
+      const blob = await rateSheetApi.downloadFilled(sessionId, buildFinalRows());
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -158,21 +149,36 @@ export default function RateSheetBuilder() {
     }
   };
 
+  const handleCommit = async () => {
+    if (!sessionId) return;
+    try {
+      const res = (await rateSheetApi.commitToDb(sessionId, buildFinalRows())) as ApiLike;
+      if (res.code === 0) {
+        const d = res.data as { tier_rows: number; skipped_weekly: number };
+        message.success(t('rateSheet.commitSuccess', { tier: d.tier_rows, skipped: d.skipped_weekly }));
+      } else {
+        message.error(res.message || t('rateSheet.commitFailed'));
+      }
+    } catch {
+      message.error(t('rateSheet.commitFailed'));
+    }
+  };
+
   const statusTag = (status: string) => {
-    const map: Record<string, { color: string; key: string }> = {
-      parsed: { color: 'green', key: 'rateSheet.statusParsed' },
-      skipped: { color: 'orange', key: 'rateSheet.statusSkipped' },
-      error: { color: 'red', key: 'rateSheet.statusError' },
+    const map: Record<string, { cls: string; key: string }> = {
+      parsed: { cls: 'tag-success', key: 'rateSheet.statusParsed' },
+      skipped: { cls: 'tag-warn', key: 'rateSheet.statusSkipped' },
+      error: { cls: 'tag-danger', key: 'rateSheet.statusError' },
     };
-    const m = map[status] || { color: 'default', key: status };
-    return <Tag color={m.color}>{t(m.key)}</Tag>;
+    const m = map[status] || { cls: 'tag-muted', key: status };
+    return <span className={`tag ${m.cls}`}>{t(m.key)}</span>;
   };
 
   const fileColumns = [
-    { title: t('rateSheet.fileName'), dataIndex: 'name', key: 'name' },
-    { title: t('rateSheet.sourceType'), dataIndex: 'source_type', key: 'source_type' },
-    { title: t('rateSheet.status'), dataIndex: 'status', key: 'status', render: statusTag },
-    { title: t('rateSheet.rowCount'), dataIndex: 'row_count', key: 'row_count' },
+    { title: t('rateSheet.fileName'), dataIndex: 'name', key: 'name', width: 160 },
+    { title: t('rateSheet.sourceType'), dataIndex: 'source_type', key: 'source_type', width: 80 },
+    { title: t('rateSheet.status'), dataIndex: 'status', key: 'status', width: 84, render: statusTag },
+    { title: t('rateSheet.rowCount'), dataIndex: 'row_count', key: 'row_count', width: 90 },
     {
       title: t('rateSheet.colRemark'),
       key: 'message',
@@ -192,6 +198,7 @@ export default function RateSheetBuilder() {
     render: (_: unknown, r: PreviewRow) => (
       <Input
         size="small"
+        variant="outlined"
         value={(valueOf(r, field) as string) ?? ''}
         onChange={(e) => editCell(r._rid as number, field, e.target.value)}
       />
@@ -201,9 +208,11 @@ export default function RateSheetBuilder() {
   const numCol = (title: string, field: keyof PreviewRow) => ({
     title,
     key: field as string,
+    width: 92,
     render: (_: unknown, r: PreviewRow) => (
       <InputNumber
         size="small"
+        variant="outlined"
         style={{ width: '100%' }}
         value={valueOf(r, field) as number | null | undefined}
         onChange={(v) => editCell(r._rid as number, field, v)}
@@ -211,11 +220,50 @@ export default function RateSheetBuilder() {
     ),
   });
 
+  // 档位列(动态)：读写嵌套的 tier_prices[kg]。编辑时整份合并写回，保证下载的 {...r,...edited} 整体替换正确。
+  const mergedTiers = (r: PreviewRow): Record<string, number | null> =>
+    (editedRows[r._rid as number]?.tier_prices ?? r.tier_prices ?? {});
+
+  const editTier = (r: PreviewRow, kg: number, value: number | null) =>
+    editCell(r._rid as number, 'tier_prices', { ...mergedTiers(r), [String(kg)]: value });
+
+  const tierCol = (kg: number) => ({
+    title: `${kg}KG`,
+    key: `tier_${kg}`,
+    width: 88,
+    render: (_: unknown, r: PreviewRow) => (
+      <InputNumber
+        size="small"
+        variant="outlined"
+        style={{ width: '100%' }}
+        value={mergedTiers(r)[String(kg)] as number | null | undefined}
+        onChange={(v) => editTier(r, kg, v as number | null)}
+      />
+    ),
+  });
+
+  // air 档位源：全表档位并集(升序)。非空即进「档位模式」(动态 KG 列)，否则用 day1-7 周表列。
+  const tierColumns = Array.from(
+    new Set(rows.flatMap((r) => Object.keys(r.tier_prices ?? {}).map(Number))),
+  ).sort((a, b) => a - b);
+
   const reviewCol = {
-    title: t('rateSheet.needsReview'),
+    title: (
+      <Tooltip title={t('rateSheet.needsReview')}>
+        <span className="rs-review-th">
+          <Icon name="review" size={14} />
+        </span>
+      </Tooltip>
+    ),
     key: 'needs_review',
+    width: 44,
+    align: 'center' as const,
     render: (_: unknown, r: PreviewRow) =>
-      r.needs_review ? <Tag color="orange">{t('rateSheet.needsReview')}</Tag> : null,
+      r.needs_review ? (
+        <Tooltip title={t('rateSheet.needsReview')}>
+          <span className="rs-review-dot" aria-label={t('rateSheet.needsReview')} />
+        </Tooltip>
+      ) : null,
   };
 
   const seaCols = [
@@ -226,116 +274,211 @@ export default function RateSheetBuilder() {
     textCol(t('rateSheet.colRemark'), 'remark'),
     reviewCol,
   ];
+  // 起运港：联运商均沪发，默认 PVG；只读展示（不参与编辑），让客户一眼看清从哪发。
+  const originCol = {
+    title: t('rateSheet.colOrigin'),
+    key: 'origin',
+    width: 72,
+    render: (_: unknown, r: PreviewRow) => r.origin ?? '',
+  };
+  const airDayCols = Array.from({ length: 7 }, (_, i) =>
+    numCol(t('rateSheet.colDay', { n: i + 1 }), `day${i + 1}` as keyof PreviewRow),
+  );
   const airCols = [
+    originCol,
     textCol(t('rateSheet.colDestination'), 'destination'),
     textCol(t('rateSheet.colService'), 'service'),
-    ...Array.from({ length: 7 }, (_, i) =>
-      numCol(t('rateSheet.colDay', { n: i + 1 }), `day${i + 1}` as keyof PreviewRow),
-    ),
+    // 档位模式 → 动态 KG 列；否则 day1-7 周表列(Market Price 周报)。
+    ...(tierColumns.length > 0 ? tierColumns.map((kg) => tierCol(kg)) : airDayCols),
     textCol(t('rateSheet.colRemark'), 'remark'),
     reviewCol,
   ];
   const previewCols = templateType === 'air' ? airCols : seaCols;
 
+  // 顶部进度：选模板(已默认) → 上传 → AI抽取 → 审核/下载
+  const activeStep = rows.length ? 3 : uploading ? 2 : 1;
+  const flowSteps = [
+    t('rateSheet.flow1'),
+    t('rateSheet.flow2'),
+    t('rateSheet.flow3'),
+    t('rateSheet.flow4'),
+  ];
+
   return (
-    <div style={{ padding: 24 }}>
-      <Typography.Title level={3} style={{ marginBottom: 4 }}>
-        {t('rateSheet.title')}
-      </Typography.Title>
-      <Typography.Paragraph type="secondary">{t('rateSheet.subtitle')}</Typography.Paragraph>
+    <div className="page">
+      <div className="page-head">
+        <h1>{t('rateSheet.title')}</h1>
+        <div className="sub">RATE SHEET BUILDER</div>
+      </div>
 
-      <Card title={t('rateSheet.step1')} style={{ marginBottom: 16 }}>
-        <Segmented
-          value={templateType ?? undefined}
-          onChange={(v) => onSelectTemplate(String(v))}
-          options={[
-            { label: t('rateSheet.templateAir'), value: 'air' },
-            { label: t('rateSheet.templateSea'), value: 'sea' },
-          ]}
-        />
-        {!templateType && (
-          <Typography.Text type="secondary" style={{ marginLeft: 16 }}>
-            {t('rateSheet.selectTemplate')}
-          </Typography.Text>
-        )}
-      </Card>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-body">
+          <div className="steps">
+            {flowSteps.map((title, i) => (
+              <Fragment key={i}>
+                <div className={`step${i === activeStep ? ' active' : ''}${i < activeStep ? ' done' : ''}`}>
+                  <div className="step-num">{i < activeStep ? <Icon name="check" size={14} /> : i + 1}</div>
+                  <div className="step-body">
+                    <div className="step-title">{title}</div>
+                  </div>
+                </div>
+                {i < flowSteps.length - 1 && <div className={`step-line${i < activeStep ? ' done' : ''}`} />}
+              </Fragment>
+            ))}
+          </div>
+        </div>
+      </div>
 
-      <Card title={t('rateSheet.step2')} style={{ marginBottom: 16 }}>
-        <Space direction="vertical" style={{ width: '100%' }}>
-          <Upload
-            multiple
-            beforeUpload={() => false}
-            fileList={fileList}
-            onChange={({ fileList: fl }) => setFileList(fl)}
-            disabled={!sessionId}
-          >
-            <Button disabled={!sessionId}>{t('rateSheet.uploadHint')}</Button>
-          </Upload>
-          <Button
-            type="primary"
-            loading={uploading}
-            disabled={!sessionId || fileList.length === 0}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-head">
+          <h3>{t('rateSheet.step1')}</h3>
+        </div>
+        <div className="card-body">
+          <div className="chip-group">
+            {[
+              { v: 'air', l: t('rateSheet.templateAir') },
+              { v: 'sea', l: t('rateSheet.templateSea') },
+            ].map((o) => (
+              <button
+                key={o.v}
+                type="button"
+                className={`chip${templateType === o.v ? ' on' : ''}`}
+                onClick={() => onSelectTemplate(o.v)}
+              >
+                {o.l}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-head">
+          <h3>{t('rateSheet.step2')}</h3>
+        </div>
+        <div className="card-body">
+          <div className="rs-dropwrap">
+            <Upload
+              multiple
+              beforeUpload={() => false}
+              fileList={fileList}
+              onChange={({ fileList: fl }) => setFileList(fl)}
+              disabled={!sessionId}
+            >
+              <div className={`dropzone${!sessionId ? ' disabled' : ''}`}>
+                <div className="dropzone-icon">
+                  <Icon name="import" size={22} />
+                </div>
+                <div className="dropzone-text">{t('rateSheet.uploadHint')}</div>
+                <div className="dropzone-hint">{t('rateSheet.uploadHintSub')}</div>
+              </div>
+            </Upload>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ marginTop: 14 }}
+            disabled={!sessionId || fileList.length === 0 || uploading}
             onClick={handleUpload}
           >
-            {t('rateSheet.uploadBtn')}
-          </Button>
-          {fileResults.length > 0 && (
-            <Table
-              size="small"
-              rowKey={(_, i) => String(i)}
-              columns={fileColumns}
-              dataSource={fileResults}
-              pagination={false}
-            />
-          )}
-        </Space>
-      </Card>
+            {uploading ? `${t('rateSheet.flow3')}…` : t('rateSheet.uploadBtn')}
+          </button>
 
-      <Card
-        title={t('rateSheet.step3')}
-        extra={
-          <Button type="primary" disabled={!summary || keptCount === 0} onClick={handleDownload}>
+          {fileResults.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <Table
+                className="rs-files"
+                size="small"
+                rowKey={(_, i) => String(i)}
+                columns={fileColumns}
+                dataSource={fileResults}
+                pagination={false}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head">
+          <h3>{t('rateSheet.step3')}</h3>
+          {tierColumns.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              style={{ marginLeft: 'auto' }}
+              disabled={!summary || keptCount === 0}
+              onClick={handleCommit}
+            >
+              <Icon name="import" size={14} />
+              {t('rateSheet.commit')}
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            style={{ marginLeft: tierColumns.length > 0 ? 8 : 'auto' }}
+            disabled={!summary || keptCount === 0}
+            onClick={handleDownload}
+          >
+            <Icon name="download" size={14} />
             {t('rateSheet.download')}
-          </Button>
-        }
-      >
-        {summary ? (
-          <>
-            <Row gutter={24} style={{ marginBottom: 16 }}>
-              <Col>
-                <Statistic title={t('rateSheet.summaryTotal')} value={`${keptCount} / ${summary.total_rows}`} />
-              </Col>
-              <Col>
-                <Statistic
-                  title={t('rateSheet.summaryReview')}
-                  value={`${keptReview} / ${summary.needs_review}`}
-                  valueStyle={{ color: keptReview > 0 ? '#F79009' : undefined }}
-                />
-              </Col>
-            </Row>
-            <Table
-              size="small"
-              rowKey={(r: PreviewRow) => r._rid as number}
-              rowSelection={{
-                selectedRowKeys,
-                onChange: (keys) => setSelectedRowKeys(keys as number[]),
-              }}
-              columns={previewCols}
-              dataSource={rows}
-              rowClassName={(r: PreviewRow) =>
-                !selectedRowKeys.includes(r._rid as number)
-                  ? 'row-excluded'
-                  : r.needs_review
-                    ? 'row-needs-review'
-                    : ''
-              }
-              pagination={{ pageSize: 20 }}
-            />
-          </>
-        ) : (
-          <Empty description={t('rateSheet.previewTitle')} />
-        )}
-      </Card>
+          </button>
+        </div>
+        <div className="card-body">
+          {summary ? (
+            <>
+              <div
+                className="kpi-grid"
+                style={{ gridTemplateColumns: 'repeat(2, minmax(150px, 220px))', marginBottom: 18 }}
+              >
+                <div className="kpi">
+                  <div className="kpi-label">
+                    <span className="zh">{t('rateSheet.summaryTotal')}</span>
+                  </div>
+                  <div className="kpi-value">
+                    {keptCount} <span style={{ color: 'var(--ink-400)', fontWeight: 400 }}>/ {summary.total_rows}</span>
+                  </div>
+                </div>
+                <div className="kpi">
+                  <div className="kpi-label">
+                    <span className="zh">{t('rateSheet.summaryReview')}</span>
+                  </div>
+                  <div className="kpi-value" style={{ color: keptReview > 0 ? 'var(--warn)' : undefined }}>
+                    {keptReview} <span style={{ color: 'var(--ink-400)', fontWeight: 400 }}>/ {summary.needs_review}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="rs-edit-hint">
+                <Icon name="review" size={13} />
+                {t('rateSheet.editHint')}
+              </div>
+              <Table
+                className="rs-table"
+                size="small"
+                rowKey={(r: PreviewRow) => r._rid as number}
+                rowSelection={{
+                  selectedRowKeys,
+                  onChange: (keys) => setSelectedRowKeys(keys as number[]),
+                }}
+                columns={previewCols}
+                dataSource={rows}
+                rowClassName={(r: PreviewRow) =>
+                  !selectedRowKeys.includes(r._rid as number)
+                    ? 'row-excluded'
+                    : r.needs_review
+                      ? 'row-needs-review'
+                      : ''
+                }
+                pagination={{ pageSize: 20 }}
+              />
+            </>
+          ) : (
+            <div className="rs-empty">{t('rateSheet.previewTitle')}</div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

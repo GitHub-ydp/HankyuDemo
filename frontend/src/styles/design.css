@@ -1562,3 +1562,56 @@ input, select, textarea { font-family: inherit; font-size: inherit; color: inher
 /* 运价表生成审核台：未勾选行置灰、待确认行底色 */
 .row-excluded td { opacity: 0.4; }
 .row-needs-review td { background: #fffbe6; }
+
+/* 运价表生成页：把 AntD Upload 撑成全宽 dropzone，空态占位 */
+.rs-dropwrap .ant-upload-wrapper,
+.rs-dropwrap .ant-upload,
+.rs-dropwrap .ant-upload-select { display: block; width: 100%; }
+.rs-empty { text-align: center; color: var(--ink-400); font-size: 13px; padding: 48px 0; }
+.rs-edit-hint { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-500); margin-bottom: 10px; }
+/* 预览表：单元格自动换行、不靠横向滚动撑宽（尤其备注列长文本） */
+.rs-table .ant-table-cell { white-space: normal; word-break: break-word; }
+
+/* 审核台列头：和可编辑网格拉开层次，一眼分清"表头 vs 可改的格子" */
+.rs-table .ant-table-thead > tr > th {
+  background: var(--mist);
+  color: var(--ink-700);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: .01em;
+  border-bottom: 2px solid var(--line);
+}
+
+/* 审核台可编辑单元格：给"能改的框"明确的边框 + 悬停/聚焦反馈，
+   静态格子也长得像输入框，避免用户看不出哪里能点改 */
+.rs-table .ant-input,
+.rs-table .ant-input-number {
+  background: var(--white);
+  border: 1px solid var(--ink-300);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  transition: border-color .15s, box-shadow .15s;
+}
+.rs-table .ant-input:hover,
+.rs-table .ant-input-number:hover { border-color: var(--teal-400); }
+.rs-table .ant-input:focus,
+.rs-table .ant-input-focused,
+.rs-table .ant-input-number-focused,
+.rs-table .ant-input-number:focus-within {
+  border-color: var(--teal-500) !important;
+  box-shadow: 0 0 0 3px var(--teal-100) !important;
+}
+
+/* 文件结果表：短表头（状态/抽出行数）别被长备注挤成"一字一行"，强制不换行 */
+.rs-files .ant-table-thead > tr > th { white-space: nowrap; }
+
+/* 待确认：去掉"文字成一列"，改成一个琥珀小圆点 + 图标列头（悬停出提示） */
+.rs-review-th { display: inline-flex; align-items: center; color: var(--warn); }
+.rs-review-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warn);
+  box-shadow: 0 0 0 3px var(--warn-bg);
+}

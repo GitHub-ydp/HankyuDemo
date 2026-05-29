@@ -254,6 +254,8 @@ export const rateSheetApi = {
       { rows },
       { responseType: 'blob' },
     ),
+  commitToDb: (sessionId: string, rows: unknown[]): Promise<ApiResponse> =>
+    api.post<unknown, ApiResponse>(`/rate-sheet/${sessionId}/commit`, { rows }),
 };
 
 export default api;
