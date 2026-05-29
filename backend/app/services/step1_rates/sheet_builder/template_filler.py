@@ -10,7 +10,11 @@
 normalized rate dict 字段约定：
   通用:  destination, carrier, remark
   sea :  freight_20, freight_40, lss_cic, baf, ebs, yas_caf, sailing, via, transit, booking
-  air :  service, day1..day7
+  air(周表源 Market Price):  service, day1..day7
+  air(档位源 EES/唯凯):       service, tier_prices(稀疏 KG→价)
+
+档位源的列是动态的(全表档位并集)，套不进固定 air_blank.xlsx → 程序从零生成档位表
+(起运港|目的港|服务|动态 KG 列|备注)，报价日入 sheet 名。
 """
 from __future__ import annotations
 
@@ -18,7 +22,7 @@ from datetime import date, timedelta
 from io import BytesIO
 from typing import Any
 
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 
 from app.services.step1_rates.sheet_builder.entities import SheetFillConfig
 from app.services.step1_rates.sheet_builder.template_registry import get_template_config
@@ -30,9 +34,13 @@ _SEA_CONTAINER_ROWS = (("20FT", "freight_20"), ("40FT/40HQ", "freight_40"))
 
 def fill_template(template_type: str, rows: list[dict[str, Any]]) -> tuple[bytes, str]:
     """把 rows 填进对应空白模板，返回 (xlsx_bytes, 建议文件名)。"""
-    cfg = get_template_config(template_type)
-    workbook = load_workbook(cfg.template_path, data_only=False)
+    cfg = get_template_config(template_type)  # 校验类型；未知抛 ValueError
 
+    # air 档位源(行带 tier_prices)：列动态 → 程序生成档位表，不套固定 air_blank.xlsx。
+    if template_type == "air" and any(r.get("tier_prices") for r in rows):
+        return _build_tier_sheet(rows)
+
+    workbook = load_workbook(cfg.template_path, data_only=False)
     if template_type == "air":
         _fill_air(workbook, cfg.sheets[0], rows)
     elif template_type == "sea":
@@ -43,6 +51,54 @@ def fill_template(template_type: str, rows: list[dict[str, Any]]) -> tuple[bytes
     buffer = BytesIO()
     workbook.save(buffer)
     return buffer.getvalue(), f"{template_type}_rate_sheet_filled.xlsx"
+
+
+def _row_tiers(row: dict[str, Any]) -> dict[int, Any]:
+    """取行的档位 dict，键归一为 int(KG)——JSON 往返后键可能是字符串('45')。"""
+    raw = row.get("tier_prices") or {}
+    return {int(kg): price for kg, price in raw.items()}
+
+
+def _tier_sheet_name(rows: list[dict[str, Any]]) -> str:
+    """报价日(effective_week_start)入 sheet 名；无则用通用名。"""
+    for row in rows:
+        value = row.get("effective_week_start")
+        if value:
+            return f"Air Rates {str(value)[:10]}"
+    return "Air Tier Rates"
+
+
+def _build_tier_sheet(rows: list[dict[str, Any]]) -> tuple[bytes, str]:
+    """程序生成档位表：起运港|目的港|服务|动态 KG 列(全表并集升序)|备注。稀疏档某行缺的留空。"""
+    tiers = sorted({kg for row in rows for kg in _row_tiers(row)})
+    wb = Workbook()
+    ws = wb.active
+    ws.title = _tier_sheet_name(rows)
+
+    header = (
+        ["Origin (POL)", "Destination", "Service"]
+        + [f"{kg}KG" for kg in tiers]
+        + ["Remark"]
+    )
+    for c, label in enumerate(header, start=1):
+        ws.cell(1, c).value = label
+
+    r = 2
+    for row in rows:
+        ws.cell(r, 1).value = row.get("origin")
+        ws.cell(r, 2).value = row.get("destination")
+        ws.cell(r, 3).value = row.get("service")
+        row_tiers = _row_tiers(row)
+        for i, kg in enumerate(tiers):
+            price = row_tiers.get(kg)
+            if price is not None:  # 稀疏：缺的档留空，不写
+                ws.cell(r, 4 + i).value = price
+        ws.cell(r, 4 + len(tiers)).value = row.get("remark")
+        r += 1
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue(), "air_rate_sheet_filled.xlsx"
 
 
 def _unmerge_data_area(ws, data_start_row: int) -> None:
@@ -89,6 +145,7 @@ def _fill_air(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) 
     col = sheet_cfg.columns
     r = sheet_cfg.data_start_row
     for row in rows:
+        safe_set(ws.cell(r, col["origin"]), row.get("origin"))
         safe_set(ws.cell(r, col["destination"]), row.get("destination"))
         safe_set(ws.cell(r, col["service"]), row.get("service"))
         for day in range(1, 8):

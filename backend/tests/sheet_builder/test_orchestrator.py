@@ -89,6 +89,7 @@ def test_air_template_extracts_daily_prices(monkeypatch):
     row = s.rows[0]
     assert row["destination"] == "NRT"
     assert row["service"] == "CK 2 days service"
+    assert row["origin"] == "PVG"  # 未提供起运港时默认 PVG(上海)
     assert row["day1"] == 14
     assert row["day3"] == 15
     assert row["day7"] == 14
@@ -113,13 +114,14 @@ def test_air_same_dest_different_service_not_marked_review(monkeypatch):
 
 
 def test_air_weight_break_same_dest_multi_flight_marked_review(monkeypatch):
-    """重量档报价：同目的港多航班(multi_flight_pick) → 全标 needs_review 供人工选一条；单航班不标。"""
-    days = {f"price_day{d}": 13 for d in range(1, 8)}
+    """档位源(唯凯)：同目的港多航班(multi_flight_pick) → 全标 needs_review 供人工选一条；单航班不标。
+    tier_prices 透传(不再走 day1-7)。"""
+    tiers = {"tier_prices": {100: 13, 500: 13, 1000: 13}}
     fake = {
         "parsed_rows": [
-            {"destination_port_name": "NRT", "service_desc": "KZ226", "multi_flight_pick": True, **days},
-            {"destination_port_name": "NRT", "service_desc": "KZ228", "multi_flight_pick": True, **days},
-            {"destination_port_name": "KIX", "service_desc": "CK247", "multi_flight_pick": True, **days},
+            {"destination_port_name": "NRT", "service_desc": "KZ226", "multi_flight_pick": True, **tiers},
+            {"destination_port_name": "NRT", "service_desc": "KZ228", "multi_flight_pick": True, **tiers},
+            {"destination_port_name": "KIX", "service_desc": "CK247", "multi_flight_pick": True, **tiers},
         ],
         "warnings": [],
     }
@@ -132,7 +134,40 @@ def test_air_weight_break_same_dest_multi_flight_marked_review(monkeypatch):
     kix = [r for r in s.rows if r["destination"] == "KIX"]
     assert len(nrt) == 2 and all(r["needs_review"] for r in nrt), "NRT 两航班应标 needs_review"
     assert not kix[0]["needs_review"], "KIX 单航班不必标"
-    assert nrt[0]["day1"] == 13 and nrt[0]["day7"] == 13, "+100KG 价应填满 day1-7"
+    assert nrt[0]["tier_prices"] == {100: 13.0, 500: 13.0, 1000: 13.0}, "档位应透传"
+
+
+def test_air_tier_row_normalizes_with_tier_prices(monkeypatch):
+    """档位源(EES/唯凯)行带 tier_prices → 归一透传 tier_prices(值转 float)、不发 day1-7、
+    备注取 remarks、起运港默认 PVG、multi_flight_pick → needs_review_by_destination。"""
+    from decimal import Decimal
+
+    fake = {
+        "parsed_rows": [
+            {
+                "destination_port_name": "KIX",
+                "service_desc": "CK/MU",
+                "tier_prices": {45: Decimal("17"), 100: 14},  # Decimal/int 混入应都转 float
+                "remarks": "含油备注",
+                "multi_flight_pick": True,
+            }
+        ],
+        "warnings": [],
+    }
+    monkeypatch.setattr(air_extractor, "extract_air_rates", lambda p, db: fake)
+
+    s = orchestrator.create_session("air")
+    orchestrator.add_file(s.session_id, "EES.xlsx", "/tmp/ees.xlsx", db=None)
+
+    row = s.rows[0]
+    assert row["origin"] == "PVG"
+    assert row["destination"] == "KIX"
+    assert row["service"] == "CK/MU"
+    assert row["tier_prices"] == {45: 17.0, 100: 14.0}
+    assert all(isinstance(v, float) for v in row["tier_prices"].values()), "值应转 float 便于 JSON/写表"
+    assert all(f"day{d}" not in row for d in range(1, 8)), "档位行不应带 day1-7"
+    assert row["remark"] == "含油备注"
+    assert row["needs_review_by_destination"] is True
 
 
 def test_unsupported_extension_skipped():

@@ -15,7 +15,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.services.step1_rates.adapters.air import AirAdapter
-from app.services.step1_rates.sheet_builder import air_weight_break
+from app.services.step1_rates.sheet_builder import air_ees, air_weight_break
 
 
 def extract_air_rates(file_path: str, db: Session | None) -> dict[str, Any]:
@@ -33,6 +33,14 @@ def extract_air_rates(file_path: str, db: Session | None) -> dict[str, Any]:
         return {"error": f"Air 文件解析失败: {exc}", "parsed_rows": []}
     if weight_break["parsed_rows"]:
         return weight_break
+
+    # 3) 百福东方(EES)式多航线表（目的港/港口 + KG 档 + 平散货子行，取 100KG 价填 day1-7）
+    try:
+        ees = air_ees.parse_ees(str(path))
+    except Exception as exc:  # noqa: BLE001 — 同上，解析失败透传原因不抛
+        return {"error": f"Air 文件解析失败: {exc}", "parsed_rows": []}
+    if ees["parsed_rows"]:
+        return ees
 
     return {
         "error": "既不是 Air Market Price 周报，也未识别到重量档航线表（请确认是 Air 运价资料）",

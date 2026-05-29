@@ -1,8 +1,9 @@
-"""重量档 Air 报价解析（如阪急唯凯联运商报价）。
+"""重量档 Air 报价解析（如阪急唯凯联运商报价）—— 自适应多档抽取。
 
-这种报价按「重量档(+45/+100/+500/+1000KG)」给价，而非按星期几。业务规则(待福山最终确认)：
-取每条航线的 **+100KG 价** 作为目标模板 day1~day7 的每日价（一周不变），service 填航班/航司。
-同一目的港下多航班全部保留并标 needs_review（由审核台人工选一条）。
+这种报价按「重量档(45/100/300/500/1000KG，澳洲还有 3000)」给价，而非按星期几。表头档位列是
+**数字**(45/100.0/1000…)。业务规则(福山 2026-05-28 定稿)：从每个块的表头自适应读出所有数字
+档位列，每条航线存稀疏 `tier_prices={45:15,100:13,…}`(有哪档数字存哪档)，取代单一 +100KG×7天。
+service 填航班/航司；同一目的港下多航班全部保留并标 needs_review（由审核台人工选一条）。
 
 只解析「Effective / DEST / 重量档」这种规整块结构（覆盖亚洲/澳洲线那几张表）；
 航司专属欧美线表布局完全不同、极不规则，本解析器不覆盖，计入 warnings 的"未覆盖"清单，
@@ -41,7 +42,7 @@ def parse_weight_break(file_path: str) -> dict[str, Any]:
 
     warnings: list[str] = []
     if covered:
-        warnings.append("已抽取航线表(+100KG)：" + "/".join(covered))
+        warnings.append("已抽取航线表(多档)：" + "/".join(covered))
     if skipped:
         warnings.append("未覆盖(布局不同/非航线表)：" + "/".join(skipped))
     return {"parsed_rows": parsed_rows, "warnings": warnings}
@@ -54,19 +55,34 @@ def _is_header_row(row: list[Any]) -> bool:
     return has_effective and has_dest
 
 
-def _column_map(header: list[Any]) -> dict[str, int]:
-    cmap: dict[str, int] = {}
+def _tier_kg(value: Any) -> int | None:
+    """表头单元格 → 重量档 KG 整数。唯凯档位列头是数字(45 / 100.0 / '1000' / 3000.0)，
+    取纯正整数为档位；DEST/Flight/Frequency 等文本及 Frequency 值(2.6 这种非整数)返回 None。"""
+    f = _to_float(value)
+    if f is None or f <= 0 or f != int(f):
+        return None
+    return int(f)
+
+
+def _column_map(header: list[Any]) -> dict[str, Any]:
+    """定位 dest / flight，并收集所有数字档位列 tiers={KG: 列号}。"""
+    cmap: dict[str, Any] = {}
+    tiers: dict[int, int] = {}
     for j, cell in enumerate(header):
         text = _clean(cell)
         if text is None:
+            continue
+        kg = _tier_kg(cell)
+        if kg is not None:
+            tiers.setdefault(kg, j)
             continue
         low = text.lower()
         if text == "DEST":
             cmap["dest"] = j
         elif low in _FLIGHT_HEADERS:
             cmap["flight"] = j
-        elif _to_float(cell) == 100.0:
-            cmap["p100"] = j
+    if tiers:
+        cmap["tiers"] = tiers
     return cmap
 
 
@@ -75,7 +91,7 @@ def _parse_sheet(
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     header_set = set(header_idxs)
-    cmap: dict[str, int] = {}
+    cmap: dict[str, Any] = {}
     current_dest: str | None = None
 
     for i, row in enumerate(rows):
@@ -83,30 +99,43 @@ def _parse_sheet(
             cmap = _column_map(row)
             current_dest = None
             continue
-        if "dest" not in cmap or "p100" not in cmap:
+        if "dest" not in cmap or not cmap.get("tiers"):
             continue
 
         dest_val = _clean(row[cmap["dest"]]) if cmap["dest"] < len(row) else None
         if dest_val:
             current_dest = dest_val
 
-        price = _to_float(row[cmap["p100"]]) if cmap["p100"] < len(row) else None
         flight = (
             _clean(row[cmap["flight"]])
             if "flight" in cmap and cmap["flight"] < len(row)
             else None
         )
+        tier_prices = _row_tier_prices(row, cmap["tiers"])
 
-        if price is not None and current_dest:
-            record: dict[str, Any] = {
-                "destination_port_name": current_dest,
-                "service_desc": flight,
-                "multi_flight_pick": True,  # 同港多航班 → 交审核台人工选一条
-                "source_file": source_file,
-            }
-            for day in range(1, 8):
-                record[f"price_day{day}"] = price
-            out.append(record)
+        if current_dest and tier_prices:
+            out.append(
+                {
+                    "destination_port_name": current_dest,
+                    "service_desc": flight,
+                    # 稀疏档位 dict(KG 升序)：有哪档数字存哪档，取代 +100KG×7天。
+                    "tier_prices": tier_prices,
+                    "multi_flight_pick": True,  # 同港多航班 → 交审核台人工选一条
+                    "source_file": source_file,
+                }
+            )
+    return out
+
+
+def _row_tier_prices(row: list[Any], tiers: dict[int, int]) -> dict[int, float]:
+    """按表头档位列逐档取价，只收正数；空/「/」/非数字留空(不入 dict)。KG 升序。"""
+    out: dict[int, float] = {}
+    for kg in sorted(tiers):
+        col = tiers[kg]
+        if col < len(row):
+            price = _to_float(row[col])
+            if price is not None and price > 0:
+                out[kg] = price
     return out
 
 

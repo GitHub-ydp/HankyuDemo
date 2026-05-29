@@ -182,10 +182,14 @@ def _normalize_sea(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]
 
 
 def _normalize_air(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]:
-    """air_extractor(AirAdapter) 产 destination_port_name / service_desc / price_dayN。
-    映射到模板字段 destination / service / day1..day7；Decimal 转 float 便于写表与 JSON。
+    """air_extractor 产两种形态，映射到模板字段后二选一：
+      - 周表源(Market Price)：price_dayN → day1..day7（按周给价）；
+      - 档位源(EES/唯凯)：tier_prices(稀疏 KG→价) 原样透传（值转 float），不发 day1-7。
+    Decimal 转 float 便于写表与 JSON。
     """
     normalized: dict[str, Any] = {
+        # 起运港：Air 默认上海 PVG（与 AirAdapter._DEFAULT_ORIGIN 一致；EES 等联运商均沪发）。
+        "origin": row.get("origin_port_name") or "PVG",
         "destination": row.get("destination_port_name") or row.get("destination"),
         "service": (
             row.get("service_desc")
@@ -201,8 +205,17 @@ def _normalize_air(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]
         # 重量档报价(联运商)同港多航班 → 按目的港标 needs_review，交审核台人工选一条。
         "needs_review_by_destination": bool(row.get("multi_flight_pick")),
     }
-    for day in range(1, 8):
-        normalized[f"day{day}"] = _to_number(row.get(f"price_day{day}"))
+    tier_prices = row.get("tier_prices")
+    if tier_prices:
+        # 档位源：键归一为 int(KG)、值统一 float（前端动态档位列 + 程序生成档位表）。
+        normalized["tier_prices"] = {
+            int(kg): float(price)
+            for kg, price in tier_prices.items()
+            if price is not None
+        }
+    else:
+        for day in range(1, 8):
+            normalized[f"day{day}"] = _to_number(row.get(f"price_day{day}"))
     return normalized
 
 
