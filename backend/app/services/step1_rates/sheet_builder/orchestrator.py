@@ -192,8 +192,17 @@ def _normalize_sea(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]
         "lss_cic": row.get("lss_20") or row.get("lss_40"),
         "baf": row.get("baf_20") or row.get("baf_40"),
         "transit": row.get("transit_days"),
-        "remark": row.get("remarks"),
+        "remark": row.get("remark") or row.get("remarks"),
         "source_file": row.get("source_file"),
+        # PDF(ONE 合约)透传字段：老 Excel 行无这些键 → None/默认，无影响
+        "container_45": row.get("container_45"),
+        "valid_from": row.get("valid_from"),
+        "valid_to": row.get("valid_to"),
+        "rate_level": row.get("rate_level"),
+        "service_code": row.get("service_code"),
+        "via": row.get("via"),
+        "is_direct": row.get("is_direct", True),
+        "commodity": row.get("commodity"),
     }
 
 

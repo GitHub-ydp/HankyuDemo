@@ -271,3 +271,23 @@ def test_normalize_sea_preserves_container_breakdown_and_origin():
     assert out["transit_days"] == 3
     assert out["freight_20"] == Decimal("250")
     assert out["freight_40"] == Decimal("500")
+
+
+def test_normalize_sea_passes_through_pdf_fields():
+    from app.services.step1_rates.sheet_builder.orchestrator import _normalize_sea
+    raw = {
+        "carrier_name": "ONE", "destination_port_name": "HILO",
+        "container_20gp": 5240.0, "container_40gp": 7100.0, "container_40hq": 7200.0,
+        "container_45": 6075.0, "valid_from": "2026-02-03", "valid_to": "2026-02-28",
+        "rate_level": "R5", "service_code": "EC3", "via": "BUSAN", "is_direct": False,
+        "commodity": "TPE1-FAK", "remark": "inclusive of AGS",
+    }
+    out = _normalize_sea(raw, carrier_fallback="")
+    assert out["container_45"] == 6075.0
+    assert out["valid_from"] == "2026-02-03"
+    assert out["valid_to"] == "2026-02-28"
+    assert out["rate_level"] == "R5"
+    assert out["service_code"] == "EC3"
+    assert out["via"] == "BUSAN"
+    assert out["is_direct"] is False
+    assert out["commodity"] == "TPE1-FAK"
