@@ -90,3 +90,15 @@ def test_parse_coded_row_flagged_needs_review():
     assert r["rate_level"] == "R2/2400"      # 编码原文保留
     assert r["container_40gp"] is None        # 非数字 → 不当价
     assert r["origin_port_name"] == "TAIPEI"
+
+
+import app.services.step1_rates.adapters.one_contract_pdf as ocp
+
+
+def test_parse_one_contract_pdf_wraps_blocks(monkeypatch):
+    monkeypatch.setattr(ocp, "_extract_word_lines", lambda path: _clean_block_lines())
+    out = ocp.parse_one_contract_pdf("/fake/path.pdf", db=None)
+    assert out["carrier_code"] == "ONE"
+    assert len(out["parsed_rows"]) == 2
+    assert out["parsed_rows"][0]["destination_port_name"] == "HILO"
+    assert isinstance(out.get("warnings"), list)

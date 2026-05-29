@@ -188,3 +188,32 @@ def parse_rate_blocks(lines: list[list[dict]]) -> list[dict]:
                 block_rows.append(row)
     flush_block()
     return results
+
+
+import pdfplumber
+from sqlalchemy.orm import Session
+
+
+def _extract_word_lines(file_path: str) -> list[list[dict]]:
+    """pdfplumber 抽词 → 按页、按行(top 聚类)分组，每行按 x0 升序。"""
+    lines: list[list[dict]] = []
+    with pdfplumber.open(file_path) as pdf:
+        for page in pdf.pages:
+            words = page.extract_words(use_text_flow=False)
+            buckets: dict[int, list[dict]] = {}
+            for w in words:
+                key = round(float(w["top"]) / 3.0)   # 3pt 容差聚成一行
+                buckets.setdefault(key, []).append({"text": w["text"], "x0": float(w["x0"])})
+            for key in sorted(buckets):
+                lines.append(sorted(buckets[key], key=lambda d: d["x0"]))
+    return lines
+
+
+def parse_one_contract_pdf(file_path: str, db: "Session | None" = None) -> dict:
+    """ONE 合约 PDF → parsed_rows(kmtc 兼容形态)。db 仅为签名一致,本层不解析港口。"""
+    lines = _extract_word_lines(file_path)
+    rows = parse_rate_blocks(lines)
+    warnings: list[str] = []
+    if not rows:
+        warnings.append("未在该 PDF 中识别到 ONE 合约运价表")
+    return {"parsed_rows": rows, "carrier_code": _CARRIER, "warnings": warnings}
