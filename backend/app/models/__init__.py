@@ -4,6 +4,7 @@ from app.models.carrier import Carrier, CarrierType
 from app.models.domestic_rate import DomesticRate
 from app.models.import_batch import ImportBatch, ImportBatchFileType, ImportBatchStatus
 from app.models.air_freight_rate import AirFreightRate
+from app.models.air_tier_rate import AirTierRate
 from app.models.air_surcharge import AirSurcharge
 from app.models.freight_rate import FreightRate, SourceType, RateStatus
 from app.models.lane import Lane, TransportMode
@@ -20,6 +21,7 @@ __all__ = [
     "DomesticRate",
     "ImportBatch", "ImportBatchFileType", "ImportBatchStatus",
     "AirFreightRate",
+    "AirTierRate",
     "AirSurcharge",
     "FreightRate", "SourceType", "RateStatus",
     "Lane", "TransportMode",
