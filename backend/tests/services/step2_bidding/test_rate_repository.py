@@ -246,9 +246,13 @@ def test_query_air_surcharges_returns_active_and_before_effective(db_session: Se
     assert row.extras["msc_fee_per_kg"] == Decimal("0.30")
 
 
-def test_ocean_and_lcl_raise_not_implemented(db_session: Session):
+def test_lcl_raises_not_implemented(db_session: Session):
     repo = Step1RateRepository(db_session)
     with pytest.raises(NotImplementedError):
-        repo.query_ocean_fcl()
-    with pytest.raises(NotImplementedError):
         repo.query_lcl()
+
+
+def test_query_ocean_fcl_implemented_returns_empty_when_no_data(db_session: Session):
+    # query_ocean_fcl 已实现(做表入库 ocean→FreightRate)；空库返回 []，不再抛 NotImplementedError
+    repo = Step1RateRepository(db_session)
+    assert repo.query_ocean_fcl(origin="SHANGHAI", destination="HONG KONG") == []
