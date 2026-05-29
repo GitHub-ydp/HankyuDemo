@@ -191,6 +191,8 @@ class Step1RateRepository:
 
         - origin/destination 是文字，先经 _resolve_port 解析为 port_id 再按 id 精确匹配
         - 仅 active 批次；解析不到任一港口 → 返回空
+        - effective_on：MVP 预留，暂不按日期过滤(仅取 active 批)；future 接窗口语义
+        - 按 id 升序返回，保证多候选(同 lane 多船司)时取价稳定可复现
         """
         from app.services.step1_rates.activator_mappers import _resolve_port
 
@@ -208,6 +210,7 @@ class Step1RateRepository:
                     FreightRate.destination_port_id == d.id,
                 )
             )
+            .order_by(FreightRate.id)
         )
         if currency is not None:
             stmt = stmt.where(FreightRate.currency == currency)
