@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.models.air_freight_rate import AirFreightRate
 from app.models.air_surcharge import AirSurcharge
+from app.models.air_tier_rate import AirTierRate
 from app.models.import_batch import ImportBatch, ImportBatchFileType, ImportBatchStatus
 from app.services.step1_rates.entities import RateSourceKind, Step1RateRow
 
@@ -70,6 +71,49 @@ class Step1RateRepository:
 
         rows = self._db.execute(stmt).all()
         return [self._weekly_to_step1_row(rate, batch) for rate, batch in rows]
+
+    # ---------- Air Tier（做表入库的重量档运价） ----------
+
+    def query_air_tier(
+        self,
+        *,
+        origin: str,
+        destination: str,
+        effective_on: date | None = None,
+        currency: str | None = None,
+    ) -> list[Step1RateRow]:
+        """查 PVG → destination 的重量档运价(air_tier 批次)。
+
+        - origin 精确、destination LIKE '%dest%'（兼容入库保留原文）
+        - effective_on(可选)：effective_from <= on 且(effective_to 为空或 >= on)；
+          tier 价 effective_to 常为空(开口) → 不被排除
+        - 仅 active 批次；tier_prices 归一为 int 键放进 extras
+        """
+        stmt = (
+            select(AirTierRate, ImportBatch)
+            .join(ImportBatch, AirTierRate.batch_id == ImportBatch.batch_id)
+            .where(
+                and_(
+                    ImportBatch.status == ImportBatchStatus.active,
+                    AirTierRate.origin == origin,
+                    AirTierRate.destination.like(f"%{destination}%"),
+                )
+            )
+        )
+        if effective_on is not None:
+            stmt = stmt.where(
+                and_(
+                    (AirTierRate.effective_from.is_(None))
+                    | (AirTierRate.effective_from <= effective_on),
+                    (AirTierRate.effective_to.is_(None))
+                    | (AirTierRate.effective_to >= effective_on),
+                )
+            )
+        if currency is not None:
+            stmt = stmt.where(AirTierRate.currency == currency)
+
+        rows = self._db.execute(stmt).all()
+        return [self._tier_to_step1_row(rate, batch) for rate, batch in rows]
 
     # ---------- Air Surcharges ----------
 
@@ -143,6 +187,34 @@ class Step1RateRepository:
         raise NotImplementedError("query_lcl 将于 v2.0 实现")
 
     # ---------- Converters ----------
+
+    @staticmethod
+    def _tier_to_step1_row(rate: AirTierRate, batch: ImportBatch) -> Step1RateRow:
+        tiers = {
+            int(kg): price
+            for kg, price in (rate.tier_prices or {}).items()
+            if price is not None
+        }
+        return Step1RateRow(
+            origin_port_name=rate.origin,
+            destination_port_name=rate.destination,
+            service_desc=rate.service_desc,
+            effective_week_start=rate.effective_from,
+            effective_week_end=rate.effective_to,
+            record_kind="air_tier",
+            currency=rate.currency or "CNY",
+            remarks=rate.remark,
+            source_type=RateSourceKind.excel.value,
+            source_file=batch.source_file,
+            upload_batch_id=str(batch.batch_id),
+            extras={
+                "tier_prices": tiers,
+                "step2_record_id": rate.id,
+                "step2_batch_status": batch.status.value
+                if hasattr(batch.status, "value")
+                else str(batch.status),
+            },
+        )
 
     @staticmethod
     def _weekly_to_step1_row(

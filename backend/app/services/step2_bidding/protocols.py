@@ -57,6 +57,15 @@ class RateRepository(Protocol):
         airline_code_in: list[str] | None = None,
     ) -> list["Step1RateRow"]: ...
 
+    def query_air_tier(
+        self,
+        *,
+        origin: str,
+        destination: str,
+        effective_on: date | None = None,
+        currency: str | None = None,
+    ) -> list["Step1RateRow"]: ...
+
     def query_air_surcharges(
         self,
         *,
