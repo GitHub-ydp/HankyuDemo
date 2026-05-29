@@ -29,6 +29,7 @@ from app.services.step1_rates.sheet_builder.template_registry import get_templat
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
 _EXCEL_EXTS = {".xlsx", ".xlsm", ".xls"}  # .xls(老二进制)经 xlrd 读取，见 requirements
 _TEXT_EXTS = {".txt", ".md", ".eml"}
+_PDF_EXTS = {".pdf"}
 
 
 @dataclass
@@ -79,7 +80,7 @@ def add_file(
     session = get_session(session_id)
     ext = os.path.splitext(file_name)[1].lower()
 
-    if ext not in _EXCEL_EXTS and ext not in _IMAGE_EXTS and ext not in _TEXT_EXTS:
+    if ext not in _EXCEL_EXTS and ext not in _IMAGE_EXTS and ext not in _TEXT_EXTS and ext not in _PDF_EXTS:
         result = FileResult(
             name=file_name,
             source_type="unsupported",
@@ -97,6 +98,10 @@ def add_file(
             else:
                 parsed = rate_parser.detect_and_parse(file_path, db)
             source_type = "excel"
+        elif ext in _PDF_EXTS:
+            from app.services.rate_parser_pdf import detect_and_parse_pdf
+            parsed = detect_and_parse_pdf(file_path, db)
+            source_type = "pdf"
         elif ext in _IMAGE_EXTS:
             parsed = wechat_image_parser.parse_wechat_image(file_path, db)
             source_type = "wechat_image"

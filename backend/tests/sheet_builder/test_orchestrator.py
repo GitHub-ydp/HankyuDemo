@@ -170,12 +170,30 @@ def test_air_tier_row_normalizes_with_tier_prices(monkeypatch):
     assert row["needs_review_by_destination"] is True
 
 
-def test_unsupported_extension_skipped():
-    s = orchestrator.create_session("sea")
-    fr = orchestrator.add_file(s.session_id, "LAX.pdf", "/tmp/LAX.pdf", db=None)
-    assert fr.status == "skipped"
-    assert fr.source_type == "unsupported"
-    assert s.rows == []
+def test_add_pdf_file_routes_to_pdf_parser(tmp_path, monkeypatch):
+    import app.services.rate_parser_pdf as rpp
+    from app.services.step1_rates.sheet_builder import orchestrator
+
+    # 假 PDF（内容无所谓，分流被 monkeypatch）
+    fake = tmp_path / "ONE_contract.pdf"
+    fake.write_bytes(b"%PDF-1.4 fake")
+    monkeypatch.setattr(
+        rpp, "detect_and_parse_pdf",
+        lambda path, db: {"parsed_rows": [{
+            "carrier_name": "ONE", "origin_port_name": "DALIAN",
+            "destination_port_name": "HILO", "container_20gp": 5240.0,
+            "container_40gp": 7100.0, "container_40hq": 7200.0,
+        }], "carrier_code": "ONE", "warnings": []},
+    )
+
+    sess = orchestrator.create_session("sea")
+    res = orchestrator.add_file(sess.session_id, "ONE_contract.pdf", str(fake), db=None)
+
+    assert res.status == "parsed"
+    assert res.row_count == 1
+    rows = orchestrator.get_session(sess.session_id).rows
+    assert rows[0]["destination"] == "HILO"            # _normalize_sea 已映射
+    assert rows[0]["container_20gp"] == 5240.0
 
 
 def test_legacy_xls_routed_to_excel_parser(monkeypatch):
