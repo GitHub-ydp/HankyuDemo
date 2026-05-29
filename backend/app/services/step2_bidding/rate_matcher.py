@@ -15,6 +15,7 @@ from app.services.step2_bidding.entities import (
     RowStatus,
 )
 from app.services.step2_bidding.protocols import RateRepository
+from app.services.step2_bidding.weight_tier import parse_assumed_weight, select_tier_price
 
 
 _LOCAL_SECTION_CODES: frozenset[str] = frozenset({"PVG"})
@@ -65,10 +66,7 @@ class RateMatcher:
             currency=row.currency,
             airline_code_in=None,
         )
-        if not weekly_rows:
-            return (RowStatus.NO_RATE, [])
-
-        # §5.3 展开候选
+        # §5.3 展开候选（周报价 + 重量档两条支路，合并竞争；缺周报价不直接 NO_RATE）
         candidates: list[QuoteCandidate] = []
         for weekly_row in weekly_rows:
             airline_codes = list(weekly_row.extras.get("airline_codes") or [])
@@ -114,6 +112,23 @@ class RateMatcher:
                 )
                 if cand is not None:
                     candidates.append(cand)
+
+        # §5.3b 重量档支路：做表入库的 air_tier 运价，按投标包想定平均重量选一档(单一价 All-in)
+        chargeable_weight = parse_assumed_weight(row.volume_desc)
+        for tier_row in self._repo.query_air_tier(
+            origin=row.origin_code,
+            destination=row.destination_code,
+            effective_on=effective_on,
+            currency=row.currency,
+        ):
+            cand = self._build_tier_candidate(
+                row=row,
+                tier_row=tier_row,
+                chargeable_weight=chargeable_weight,
+                effective_on=effective_on,
+            )
+            if cand is not None:
+                candidates.append(cand)
 
         if not candidates:
             return (RowStatus.NO_RATE, [])
@@ -220,6 +235,60 @@ class RateMatcher:
             remarks_from_step1=remarks_from_step1,
             step1_must_go=step1_must_go,
             step1_case_by_case=step1_case_by_case,
+            match_score=score,
+        )
+
+    def _build_tier_candidate(
+        self,
+        *,
+        row: PkgRow,
+        tier_row: Step1RateRow,
+        chargeable_weight: Decimal | None,
+        effective_on: date,
+    ) -> QuoteCandidate | None:
+        """重量档候选：按计费重选一档；档位价是含油 All-in，直接当 cost(不叠加 MYC/MSC)。
+        计费重为空(投标包没给重量) → select 返回 None → 不出该候选(不默认某档)。"""
+        selected = select_tier_price(tier_row.extras.get("tier_prices") or {}, chargeable_weight)
+        if selected is None:
+            return None
+        price, _tier_kg = selected
+
+        dest_exact = bool(
+            row.destination_code
+            and tier_row.destination_port_name
+            and row.destination_code in tier_row.destination_port_name
+        )
+        currency_match = (tier_row.currency or "") == (row.currency or "")
+        validity_cover = tier_row.effective_week_start is not None and (
+            tier_row.effective_week_end is None
+            or tier_row.effective_week_start <= effective_on <= tier_row.effective_week_end
+        )
+        score = self._calc_score(
+            dest_exact=dest_exact,
+            currency_match=currency_match,
+            validity_cover=validity_cover,
+            in_carrier_pref=False,
+            no_constraint=True,
+            case_by_case=False,
+        )
+        return QuoteCandidate(
+            base_price=price,
+            base_price_day_index=None,
+            airline_codes=[],
+            service_desc=tier_row.service_desc or "",
+            via=None,
+            myc_fee_per_kg=None,
+            msc_fee_per_kg=None,
+            myc_applied=False,
+            msc_applied=False,
+            cost_price=price,  # tier 价含油 All-in，不叠加附加费
+            currency=tier_row.currency or "",
+            source_batch_id=tier_row.upload_batch_id or "",
+            source_weekly_record_id=int(tier_row.extras.get("step2_record_id") or 0),
+            source_surcharge_record_id=None,
+            remarks_from_step1=tier_row.remarks,
+            step1_must_go=False,
+            step1_case_by_case=False,
             match_score=score,
         )
 

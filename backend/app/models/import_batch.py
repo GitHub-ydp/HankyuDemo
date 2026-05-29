@@ -11,6 +11,7 @@ from app.models.base import Base
 
 class ImportBatchFileType(str, enum.Enum):
     air = "air"
+    air_tier = "air_tier"  # 做表→入库的重量档运价(与 weekly air 隔离，互不 supersede)
     ocean = "ocean"
     ocean_ngb = "ocean_ngb"
 
@@ -62,5 +63,6 @@ class ImportBatch(Base):
 
     freight_rates = relationship("FreightRate", back_populates="import_batch")
     air_freight_rates = relationship("AirFreightRate", back_populates="import_batch")
+    air_tier_rates = relationship("AirTierRate", back_populates="import_batch")
     air_surcharges = relationship("AirSurcharge", back_populates="import_batch")
     lcl_rates = relationship("LclRate", back_populates="import_batch")

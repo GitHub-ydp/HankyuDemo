@@ -10,13 +10,15 @@
 from typing import Iterator
 
 import pytest
+from sqlalchemy import create_engine, event
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.api.deps import get_db
 from app.main import app
 from app.models import Base, Carrier, CarrierType, Port
+from app.models.air_tier_rate import AirTierRate
+from app.models.import_batch import ImportBatch, ImportBatchFileType
 
 
 @pytest.fixture
@@ -120,3 +122,83 @@ def test_reset_on_empty_db_still_reseeds(client_with_isolated_db):
     assert data["ports_deleted"] == 0
     assert data["carriers_reseeded"] > 0
     assert data["ports_reseeded"] > 0
+
+
+@pytest.fixture
+def client_with_fk_db(tmp_path) -> Iterator[TestClient]:
+    """与生产一致：SQLite 开启 FK 强制（PRAGMA foreign_keys=ON）。
+
+    生产 engine 在 app/core/database.py 通过 connect 事件开 FK；测试 engine 是另建的，
+    默认 FK 关闭——不开就复现不了「删父表 import_batches 时子表仍引用」的 FK 报错。
+    """
+    db_path = tmp_path / "admin_reset_fk.db"
+    url = f"sqlite:///{db_path}"
+    engine = create_engine(url, connect_args={"check_same_thread": False})
+
+    @event.listens_for(engine, "connect")
+    def _fk_on(dbapi_conn, _record):
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA foreign_keys=ON")
+        cur.close()
+
+    TestSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    Base.metadata.create_all(engine)
+
+    def _override_get_db():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = _override_get_db
+    yield TestClient(app)
+    app.dependency_overrides.pop(get_db, None)
+
+
+def test_reset_clears_air_tier_rates_with_fk_on(client_with_fk_db):
+    """回归：库里有 air_tier_rates(FK->import_batches) 时 reset 不能因 FK 报 500。
+
+    air_tier_rates 是 Air EES 多档表，reset_rates 早期删除清单漏了它；
+    开启 FK 后删 import_batches 会触发 FOREIGN KEY constraint failed → 500 → 前端 Network Error。
+    """
+    client = client_with_fk_db
+
+    # 灌一个批次 + 一条挂在它下面的 air_tier 运价
+    gen = app.dependency_overrides[get_db]()
+    db = next(gen)
+    try:
+        batch = ImportBatch(file_type=ImportBatchFileType.air_tier, row_count=1)
+        db.add(batch)
+        db.flush()
+        db.add(
+            AirTierRate(
+                origin="PVG",
+                destination="LAX",
+                tier_prices={"45": 17, "100": 14},
+                batch_id=batch.batch_id,
+            )
+        )
+        db.commit()
+        assert db.query(AirTierRate).count() == 1
+        assert db.query(ImportBatch).count() == 1
+    finally:
+        try:
+            next(gen)
+        except StopIteration:
+            pass
+
+    r = client.post("/api/v1/admin/reset-rates")
+    assert r.status_code == 200, r.text  # 当前 bug 下这里会是 500
+
+    # air_tier_rates 与 import_batches 都被清掉
+    gen = app.dependency_overrides[get_db]()
+    db = next(gen)
+    try:
+        assert db.query(AirTierRate).count() == 0
+        assert db.query(ImportBatch).count() == 0
+    finally:
+        try:
+            next(gen)
+        except StopIteration:
+            pass

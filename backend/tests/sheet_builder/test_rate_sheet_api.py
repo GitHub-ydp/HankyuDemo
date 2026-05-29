@@ -74,3 +74,26 @@ def test_create_session_bad_type(client):
 def test_preview_unknown_session_404(client):
     r = client.get("/api/v1/rate-sheet/does-not-exist/preview")
     assert r.json()["code"] == 404
+
+
+def test_download_post_fills_given_rows(client):
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    r = client.post("/api/v1/rate-sheet/session", data={"template_type": "sea"})
+    sid = r.json()["data"]["session_id"]
+
+    rows = [{"destination": "OSAKA", "carrier": "ONE", "freight_20": 111, "freight_40": 222}]
+    r = client.post(f"/api/v1/rate-sheet/{sid}/download", json={"rows": rows})
+
+    assert r.status_code == 200
+    assert r.content[:2] == b"PK"  # xlsx = zip
+    ws = load_workbook(BytesIO(r.content))["JP N RATE FCL & LCL"]
+    assert ws.cell(9, 1).value == "OSAKA"  # 数据起始行 r9, A=目的港
+    assert ws.cell(9, 4).value == 111      # D=运费, 20FT 行取 freight_20
+
+
+def test_download_post_unknown_session_404(client):
+    r = client.post("/api/v1/rate-sheet/does-not-exist/download", json={"rows": []})
+    assert r.json()["code"] == 404

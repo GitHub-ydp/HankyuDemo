@@ -248,6 +248,14 @@ export const rateSheetApi = {
     api.get<unknown, ApiResponse>(`/rate-sheet/${sessionId}/preview`),
   downloadUrl: (sessionId: string) =>
     `${api.defaults.baseURL}/rate-sheet/${sessionId}/download`,
+  downloadFilled: (sessionId: string, rows: unknown[]): Promise<Blob> =>
+    api.post<unknown, Blob>(
+      `/rate-sheet/${sessionId}/download`,
+      { rows },
+      { responseType: 'blob' },
+    ),
+  commitToDb: (sessionId: string, rows: unknown[]): Promise<ApiResponse> =>
+    api.post<unknown, ApiResponse>(`/rate-sheet/${sessionId}/commit`, { rows }),
 };
 
 export default api;
