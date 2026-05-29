@@ -360,3 +360,65 @@ def test_unsupported_docx_still_skipped():
     assert fr.status == "skipped"
     assert fr.source_type == "unsupported"
     assert s.rows == []
+
+
+def test_sea_same_dest_carrier_different_origin_not_marked_review(monkeypatch):
+    """M-1 关键：同 dest+carrier 但 origin 不同的两行（PDF 合约 148 起运港场景）不应标 needs_review。"""
+    f1 = {"parsed_rows": [
+        {"destination_port_name": "CHICAGO", "carrier_name": "ONE",
+         "origin_port_name": "DALIAN", "container_20gp": 1500}
+    ], "carrier_code": "", "warnings": []}
+    f2 = {"parsed_rows": [
+        {"destination_port_name": "CHICAGO", "carrier_name": "ONE",
+         "origin_port_name": "SHANGHAI", "container_20gp": 1600}
+    ], "carrier_code": "", "warnings": []}
+    calls = iter([f1, f2])
+    monkeypatch.setattr(rate_parser, "detect_and_parse", lambda p, db: next(calls))
+
+    s = orchestrator.create_session("sea")
+    orchestrator.add_file(s.session_id, "a.xlsx", "/tmp/a.xlsx", db=None)
+    orchestrator.add_file(s.session_id, "b.xlsx", "/tmp/b.xlsx", db=None)
+
+    assert len(s.rows) == 2
+    assert all(not r["needs_review"] for r in s.rows), "origin 不同的行不应被标 needs_review"
+
+
+def test_sea_same_full_key_still_marked_review(monkeypatch):
+    """M-1：origin+dest+carrier+via+commodity+valid_from 全同的两行仍应标 needs_review。"""
+    row_data = {
+        "destination_port_name": "CHICAGO", "carrier_name": "ONE",
+        "origin_port_name": "DALIAN", "container_20gp": 1500,
+        "via": "USLAX", "commodity": "FAK", "valid_from": "2026-02-03",
+    }
+    f1 = {"parsed_rows": [dict(row_data)], "carrier_code": "", "warnings": []}
+    f2 = {"parsed_rows": [dict(row_data)], "carrier_code": "", "warnings": []}
+    calls = iter([f1, f2])
+    monkeypatch.setattr(rate_parser, "detect_and_parse", lambda p, db: next(calls))
+
+    s = orchestrator.create_session("sea")
+    orchestrator.add_file(s.session_id, "a.xlsx", "/tmp/a.xlsx", db=None)
+    orchestrator.add_file(s.session_id, "b.xlsx", "/tmp/b.xlsx", db=None)
+
+    assert len(s.rows) == 2
+    assert all(r["needs_review"] for r in s.rows), "6 维全同时仍应标 needs_review"
+
+
+def test_sea_same_dest_carrier_different_valid_from_not_marked_review(monkeypatch):
+    """M-1：同 dest+carrier+origin 但 valid_from 不同（不同有效期）不应标 needs_review。"""
+    f1 = {"parsed_rows": [
+        {"destination_port_name": "HILO", "carrier_name": "ONE",
+         "origin_port_name": "DALIAN", "container_20gp": 5000, "valid_from": "2026-02-03"}
+    ], "carrier_code": "", "warnings": []}
+    f2 = {"parsed_rows": [
+        {"destination_port_name": "HILO", "carrier_name": "ONE",
+         "origin_port_name": "DALIAN", "container_20gp": 5200, "valid_from": "2026-03-01"}
+    ], "carrier_code": "", "warnings": []}
+    calls = iter([f1, f2])
+    monkeypatch.setattr(rate_parser, "detect_and_parse", lambda p, db: next(calls))
+
+    s = orchestrator.create_session("sea")
+    orchestrator.add_file(s.session_id, "a.xlsx", "/tmp/a.xlsx", db=None)
+    orchestrator.add_file(s.session_id, "b.xlsx", "/tmp/b.xlsx", db=None)
+
+    assert len(s.rows) == 2
+    assert all(not r["needs_review"] for r in s.rows), "valid_from 不同的行不应被标 needs_review"

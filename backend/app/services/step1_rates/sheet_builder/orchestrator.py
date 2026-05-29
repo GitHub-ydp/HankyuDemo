@@ -269,7 +269,14 @@ def _review_key(row: dict[str, Any]) -> tuple[Any, ...]:
     # sea 分支扩展 key 加入 via 和 commodity：同 dest+carrier 但网关/commodity 不同的合约行不被误判重复。
     # kmtc/Excel 行 via=None, commodity=None → key 与原来等价，行为不变。
     if "carrier" in row:
-        return (row.get("destination"), row.get("carrier"), row.get("via"), row.get("commodity"))
+        return (
+            row.get("origin"),
+            row.get("destination"),
+            row.get("carrier"),
+            row.get("via"),
+            row.get("commodity"),
+            row.get("valid_from"),
+        )
     return (row.get("destination"), row.get("service"))
 
 
