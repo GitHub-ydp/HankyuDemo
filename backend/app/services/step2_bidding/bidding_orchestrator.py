@@ -82,7 +82,7 @@ def run_auto_fill(
         )
 
     if identify_result.matched_customer == "nitori":
-        return _run_nitori(input_path, bid_id, bid_dir, identify_block)
+        return _run_nitori(input_path, bid_id, bid_dir, identify_block, db)
 
     profile = CustomerAProfile(markup_fn=default_markup_fn)
 
@@ -150,13 +150,16 @@ def run_auto_fill(
 # ---------- internal helpers ----------
 
 
-def _run_nitori(input_path, bid_id, bid_dir, identify_block):
+def _run_nitori(input_path, bid_id, bid_dir, identify_block, db):
     from app.services.step2_bidding.nitori_bundle import resolve_bundle
     from app.services.step2_bidding.nitori_cost_book import NitoriCostBook
     from app.services.step2_bidding.customer_profiles.nitori import NitoriProfile
 
     quote_path, cost_path = resolve_bundle(Path(bid_dir))
-    profile = NitoriProfile(cost_book=NitoriCostBook.from_xlsx(cost_path))
+    profile = NitoriProfile(
+        cost_book=NitoriCostBook.from_xlsx(cost_path),
+        repo=Step1RateRepository(db) if db is not None else None,
+    )
     parsed = profile.parse(quote_path, bid_id=bid_id, period="2026Q2")
     parse_block = _to_parse_block(parsed, sample_limit=5)
     reports = profile.match(parsed)

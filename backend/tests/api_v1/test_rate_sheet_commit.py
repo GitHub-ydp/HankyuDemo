@@ -67,3 +67,20 @@ def test_commit_unknown_session_returns_404(client):
     r = client.post("/api/v1/rate-sheet/nope/commit", json={"rows": []})
     assert r.status_code == 200
     assert r.json()["code"] == 404
+
+
+def _new_sea_session(client: TestClient) -> str:
+    r = client.post("/api/v1/rate-sheet/session", data={"template_type": "sea"})
+    assert r.status_code == 200
+    return r.json()["data"]["session_id"]
+
+
+def test_commit_dispatches_ocean_path(client):
+    sid = _new_sea_session(client)
+    rows = [{"origin": "SHANGHAI", "destination": "HONG KONG", "carrier": "KMTC",
+             "container_20gp": 250, "container_40hq": 500, "transit_days": 3}]
+    r = client.post(f"/api/v1/rate-sheet/{sid}/commit", json={"rows": rows})
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert "fcl_rows" in data                    # 走了 ocean 分流
+    assert data["skipped_unresolved"] == 1       # 测试 DB 未 seed 港口/船司 → 解析不到
