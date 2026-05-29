@@ -227,3 +227,29 @@ def test_parser_error_marked_not_crash(monkeypatch):
     assert fr.status == "error"
     assert "解析炸了" in fr.message
     assert s.rows == []
+
+
+from decimal import Decimal
+from app.services.step1_rates.sheet_builder.orchestrator import _normalize_sea
+
+
+def test_normalize_sea_preserves_container_breakdown_and_origin():
+    row = {
+        "destination_port_name": "HONG KONG",
+        "carrier_name": "KMTC",
+        "container_20gp": Decimal("250"),
+        "container_40gp": Decimal("500"),
+        "container_40hq": Decimal("520"),
+        "transit_days": 3,
+        "remarks": "直达",
+    }
+    out = _normalize_sea(row, "FALLBACK")
+    assert out["origin"] == "SHANGHAI"
+    assert out["destination"] == "HONG KONG"
+    assert out["carrier"] == "KMTC"
+    assert out["container_20gp"] == Decimal("250")
+    assert out["container_40gp"] == Decimal("500")
+    assert out["container_40hq"] == Decimal("520")
+    assert out["transit_days"] == 3
+    assert out["freight_20"] == Decimal("250")
+    assert out["freight_40"] == Decimal("500")

@@ -168,11 +168,22 @@ def _normalize(
 
 
 def _normalize_sea(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]:
+    c20 = row.get("container_20gp")
+    c40gp = row.get("container_40gp")
+    c40hq = row.get("container_40hq")
     return {
+        # 起运港按文件，默认上海（Sea Net Rate 模板 From: Shanghai）
+        "origin": row.get("origin_port_name") or "SHANGHAI",
         "destination": row.get("destination_port_name") or row.get("destination"),
         "carrier": row.get("carrier_name") or carrier_fallback,
-        "freight_20": row.get("container_20gp"),
-        "freight_40": row.get("container_40gp") or row.get("container_40hq"),
+        # 结构化箱型价：入库 FreightRate 用，不再合并丢失
+        "container_20gp": c20,
+        "container_40gp": c40gp,
+        "container_40hq": c40hq,
+        "transit_days": row.get("transit_days"),
+        # 兼容前端现有 sea 预览列
+        "freight_20": c20,
+        "freight_40": c40gp or c40hq,
         "lss_cic": row.get("lss_20") or row.get("lss_40"),
         "baf": row.get("baf_20") or row.get("baf_40"),
         "transit": row.get("transit_days"),
