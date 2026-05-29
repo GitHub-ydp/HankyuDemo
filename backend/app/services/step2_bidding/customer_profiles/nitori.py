@@ -17,6 +17,7 @@ _COL = dict(carrier=4, country_exp=5, pol=6, country_imp=7, pod=8, size=9,
             thc_cur=26, thc_amt=27, doc_cur=28, doc_amt=29, dem_free=103, det_free=104)
 _CHINA_POLS = {"SHANGHAI", "TAICANG"}
 _SIZE_TO_COST = {"20F": "20gp", "40HC": "40hc", "40F": "40hc"}   # 40F←40HC（assumption）
+_SIZE_TO_CONTAINER = {"20F": "container_20gp", "40HC": "container_40hq", "40F": "container_40hq"}  # 40HC=40HQ
 _MARKUP = Decimal("1.15")
 
 
@@ -25,9 +26,11 @@ class NitoriProfile:
     display_name = "ニトリ (Nitori) TO GLOBAL"
     priority = 20
 
-    def __init__(self, cost_book: NitoriCostBook | None = None, markup_ratio: Decimal = _MARKUP):
+    def __init__(self, cost_book: NitoriCostBook | None = None,
+                 markup_ratio: Decimal = _MARKUP, repo=None):
         self._cost = cost_book
         self._markup = markup_ratio
+        self._repo = repo
 
     def detect(self, path: Path, hint: str | None = None) -> bool:
         if hint == self.customer_code:
@@ -72,16 +75,14 @@ class NitoriProfile:
             wb.close()
 
     def match(self, parsed: ParsedPkg) -> list[PerRowReport]:
-        assert self._cost is not None, "NitoriProfile.match 需要 cost_book"
         reports: list[PerRowReport] = []
         for row in parsed.rows:
             if not row.extras.get("is_china"):
                 continue
-            lane = self._cost.lookup(pol=row.origin_code, pod=row.destination_code)
-            cost_field = _SIZE_TO_COST.get(row.extras.get("size", ""))
-            cost_price = None
-            if lane and not lane.no_service and cost_field:
-                cost_price = getattr(lane, f"rate_{cost_field}")
+            size = row.extras.get("size", "")
+            cost_price, carrier_text, lead = self._match_from_db(row, size)
+            if cost_price is None and self._cost is not None:
+                cost_price, carrier_text, lead = self._match_from_cost_book(row, size)
             if cost_price is None:
                 reports.append(PerRowReport(
                     row_idx=row.row_idx, section_code="GLOBAL",
@@ -95,9 +96,35 @@ class NitoriProfile:
                 row_idx=row.row_idx, section_code="GLOBAL",
                 destination_code=row.destination_code, status=RowStatus.FILLED,
                 cost_price=cost_price, sell_price=sell, markup_ratio=self._markup,
-                lead_time_text=lane.transit_time, carrier_text=lane.carrier,
+                lead_time_text=lead, carrier_text=carrier_text,
                 remark_text=None, selected_candidate=None))
         return reports
+
+    def _match_from_db(self, row, size):
+        """优先：查 DB 运价(福山确认口径)。返回 (cost_price, carrier, lead) 或 (None,None,None)。"""
+        if self._repo is None:
+            return None, None, None
+        cands = self._repo.query_ocean_fcl(origin=row.origin_code, destination=row.destination_code)
+        if not cands:
+            return None, None, None
+        cand = cands[0]  # MVP：取第一条
+        col = _SIZE_TO_CONTAINER.get(size)
+        price = getattr(cand, col) if col else None
+        if price is None:
+            return None, None, None
+        lead = cand.transit_time_text or (str(cand.transit_days) if cand.transit_days is not None else None)
+        return price, cand.carrier_name, lead
+
+    def _match_from_cost_book(self, row, size):
+        """回退：zip 内成本文件(MVP 兜底；福山验收后或移除)。"""
+        lane = self._cost.lookup(pol=row.origin_code, pod=row.destination_code)
+        cost_field = _SIZE_TO_COST.get(size)
+        if not lane or lane.no_service or not cost_field:
+            return None, None, None
+        price = getattr(lane, f"rate_{cost_field}")
+        if price is None:
+            return None, None, None
+        return price, lane.carrier, lane.transit_time
 
     def fill(self, source_path: Path, parsed: ParsedPkg,
              row_reports: list[PerRowReport], variant: str, output_path: Path):
