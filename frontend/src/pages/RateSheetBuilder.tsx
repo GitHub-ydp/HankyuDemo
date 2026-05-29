@@ -154,8 +154,26 @@ export default function RateSheetBuilder() {
     try {
       const res = (await rateSheetApi.commitToDb(sessionId, buildFinalRows())) as ApiLike;
       if (res.code === 0) {
-        const d = res.data as { tier_rows: number; skipped_weekly: number };
-        message.success(t('rateSheet.commitSuccess', { tier: d.tier_rows, skipped: d.skipped_weekly }));
+        // 后端按行形状分流：海运返回 fcl_rows，空运重量档返回 tier_rows。
+        const d = res.data as {
+          tier_rows?: number;
+          skipped_weekly?: number;
+          fcl_rows?: number;
+          skipped_no_price?: number;
+          skipped_unresolved?: number;
+        };
+        if (typeof d.fcl_rows === 'number') {
+          message.success(
+            t('rateSheet.commitSuccessOcean', {
+              fcl: d.fcl_rows,
+              skipped: (d.skipped_no_price ?? 0) + (d.skipped_unresolved ?? 0),
+            }),
+          );
+        } else {
+          message.success(
+            t('rateSheet.commitSuccess', { tier: d.tier_rows ?? 0, skipped: d.skipped_weekly ?? 0 }),
+          );
+        }
       } else {
         message.error(res.message || t('rateSheet.commitFailed'));
       }
@@ -295,6 +313,10 @@ export default function RateSheetBuilder() {
   ];
   const previewCols = templateType === 'air' ? airCols : seaCols;
 
+  // 入库按钮显隐：海运(FCL) 或 空运重量档(tier) 都有 DB 落地表可入库；
+  // 空运周报价(Market Price day1-7) 无落地表，保持只下载、不显示入库。
+  const showCommit = templateType === 'sea' || tierColumns.length > 0;
+
   // 顶部进度：选模板(已默认) → 上传 → AI抽取 → 审核/下载
   const activeStep = rows.length ? 3 : uploading ? 2 : 1;
   const flowSteps = [
@@ -403,7 +425,7 @@ export default function RateSheetBuilder() {
       <div className="card">
         <div className="card-head">
           <h3>{t('rateSheet.step3')}</h3>
-          {tierColumns.length > 0 && (
+          {showCommit && (
             <button
               type="button"
               className="btn btn-ghost btn-sm"
@@ -418,7 +440,7 @@ export default function RateSheetBuilder() {
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            style={{ marginLeft: tierColumns.length > 0 ? 8 : 'auto' }}
+            style={{ marginLeft: showCommit ? 8 : 'auto' }}
             disabled={!summary || keptCount === 0}
             onClick={handleDownload}
           >

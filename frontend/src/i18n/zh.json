@@ -40,6 +40,7 @@
     "downloadFailed": "下载失败",
     "commit": "确认入库",
     "commitSuccess": "已入库 {{tier}} 条重量档运价（跳过 {{skipped}} 条周报价）",
+    "commitSuccessOcean": "已入库 {{fcl}} 条海运FCL运价（跳过 {{skipped}} 条无价/未匹配）",
     "commitFailed": "入库失败",
     "createFailed": "创建会话失败",
     "uploadFailed": "上传失败",
