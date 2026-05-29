@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from app.models.air_freight_rate import AirFreightRate
 from app.models.air_surcharge import AirSurcharge
 from app.models.air_tier_rate import AirTierRate
+from app.models.freight_rate import FreightRate
 from app.models.import_batch import ImportBatch, ImportBatchFileType, ImportBatchStatus
 from app.services.step1_rates.entities import RateSourceKind, Step1RateRow
 
@@ -178,9 +179,40 @@ class Step1RateRepository:
 
     # ---------- Ocean / LCL 占位 ----------
 
-    def query_ocean_fcl(self, **kwargs: Any) -> list[Step1RateRow]:
-        # TODO(v2.0): FreightRate 表查询；Customer A v1.0 全为 Air，不需要
-        raise NotImplementedError("query_ocean_fcl 将于 v2.0 实现")
+    def query_ocean_fcl(
+        self,
+        *,
+        origin: str,
+        destination: str,
+        effective_on: date | None = None,
+        currency: str | None = None,
+    ) -> list[Step1RateRow]:
+        """查 origin → destination 的 FCL 海运运价(做表入库的 active ocean 批)。
+
+        - origin/destination 是文字，先经 _resolve_port 解析为 port_id 再按 id 精确匹配
+        - 仅 active 批次；解析不到任一港口 → 返回空
+        """
+        from app.services.step1_rates.activator_mappers import _resolve_port
+
+        o = _resolve_port(self._db, origin)
+        d = _resolve_port(self._db, destination)
+        if o is None or d is None:
+            return []
+        stmt = (
+            select(FreightRate, ImportBatch)
+            .join(ImportBatch, FreightRate.batch_id == ImportBatch.batch_id)
+            .where(
+                and_(
+                    ImportBatch.status == ImportBatchStatus.active,
+                    FreightRate.origin_port_id == o.id,
+                    FreightRate.destination_port_id == d.id,
+                )
+            )
+        )
+        if currency is not None:
+            stmt = stmt.where(FreightRate.currency == currency)
+        rows = self._db.execute(stmt).all()
+        return [self._ocean_to_step1_row(rate, batch) for rate, batch in rows]
 
     def query_lcl(self, **kwargs: Any) -> list[Step1RateRow]:
         # TODO(v2.0): LclRate 表查询
@@ -279,6 +311,33 @@ class Step1RateRepository:
                 "all_fees_dash": _all_fees_dash(
                     sur.myc_min, sur.myc_fee_per_kg, sur.msc_min, sur.msc_fee_per_kg
                 ),
+            },
+        )
+
+    @staticmethod
+    def _ocean_to_step1_row(rate: FreightRate, batch: ImportBatch) -> Step1RateRow:
+        return Step1RateRow(
+            carrier_id=rate.carrier_id,
+            carrier_name=rate.carrier.name_en if rate.carrier else None,
+            origin_port_id=rate.origin_port_id,
+            destination_port_id=rate.destination_port_id,
+            container_20gp=_as_decimal(rate.container_20gp),
+            container_40gp=_as_decimal(rate.container_40gp),
+            container_40hq=_as_decimal(rate.container_40hq),
+            container_45=_as_decimal(rate.container_45),
+            transit_days=rate.transit_days,
+            transit_time_text=rate.transit_time_text,
+            record_kind="ocean_fcl",
+            currency=rate.currency or "USD",
+            remarks=rate.remarks,
+            source_type=RateSourceKind.excel.value,
+            source_file=batch.source_file,
+            upload_batch_id=str(batch.batch_id),
+            extras={
+                "step2_record_id": rate.id,
+                "step2_batch_status": batch.status.value
+                if hasattr(batch.status, "value")
+                else str(batch.status),
             },
         )
 
