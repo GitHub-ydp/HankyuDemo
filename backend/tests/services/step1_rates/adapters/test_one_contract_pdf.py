@@ -67,3 +67,26 @@ def test_parse_clean_block_yields_rows_with_prices():
 
     assert rows[1]["destination_port_name"] == "HONOLULU"
     assert rows[1]["container_45"] == 6075.0
+
+
+def _coded_block_lines():
+    return [
+        _line(("6.", 5), ("CONTRACT", 30), ("RATES", 120), ("OR", 200), ("RATE", 240), ("SCHEDULE(S)", 300)),
+        _line(("212)", 5), ("COMMODITY", 40), (":", 150), ("TPE1-FAK", 170)),
+        _line(("ORIGIN", 5), (":", 150), ("TAIPEI,", 170), ("TAIWAN(CY)", 240)),
+        _line(("Destination", 10), ("Cntry", 200), ("Term", 350), ("Type", 400),
+              ("Cur", 450), ("20'", 500), ("40'", 560), ("40HC", 620), ("45'", 680), ("Note", 740)),
+        # 冷藏 RF + 编码价 R2/2400(落在 40' 列)
+        _line(("USLAX", 10), ("USLGB", 70), ("US", 200), ("CY", 350), ("RF", 400),
+              ("USD", 450), ("R2/2400", 560)),
+    ]
+
+
+def test_parse_coded_row_flagged_needs_review():
+    rows = parse_rate_blocks(_coded_block_lines())
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["needs_review"] is True
+    assert r["rate_level"] == "R2/2400"      # 编码原文保留
+    assert r["container_40gp"] is None        # 非数字 → 不当价
+    assert r["origin_port_name"] == "TAIPEI"
