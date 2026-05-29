@@ -422,3 +422,99 @@ def test_sea_same_dest_carrier_different_valid_from_not_marked_review(monkeypatc
 
     assert len(s.rows) == 2
     assert all(not r["needs_review"] for r in s.rows), "valid_from 不同的行不应被标 needs_review"
+
+
+# ── 编码/RF 行 needs_review 透传修复测试 ─────────────────────────────────────
+
+
+def test_coded_row_needs_review_preserved_when_no_collision():
+    """解析器标过 needs_review=True 的编码行，即使不与任何其他行碰撞，也应保持 True。
+
+    修复前：_mark_needs_review 直接赋值 keys[key] > 1，单独的编码行
+    因不碰撞被冲成 False，人工会漏审。
+    """
+    from app.services.step1_rates.sheet_builder.orchestrator import _mark_needs_review
+
+    rows = [
+        # 编码行：解析器已标 needs_review=True，且此行在会话中唯一（不碰撞）
+        {
+            "origin": "DALIAN", "destination": "HILO", "carrier": "ONE",
+            "via": None, "commodity": "TPE1-FAK", "valid_from": "2026-02-03",
+            "needs_review": True,
+        },
+        # 普通行：无编码标记，不碰撞 → 应保持 False
+        {
+            "origin": "DALIAN", "destination": "BUSAN", "carrier": "ONE",
+            "via": None, "commodity": None, "valid_from": "2026-02-03",
+            "needs_review": False,
+        },
+    ]
+    _mark_needs_review(rows)
+
+    assert rows[0]["needs_review"] is True, (
+        "编码行不碰撞时仍应保持 needs_review=True（修复前会被冲成 False）"
+    )
+    assert rows[1]["needs_review"] is False, "普通不碰撞行应保持 False"
+
+
+def test_collision_still_marks_needs_review():
+    """碰撞逻辑不受 OR 改动影响：两行 key 完全相同时仍双双标 True。"""
+    from app.services.step1_rates.sheet_builder.orchestrator import _mark_needs_review
+
+    rows = [
+        {
+            "origin": "DALIAN", "destination": "HILO", "carrier": "ONE",
+            "via": None, "commodity": "FAK", "valid_from": "2026-02-03",
+            "needs_review": False,  # 解析器未标，靠碰撞检测
+        },
+        {
+            "origin": "DALIAN", "destination": "HILO", "carrier": "ONE",
+            "via": None, "commodity": "FAK", "valid_from": "2026-02-03",
+            "needs_review": False,
+        },
+    ]
+    _mark_needs_review(rows)
+
+    assert all(r["needs_review"] for r in rows), "碰撞行仍应全部标 True"
+
+
+def test_coded_row_collision_also_true():
+    """编码行本身已是 True，再碰撞也应 True（OR 后不变）。"""
+    from app.services.step1_rates.sheet_builder.orchestrator import _mark_needs_review
+
+    rows = [
+        {
+            "origin": "DALIAN", "destination": "HILO", "carrier": "ONE",
+            "via": None, "commodity": "TPE1-FAK", "valid_from": "2026-02-03",
+            "needs_review": True,
+        },
+        {
+            "origin": "DALIAN", "destination": "HILO", "carrier": "ONE",
+            "via": None, "commodity": "TPE1-FAK", "valid_from": "2026-02-03",
+            "needs_review": False,
+        },
+    ]
+    _mark_needs_review(rows)
+
+    assert all(r["needs_review"] for r in rows), "编码行碰撞时两行均应为 True"
+
+
+def test_normalize_sea_passes_through_needs_review():
+    """_normalize_sea 应透传 needs_review 字段；无此键时默认 False。"""
+    from app.services.step1_rates.sheet_builder.orchestrator import _normalize_sea
+
+    row_coded = {
+        "carrier_name": "ONE", "destination_port_name": "HILO",
+        "container_20gp": None, "needs_review": True,
+    }
+    row_normal = {
+        "carrier_name": "ONE", "destination_port_name": "BUSAN",
+        "container_20gp": 1500,
+        # 无 needs_review 键
+    }
+
+    out_coded = _normalize_sea(row_coded, "")
+    out_normal = _normalize_sea(row_normal, "")
+
+    assert out_coded["needs_review"] is True, "解析器设置的 needs_review 应透传"
+    assert out_normal["needs_review"] is False, "无 needs_review 键时应默认 False"

@@ -204,6 +204,7 @@ def _normalize_sea(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]
         "is_direct": row.get("is_direct", True),
         "commodity": row.get("commodity"),
         "source_type": row.get("source_type"),
+        "needs_review": row.get("needs_review", False),
     }
 
 
@@ -281,7 +282,8 @@ def _review_key(row: dict[str, Any]) -> tuple[Any, ...]:
 
 
 def _mark_needs_review(rows: list[dict[str, Any]]) -> None:
-    """同 (目的港, 船司/service) 出现多条 → 全部标 needs_review，供审核台人工选。"""
+    """同 (目的港, 船司/service) 出现多条 → 全部标 needs_review，供审核台人工选。
+    已被解析器标 needs_review=True 的行（如编码/RF 行）保留不被覆盖。"""
     keys = Counter(_review_key(r) for r in rows)
     for r in rows:
-        r["needs_review"] = keys[_review_key(r)] > 1
+        r["needs_review"] = bool(r.get("needs_review")) or (keys[_review_key(r)] > 1)
