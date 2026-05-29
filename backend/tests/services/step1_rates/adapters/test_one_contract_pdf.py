@@ -102,3 +102,21 @@ def test_parse_one_contract_pdf_wraps_blocks(monkeypatch):
     assert len(out["parsed_rows"]) == 2
     assert out["parsed_rows"][0]["destination_port_name"] == "HILO"
     assert isinstance(out.get("warnings"), list)
+
+
+import os
+import pytest
+
+_SAMPLE = "/Users/zhangdongxu/Desktop/project/阪急阪神/资料/2026.05.27/Sea Net Rete/LAX0751N25v93 (2).pdf"
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(not os.path.exists(_SAMPLE), reason="真实 ONE 合约样例不在本机")
+def test_real_one_contract_parses_rows():
+    out = ocp.parse_one_contract_pdf(_SAMPLE, db=None)
+    assert out["carrier_code"] == "ONE"
+    assert len(out["parsed_rows"]) > 0          # 至少抽到运价行
+    # 干净数字行应有价（不全是 needs_review）
+    priced = [r for r in out["parsed_rows"]
+              if r["container_20gp"] is not None or r["container_40gp"] is not None]
+    assert len(priced) > 0

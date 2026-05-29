@@ -187,7 +187,7 @@ def commit_ocean_rows(
                 container_45=_to_decimal(r.get("container_45")),
                 valid_from=_to_date(r.get("valid_from")),
                 valid_to=_to_date(r.get("valid_to")),
-                rate_level=r.get("rate_level"),
+                rate_level=(r.get("rate_level") or None) and str(r.get("rate_level"))[:10],
                 service_code=r.get("service_code"),
                 via=r.get("via"),
                 is_direct=r.get("is_direct", True),

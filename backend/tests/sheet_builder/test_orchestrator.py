@@ -291,3 +291,12 @@ def test_normalize_sea_passes_through_pdf_fields():
     assert out["via"] == "BUSAN"
     assert out["is_direct"] is False
     assert out["commodity"] == "TPE1-FAK"
+    assert out["remark"] == "inclusive of AGS"
+
+
+def test_unsupported_docx_still_skipped():
+    s = orchestrator.create_session("sea")
+    fr = orchestrator.add_file(s.session_id, "report.docx", "/tmp/report.docx", db=None)
+    assert fr.status == "skipped"
+    assert fr.source_type == "unsupported"
+    assert s.rows == []
