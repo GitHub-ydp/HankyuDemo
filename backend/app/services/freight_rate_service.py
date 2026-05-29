@@ -11,11 +11,13 @@ from app.models import (
     FreightRate,
     ImportBatch,
     ImportBatchFileType,
+    ImportBatchStatus,
     LclRate,
     Port,
     RateStatus,
 )
 from app.models.air_freight_rate import AirFreightRate
+from app.models.air_tier_rate import AirTierRate
 from app.schemas.freight_rate import RateType
 
 
@@ -637,11 +639,33 @@ def get_rate_stats(db: Session) -> dict:
     air_surcharge_total = db.query(AirSurcharge).count()
     lcl_total = db.query(LclRate).count()
 
+    # 空运重量档（做表→入库 air_tier）— 只数 active 批，与 query_air_tier 口径一致
+    air_tier_total = (
+        db.query(AirTierRate)
+        .join(ImportBatch, AirTierRate.batch_id == ImportBatch.batch_id)
+        .filter(ImportBatch.status == ImportBatchStatus.active)
+        .count()
+    )
+    air_tier_routes = (
+        db.query(
+            func.count(
+                func.distinct(
+                    func.concat(AirTierRate.origin, "-", AirTierRate.destination)
+                )
+            )
+        )
+        .join(ImportBatch, AirTierRate.batch_id == ImportBatch.batch_id)
+        .filter(ImportBatch.status == ImportBatchStatus.active)
+        .scalar()
+        or 0
+    )
+
     # 注：海/空运承运商可能重叠但跨表无法精确去重，此处为合计估算（Demo 可接受）
+    # air_tier 无规范化船司字段（service_desc 是 "CK/MU" 这类路由提示），故不计入 carriers。
     return {
-        "total_rates": ocean_total + air_total + air_surcharge_total + lcl_total,
-        "active_rates": ocean_active + air_total + air_surcharge_total + lcl_total,
+        "total_rates": ocean_total + air_total + air_surcharge_total + lcl_total + air_tier_total,
+        "active_rates": ocean_active + air_total + air_surcharge_total + lcl_total + air_tier_total,
         "draft_rates": ocean_draft,
         "carriers_count": ocean_carriers + air_carriers,
-        "routes_count": ocean_routes + air_routes,
+        "routes_count": ocean_routes + air_routes + air_tier_routes,
     }
