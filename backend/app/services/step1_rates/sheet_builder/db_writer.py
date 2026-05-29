@@ -12,17 +12,21 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.models.air_tier_rate import AirTierRate
+from app.models.carrier import Carrier
+from app.models.freight_rate import FreightRate, RateStatus, SourceType
 from app.models.import_batch import (
     ImportBatch,
     ImportBatchFileType,
     ImportBatchStatus,
 )
+from app.services.step1_rates.activator_mappers import _resolve_port
 
 
 @dataclass
@@ -112,4 +116,118 @@ def _to_date(value: Any) -> date | None:
     try:
         return date.fromisoformat(str(value)[:10])
     except ValueError:
+        return None
+
+
+@dataclass
+class OceanCommitResult:
+    """海运入库结果。fcl_rows=0 时不建批次，batch_id 为空串。"""
+
+    batch_id: str
+    fcl_rows: int
+    skipped_no_price: int
+    skipped_unresolved: int
+
+
+_OCEAN_PRICE_KEYS = ("container_20gp", "container_40gp", "container_40hq")
+
+
+def commit_ocean_rows(
+    rows: list[dict[str, Any]],
+    db: Session,
+    *,
+    source_file: str | None = None,
+    imported_by: str | None = None,
+) -> OceanCommitResult:
+    """审核后的海运行入库 FreightRate(FCL)；无箱型价/港口船司解析不到的行跳过计数。
+
+    只写 active；新批次 supersede 上一个 active 的 ocean 批(与 air_tier 套路一致)。
+    """
+    priced = [r for r in rows if any(r.get(k) is not None for k in _OCEAN_PRICE_KEYS)]
+    skipped_no_price = len(rows) - len(priced)
+    if not priced:
+        return OceanCommitResult(batch_id="", fcl_rows=0, skipped_no_price=skipped_no_price, skipped_unresolved=0)
+
+    db.execute(
+        update(ImportBatch)
+        .where(
+            ImportBatch.file_type == ImportBatchFileType.ocean,
+            ImportBatch.status == ImportBatchStatus.active,
+        )
+        .values(status=ImportBatchStatus.superseded)
+    )
+
+    batch_uuid = uuid.uuid4()
+    batch = ImportBatch(
+        batch_id=batch_uuid,
+        file_type=ImportBatchFileType.ocean,
+        source_file=source_file,
+        status=ImportBatchStatus.active,
+        imported_by=imported_by,
+    )
+    db.add(batch)
+
+    written = 0
+    skipped_unresolved = 0
+    for r in priced:
+        origin_port = _resolve_port(db, r.get("origin") or "SHANGHAI")
+        dest_port = _resolve_port(db, r.get("destination"))
+        carrier_id = _resolve_carrier_id(db, r.get("carrier"))
+        if origin_port is None or dest_port is None or carrier_id is None:
+            skipped_unresolved += 1
+            continue
+        db.add(
+            FreightRate(
+                carrier_id=carrier_id,
+                origin_port_id=origin_port.id,
+                destination_port_id=dest_port.id,
+                container_20gp=_to_decimal(r.get("container_20gp")),
+                container_40gp=_to_decimal(r.get("container_40gp")),
+                container_40hq=_to_decimal(r.get("container_40hq")),
+                transit_days=_to_int(r.get("transit_days")),
+                currency="USD",
+                status=RateStatus.active,
+                source_type=SourceType.excel,
+                source_file=source_file or r.get("source_file"),
+                remarks=r.get("remark"),
+                batch_id=batch_uuid,
+            )
+        )
+        written += 1
+
+    batch.row_count = written
+    db.commit()
+    return OceanCommitResult(
+        batch_id=str(batch_uuid),
+        fcl_rows=written,
+        skipped_no_price=skipped_no_price,
+        skipped_unresolved=skipped_unresolved,
+    )
+
+
+def _resolve_carrier_id(db: Session, name: Any) -> int | None:
+    """宽松解析船司 → id(查不到返回 None，不抛异常)。"""
+    if not name:
+        return None
+    n = str(name).strip()
+    c = db.query(Carrier).filter(Carrier.code == n).first()
+    if c is None:
+        c = db.query(Carrier).filter(Carrier.name_en.ilike(f"%{n}%")).first()
+    if c is None:
+        c = db.query(Carrier).filter(Carrier.code.ilike(f"%{n}%")).first()
+    return c.id if c else None
+
+
+def _to_decimal(value: Any) -> Decimal | None:
+    if value is None:
+        return None
+    return value if isinstance(value, Decimal) else Decimal(str(value))
+
+
+def _to_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
         return None
