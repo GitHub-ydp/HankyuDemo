@@ -65,15 +65,17 @@ def _word_at(line: list[dict], x: float, tol: float = _TOL) -> dict | None:
     return best
 
 
-def _parse_header(line: list[dict]) -> tuple[dict, float | None]:
-    """从列头行取各价列 x0 + 目的港右边界(第一个 Cntry 的 x0)。"""
+def _parse_header(line: list[dict]) -> tuple[dict, float | None, float | None]:
+    """从列头行取各价列 x0、目的港右边界(第一个 Cntry 的 x0)、via 右边界(第二个 Cntry 的 x0)。"""
     cols: dict[str, float] = {}
     for w in line:
         for key, label in _PRICE_HEADERS:
             if w["text"] == label:
                 cols[key] = w["x0"]
-    dest_right = next((w["x0"] for w in line if w["text"] == "Cntry"), None)
-    return cols, dest_right
+    cntry_xs = [w["x0"] for w in line if w["text"] == "Cntry"]
+    dest_right = cntry_xs[0] if cntry_xs else None
+    via_right = cntry_xs[1] if len(cntry_xs) >= 2 else None
+    return cols, dest_right, via_right
 
 
 def _parse_note(note_lines: list[str]) -> tuple[str | None, str | None, str | None]:
@@ -94,13 +96,26 @@ def _parse_note(note_lines: list[str]) -> tuple[str | None, str | None, str | No
     return vf, vt, sn
 
 
-def _parse_data_row(line: list[dict], price_cols: dict, dest_right: float | None, ctx: dict) -> dict | None:
+def _parse_data_row(
+    line: list[dict],
+    price_cols: dict,
+    dest_right: float | None,
+    ctx: dict,
+    via_right: float | None = None,
+) -> dict | None:
     if not dest_right:
         return None
     dest_raw = " ".join(w["text"] for w in line if w["x0"] < dest_right - _TOL).strip()
     destination = _clean_port_name(dest_raw)
     if not destination:
         return None
+    via: str | None = None
+    if via_right is not None:
+        via_raw = " ".join(
+            w["text"] for w in line
+            if dest_right + _TOL < w["x0"] < via_right - _TOL
+        ).strip()
+        via = _clean_port_name(via_raw) or None
     row: dict[str, Any] = {
         "carrier_name": _CARRIER,
         "origin_port_name": ctx.get("origin"),
@@ -111,10 +126,11 @@ def _parse_data_row(line: list[dict], price_cols: dict, dest_right: float | None
         "valid_from": None, "valid_to": None,
         "rate_level": None,
         "service_code": ctx.get("service_code"),
-        "via": None, "is_direct": True,
+        "via": via, "is_direct": True,
         "commodity": ctx.get("commodity"),
         "remark": None,
         "needs_review": False,
+        "source_type": "pdf",
     }
     has_price = False
     for key, x in price_cols.items():
@@ -145,6 +161,7 @@ def parse_rate_blocks(lines: list[list[dict]]) -> list[dict]:
     note_buf: list[str] = []
     price_cols: dict[str, float] = {}
     dest_right: float | None = None
+    via_right: float | None = None
     in_section = False
     in_note = False
 
@@ -180,7 +197,7 @@ def parse_rate_blocks(lines: list[list[dict]]) -> list[dict]:
             in_note = False
             flush_block()
             ctx = {"commodity": _after_colon(text) or None, "origin": None, "service_code": None}
-            price_cols, dest_right = {}, None
+            price_cols, dest_right, via_right = {}, None, None
             continue
         if text.upper().startswith("ORIGIN VIA"):
             continue
@@ -188,10 +205,10 @@ def parse_rate_blocks(lines: list[list[dict]]) -> list[dict]:
             ctx["origin"] = _clean_port_name(_after_colon(text))
             continue
         if "Destination" in text and "Cntry" in text and "Cur" in text:
-            price_cols, dest_right = _parse_header(line)
+            price_cols, dest_right, via_right = _parse_header(line)
             continue
         if price_cols:
-            row = _parse_data_row(line, price_cols, dest_right, ctx)
+            row = _parse_data_row(line, price_cols, dest_right, ctx, via_right)
             if row:
                 block_rows.append(row)
     flush_block()

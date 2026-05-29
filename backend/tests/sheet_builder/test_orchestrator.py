@@ -294,6 +294,66 @@ def test_normalize_sea_passes_through_pdf_fields():
     assert out["remark"] == "inclusive of AGS"
 
 
+def test_sea_same_dest_carrier_different_via_not_marked_review(monkeypatch):
+    """M-1：同 destination+carrier 但 via 不同的两行不应被标 needs_review。"""
+    f1 = {"parsed_rows": [
+        {"destination_port_name": "CHICAGO", "carrier_name": "ONE",
+         "container_20gp": 1500, "via": "USLAX"}
+    ], "carrier_code": "", "warnings": []}
+    f2 = {"parsed_rows": [
+        {"destination_port_name": "CHICAGO", "carrier_name": "ONE",
+         "container_20gp": 1600, "via": "USLB"}
+    ], "carrier_code": "", "warnings": []}
+    calls = iter([f1, f2])
+    monkeypatch.setattr(rate_parser, "detect_and_parse", lambda p, db: next(calls))
+
+    s = orchestrator.create_session("sea")
+    orchestrator.add_file(s.session_id, "a.xlsx", "/tmp/a.xlsx", db=None)
+    orchestrator.add_file(s.session_id, "b.xlsx", "/tmp/b.xlsx", db=None)
+
+    assert len(s.rows) == 2
+    assert all(not r["needs_review"] for r in s.rows), "via 不同的行不应被标 needs_review"
+
+
+def test_sea_same_dest_carrier_same_via_marked_review(monkeypatch):
+    """M-1：同 destination+carrier+via 的两行应仍被标 needs_review。"""
+    f1 = {"parsed_rows": [
+        {"destination_port_name": "CHICAGO", "carrier_name": "ONE",
+         "container_20gp": 1500, "via": "USLAX"}
+    ], "carrier_code": "", "warnings": []}
+    f2 = {"parsed_rows": [
+        {"destination_port_name": "CHICAGO", "carrier_name": "ONE",
+         "container_20gp": 1600, "via": "USLAX"}
+    ], "carrier_code": "", "warnings": []}
+    calls = iter([f1, f2])
+    monkeypatch.setattr(rate_parser, "detect_and_parse", lambda p, db: next(calls))
+
+    s = orchestrator.create_session("sea")
+    orchestrator.add_file(s.session_id, "a.xlsx", "/tmp/a.xlsx", db=None)
+    orchestrator.add_file(s.session_id, "b.xlsx", "/tmp/b.xlsx", db=None)
+
+    assert len(s.rows) == 2
+    assert all(r["needs_review"] for r in s.rows), "via 相同时仍应标 needs_review"
+
+
+def test_sea_kmtc_no_via_review_behavior_unchanged(monkeypatch):
+    """M-1 兼容性：kmtc/Excel 行无 via → key 等价于原来 (destination, carrier)，行为不变。"""
+    f1 = {"parsed_rows": [
+        {"destination_port_name": "BUSAN", "carrier_name": "KMTC", "container_20gp": 130}
+    ], "carrier_code": "", "warnings": []}
+    f2 = {"parsed_rows": [
+        {"destination_port_name": "BUSAN", "carrier_name": "KMTC", "container_20gp": 140}
+    ], "carrier_code": "", "warnings": []}
+    calls = iter([f1, f2])
+    monkeypatch.setattr(rate_parser, "detect_and_parse", lambda p, db: next(calls))
+
+    s = orchestrator.create_session("sea")
+    orchestrator.add_file(s.session_id, "a.xlsx", "/tmp/a.xlsx", db=None)
+    orchestrator.add_file(s.session_id, "b.xlsx", "/tmp/b.xlsx", db=None)
+
+    assert all(r["needs_review"] for r in s.rows), "kmtc 无 via 时同目的港+船司两行仍标 needs_review"
+
+
 def test_unsupported_docx_still_skipped():
     s = orchestrator.create_session("sea")
     fr = orchestrator.add_file(s.session_id, "report.docx", "/tmp/report.docx", db=None)

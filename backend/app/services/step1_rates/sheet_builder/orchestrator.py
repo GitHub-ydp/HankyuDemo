@@ -203,6 +203,7 @@ def _normalize_sea(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]
         "via": row.get("via"),
         "is_direct": row.get("is_direct", True),
         "commodity": row.get("commodity"),
+        "source_type": row.get("source_type"),
     }
 
 
@@ -264,8 +265,12 @@ def _review_key(row: dict[str, Any]) -> tuple[Any, ...]:
     # 重量档报价(联运商)：同目的港多航班需人工选一条 → 仅按目的港聚合。
     if row.get("needs_review_by_destination"):
         return (row.get("destination"),)
-    # sea 用船司、air 周报用 service 作为同目的港下的区分键。
-    return (row.get("destination"), row.get("carrier") or row.get("service"))
+    # sea 行有 "carrier" 字段；air 周报行有 "service" 字段。
+    # sea 分支扩展 key 加入 via 和 commodity：同 dest+carrier 但网关/commodity 不同的合约行不被误判重复。
+    # kmtc/Excel 行 via=None, commodity=None → key 与原来等价，行为不变。
+    if "carrier" in row:
+        return (row.get("destination"), row.get("carrier"), row.get("via"), row.get("commodity"))
+    return (row.get("destination"), row.get("service"))
 
 
 def _mark_needs_review(rows: list[dict[str, Any]]) -> None:

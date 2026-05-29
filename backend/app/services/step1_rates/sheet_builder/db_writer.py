@@ -195,7 +195,7 @@ def commit_ocean_rows(
                 transit_days=_to_int(r.get("transit_days")),
                 currency="USD",
                 status=RateStatus.active,
-                source_type=SourceType.excel,
+                source_type=SourceType(r["source_type"]) if r.get("source_type") else SourceType.excel,
                 source_file=source_file or r.get("source_file"),
                 remarks=r.get("remark"),
                 batch_id=batch_uuid,

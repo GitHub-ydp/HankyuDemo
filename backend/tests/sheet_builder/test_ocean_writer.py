@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models.base import Base
 from app.models.carrier import Carrier
-from app.models.freight_rate import FreightRate, RateStatus
+from app.models.freight_rate import FreightRate, RateStatus, SourceType
 from app.models.import_batch import ImportBatch, ImportBatchFileType, ImportBatchStatus
 from app.models.port import Port
 from app.services.step1_rates.sheet_builder import db_writer
@@ -97,6 +97,7 @@ def test_commit_ocean_writes_pdf_fields():
         "container_45": 6075, "valid_from": "2026-02-03", "valid_to": "2026-02-28",
         "rate_level": "R5", "service_code": "EC3", "via": "BUSAN", "is_direct": False,
         "commodity": "TPE1-FAK", "remark": "inclusive of AGS",
+        "source_type": "pdf",
     }]
     result = commit_ocean_rows(rows, db)
     assert result.fcl_rows == 1
@@ -111,7 +112,16 @@ def test_commit_ocean_writes_pdf_fields():
     assert fr.is_direct is False
     assert fr.rmks == "TPE1-FAK"
     assert fr.remarks == "inclusive of AGS"
+    assert fr.source_type == SourceType.pdf, "PDF 来源行应落 SourceType.pdf 而非 excel"
     db.close()
+
+
+def test_commit_ocean_no_source_type_defaults_excel(db_session):
+    """行里不带 source_type 时(kmtc/Excel 路径)，source_type 应落 SourceType.excel。"""
+    res = db_writer.commit_ocean_rows([_row("HONG KONG", Decimal("250"), Decimal("500"))], db_session)
+    assert res.fcl_rows == 1
+    fr = db_session.execute(select(FreightRate)).scalars().one()
+    assert fr.source_type == SourceType.excel
 
 
 def test_commit_ocean_supersedes_prior_active(db_session):
