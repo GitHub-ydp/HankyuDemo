@@ -330,4 +330,12 @@ def _resolve_port(db: Session, name_raw: str | None) -> Port | None:
         )
         if port is not None:
             return port
+    # 双语合并名 "English/中文"(如 KMTC 的 "Shanghai/上海"、"Busan/釜山")：整串匹配不到时
+    # 按分隔符拆段，逐段递归再试，命中任一即可。拆出的段不含分隔符，递归只下探一层。
+    parts = [p.strip() for p in re.split(r"[/／|]", name) if p.strip()]
+    if len(parts) > 1:
+        for part in parts:
+            hit = _resolve_port(db, part)
+            if hit is not None:
+                return hit
     return None
