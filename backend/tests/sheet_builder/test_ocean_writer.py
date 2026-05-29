@@ -75,6 +75,45 @@ def test_commit_ocean_skips_unresolved_and_no_price(db_session):
     assert res.skipped_no_price == 1
 
 
+def test_commit_ocean_writes_pdf_fields():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.models import Base, Carrier, CarrierType, Port
+    from app.models.freight_rate import FreightRate
+    from app.services.step1_rates.sheet_builder.db_writer import commit_ocean_rows
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    db.add(Carrier(code="ONE", name_en="Ocean Network Express",
+                   carrier_type=CarrierType.shipping_line, country="SG"))
+    db.add(Port(un_locode="CNDLC", name_en="Dalian", name_cn="大连", country="CN", region="East Asia"))
+    db.add(Port(un_locode="USHIL", name_en="Hilo", name_cn="希洛", country="US", region="North America"))
+    db.commit()
+
+    rows = [{
+        "origin": "DALIAN", "destination": "HILO", "carrier": "ONE",
+        "container_20gp": 5240, "container_40gp": 7100, "container_40hq": 7200,
+        "container_45": 6075, "valid_from": "2026-02-03", "valid_to": "2026-02-28",
+        "rate_level": "R5", "service_code": "EC3", "via": "BUSAN", "is_direct": False,
+        "commodity": "TPE1-FAK", "remark": "inclusive of AGS",
+    }]
+    result = commit_ocean_rows(rows, db)
+    assert result.fcl_rows == 1
+
+    fr = db.query(FreightRate).one()
+    assert fr.container_45 == 6075
+    assert str(fr.valid_from) == "2026-02-03"
+    assert str(fr.valid_to) == "2026-02-28"
+    assert fr.rate_level == "R5"
+    assert fr.service_code == "EC3"
+    assert fr.via == "BUSAN"
+    assert fr.is_direct is False
+    assert fr.rmks == "TPE1-FAK"
+    assert fr.remarks == "inclusive of AGS"
+    db.close()
+
+
 def test_commit_ocean_supersedes_prior_active(db_session):
     db_writer.commit_ocean_rows([_row("HONG KONG", Decimal("250"), Decimal("500"))], db_session)
     res2 = db_writer.commit_ocean_rows([_row("HONG KONG", Decimal("240"), Decimal("480"))], db_session)
