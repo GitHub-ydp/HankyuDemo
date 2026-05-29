@@ -70,3 +70,8 @@ uploads/
 screenshots/
 server-operations.md
 toyota_steel_quality_report.html
+
+# 本地 scratch / 调试工具（勿入库）
+web/
+/instancePrice.xlsx
+docs/TJTS*.pptx
