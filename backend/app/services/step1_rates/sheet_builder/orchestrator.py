@@ -140,6 +140,9 @@ def add_file(
     normalized = [
         _normalize(session.template_type, r, carrier_fallback) for r in raw_rows
     ]
+    # sea 多港格(如 'USLAX USLGB')拆成多行(同价)，审核台展示拆开后的行
+    if session.template_type == "sea" and db is not None:
+        normalized = expand_multi_port_sea(normalized, db)
     session.rows.extend(normalized)
     _mark_needs_review(session.rows)
 
@@ -207,6 +210,35 @@ def _normalize_sea(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]
         "currency": row.get("currency") or "USD",
         "needs_review": row.get("needs_review", False),
     }
+
+
+def expand_multi_port_sea(
+    rows: list[dict[str, Any]], db: Session
+) -> list[dict[str, Any]]:
+    """sea 归一行 destination 形如 'USLAX USLGB'(多 UN/LOCODE 空格拼接)→ 拆成多行(同价)。
+
+    仅当按空白拆出 >1 段、且每段都是已存在的 5 位 UN/LOCODE 才拆；否则原样
+    ('LOS ANGELES' 的 'LOS'/'ANGELES' 非 locode → 不拆，避开单港多词名被拆烂)。
+    """
+    from app.models.port import Port
+
+    def _is_locode(token: str) -> bool:
+        return (
+            len(token) == 5
+            and token.isalpha()
+            and token.isupper()
+            and db.query(Port).filter(Port.un_locode == token).first() is not None
+        )
+
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        dest = row.get("destination")
+        parts = str(dest).split() if dest else []
+        if len(parts) > 1 and all(_is_locode(p) for p in parts):
+            out.extend({**row, "destination": p} for p in parts)
+        else:
+            out.append(row)
+    return out
 
 
 def _normalize_air(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]:

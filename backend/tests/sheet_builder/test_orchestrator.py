@@ -526,3 +526,34 @@ def test_normalize_sea_passes_through_currency():
     assert _normalize_sea({"destination_port_name": "HILO", "currency": "USD"}, "")["currency"] == "USD"
     # 行无 currency → 默认 USD
     assert _normalize_sea({"destination_port_name": "HILO"}, "")["currency"] == "USD"
+
+
+def test_expand_multi_port_sea_splits_locode_pair():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    from app.models.base import Base
+    from app.models.port import Port
+    from app.services.step1_rates.sheet_builder.orchestrator import expand_multi_port_sea
+    import app.models  # noqa: F401
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(bind=engine)
+    s = Session(bind=engine)
+    s.add_all([
+        Port(un_locode="USLAX", name_en="Los Angeles", name_cn="洛杉矶"),
+        Port(un_locode="USLGB", name_en="Long Beach", name_cn="长滩"),
+    ])
+    s.commit()
+
+    rows = [{"destination": "USLAX USLGB", "container_20gp": 100}]
+    out = expand_multi_port_sea(rows, s)
+    assert len(out) == 2
+    assert {r["destination"] for r in out} == {"USLAX", "USLGB"}
+    assert all(r["container_20gp"] == 100 for r in out)
+
+    # 单港多词名不拆：'LOS'/'ANGELES' 非 5 位 locode → 保持整体
+    rows2 = [{"destination": "LOS ANGELES", "container_20gp": 100}]
+    out2 = expand_multi_port_sea(rows2, s)
+    assert len(out2) == 1 and out2[0]["destination"] == "LOS ANGELES"
+    s.close()
+    engine.dispose()
