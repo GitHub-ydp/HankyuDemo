@@ -21,6 +21,22 @@ interface PreviewRow {
   carrier?: string;
   freight_20?: number | string | null;
   freight_40?: number | string | null;
+  // 结构化海运字段(入库 commit_ocean_rows 读这些；审核台价格列直接绑定它们)
+  container_20gp?: number | string | null;
+  container_40gp?: number | string | null;
+  container_40hq?: number | string | null;
+  container_45?: number | string | null;
+  currency?: string | null;
+  via?: string | null;
+  commodity?: string | null;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  rate_level?: string | null;
+  service_code?: string | null;
+  lss_cic?: number | string | null;
+  baf?: number | string | null;
+  transit_days?: number | string | null;
+  transit?: number | string | null;
   service?: string;
   day1?: number | string | null;
   day2?: number | string | null;
@@ -129,8 +145,16 @@ export default function RateSheetBuilder() {
     rows
       .filter((r) => selectedRowKeys.includes(r._rid as number))
       .map((r) => {
-        const merged = { ...r, ...editedRows[r._rid as number] };
+        const merged = { ...r, ...editedRows[r._rid as number] } as PreviewRow;
         delete (merged as { _rid?: number })._rid;
+        // 海运：价格/航程审核台编辑的是结构化字段(container_*/transit_days，入库读这些)；
+        // 这里派生下载链路用的合并字段(freight_*/transit，template_filler 读这些)，让两条路都吃到编辑。
+        if (templateType === 'sea') {
+          merged.freight_20 = (merged.container_20gp as number | null) ?? null;
+          merged.freight_40 =
+            (merged.container_40gp as number | null) ?? (merged.container_40hq as number | null) ?? null;
+          merged.transit = (merged.transit_days as number | null) ?? null;
+        }
         return merged;
       });
 
@@ -238,6 +262,24 @@ export default function RateSheetBuilder() {
     ),
   });
 
+  // 只读列：直接展示原值(不进 editedRows)，用于起运港/币种/编码等标识性字段
+  const roCol = (title: string, field: keyof PreviewRow, width = 80) => ({
+    title,
+    key: field as string,
+    width,
+    render: (_: unknown, r: PreviewRow) => {
+      const v = (r as Record<string, unknown>)[field as string];
+      return v === null || v === undefined ? '' : String(v);
+    },
+  });
+
+  // 动态列判定：该字段全表至少一行有非空值时才渲染对应列(与 air 档位列并集同思路)
+  const seaHas = (field: string) =>
+    rows.some((r) => {
+      const v = (r as Record<string, unknown>)[field];
+      return v !== null && v !== undefined && v !== '';
+    });
+
   // 档位列(动态)：读写嵌套的 tier_prices[kg]。编辑时整份合并写回，保证下载的 {...r,...edited} 整体替换正确。
   const mergedTiers = (r: PreviewRow): Record<string, number | null> =>
     (editedRows[r._rid as number]?.tier_prices ?? r.tier_prices ?? {});
@@ -284,21 +326,36 @@ export default function RateSheetBuilder() {
       ) : null,
   };
 
-  const seaCols = [
-    textCol(t('rateSheet.colDestination'), 'destination'),
-    textCol(t('rateSheet.colCarrier'), 'carrier'),
-    numCol(t('rateSheet.colFreight20'), 'freight_20'),
-    numCol(t('rateSheet.colFreight40'), 'freight_40'),
-    textCol(t('rateSheet.colRemark'), 'remark'),
-    reviewCol,
-  ];
-  // 起运港：联运商均沪发，默认 PVG；只读展示（不参与编辑），让客户一眼看清从哪发。
+  // 起运港：联运商均沪发，默认 PVG/SHANGHAI；只读展示（不参与编辑），让客户一眼看清从哪发。
   const originCol = {
     title: t('rateSheet.colOrigin'),
     key: 'origin',
     width: 72,
     render: (_: unknown, r: PreviewRow) => r.origin ?? '',
   };
+  // 海运动态列：起运港/目的港/备注恒显；其余按该批次是否有数据出现。
+  // 价格列绑结构化 container_*(入库读这些)；via/commodity/生效日可编辑(needs_review 行纠正目标)；
+  // 起运港/币种/编码只读(标识性字段)。
+  const seaCols = [
+    originCol,
+    textCol(t('rateSheet.colDestination'), 'destination'),
+    ...(seaHas('via') ? [textCol(t('rateSheet.colVia'), 'via')] : []),
+    textCol(t('rateSheet.colCarrier'), 'carrier'),
+    ...(seaHas('container_20gp') ? [numCol(t('rateSheet.colFreight20'), 'container_20gp')] : []),
+    ...(seaHas('container_40gp') ? [numCol(t('rateSheet.col40gp'), 'container_40gp')] : []),
+    ...(seaHas('container_40hq') ? [numCol(t('rateSheet.col40hq'), 'container_40hq')] : []),
+    ...(seaHas('container_45') ? [numCol(t('rateSheet.col45'), 'container_45')] : []),
+    ...(seaHas('currency') ? [roCol(t('rateSheet.colCurrency'), 'currency', 64)] : []),
+    ...(seaHas('valid_from') ? [textCol(t('rateSheet.colValidFrom'), 'valid_from')] : []),
+    ...(seaHas('valid_to') ? [textCol(t('rateSheet.colValidTo'), 'valid_to')] : []),
+    ...(seaHas('commodity') ? [textCol(t('rateSheet.colCommodity'), 'commodity')] : []),
+    ...(seaHas('rate_level') ? [roCol(t('rateSheet.colRateLevel'), 'rate_level', 72)] : []),
+    ...(seaHas('lss_cic') ? [numCol(t('rateSheet.colLss'), 'lss_cic')] : []),
+    ...(seaHas('baf') ? [numCol(t('rateSheet.colBaf'), 'baf')] : []),
+    ...(seaHas('transit_days') ? [numCol(t('rateSheet.colTransit'), 'transit_days')] : []),
+    textCol(t('rateSheet.colRemark'), 'remark'),
+    reviewCol,
+  ];
   const airDayCols = Array.from({ length: 7 }, (_, i) =>
     numCol(t('rateSheet.colDay', { n: i + 1 }), `day${i + 1}` as keyof PreviewRow),
   );
@@ -493,6 +550,7 @@ export default function RateSheetBuilder() {
                       ? 'row-needs-review'
                       : ''
                 }
+                scroll={{ x: 'max-content' }}
                 pagination={{ pageSize: 20 }}
               />
             </>
