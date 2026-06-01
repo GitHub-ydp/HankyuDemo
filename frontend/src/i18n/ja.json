@@ -52,7 +52,7 @@
     "downloadFailed": "ダウンロード失敗",
     "commit": "DBに登録",
     "commitSuccess": "{{tier}} 件の重量帯レートを登録しました（週次レート {{skipped}} 件はスキップ）",
-    "commitSuccessOcean": "{{fcl}} 件の海上FCLレートを登録しました（価格なし/未マッチ {{skipped}} 件はスキップ）",
+    "commitSuccessOcean": "{{fcl}} 件の海上FCLレートを登録しました（スキップ：価格なし {{noPrice}} 件、港未マッチ {{unresolved}} 件）",
     "commitFailed": "DB登録に失敗",
     "createFailed": "セッション作成に失敗",
     "uploadFailed": "アップロード失敗",

@@ -52,7 +52,7 @@
     "downloadFailed": "Download failed",
     "commit": "Save to DB",
     "commitSuccess": "Saved {{tier}} weight-tier rates to DB ({{skipped}} weekly rows skipped)",
-    "commitSuccessOcean": "Saved {{fcl}} ocean FCL rates to DB ({{skipped}} no-price/unresolved rows skipped)",
+    "commitSuccessOcean": "Saved {{fcl}} ocean FCL rates to DB (skipped: {{noPrice}} no-price, {{unresolved}} unresolved ports)",
     "commitFailed": "Save to DB failed",
     "createFailed": "Failed to create session",
     "uploadFailed": "Upload failed",

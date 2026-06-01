@@ -190,7 +190,8 @@ export default function RateSheetBuilder() {
           message.success(
             t('rateSheet.commitSuccessOcean', {
               fcl: d.fcl_rows,
-              skipped: (d.skipped_no_price ?? 0) + (d.skipped_unresolved ?? 0),
+              noPrice: d.skipped_no_price ?? 0,
+              unresolved: d.skipped_unresolved ?? 0,
             }),
           );
         } else {
