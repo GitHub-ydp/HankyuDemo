@@ -128,3 +128,9 @@ def test_commit_all_weekly_creates_no_tier_batch(db_session):
     assert res.skipped_weekly == 1
     assert res.batch_id == ""
     assert db_session.execute(select(ImportBatch)).scalars().all() == []
+
+
+def test_air_tier_rate_has_multidim_columns():
+    from app.models.air_tier_rate import AirTierRate
+    cols = set(AirTierRate.__table__.columns.keys())
+    assert {"cargo_class", "packing", "density", "carrier"} <= cols
