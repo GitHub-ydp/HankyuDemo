@@ -39,7 +39,7 @@ def db_session():
         engine.dispose()
 
 
-def _add_tier_batch(session, *, destination, tier_prices, service_desc="平散货"):
+def _add_tier_batch(session, *, destination, tier_prices, service_desc="平散货", origin="PVG", currency="CNY"):
     batch = ImportBatch(
         batch_id=uuid.uuid4(),
         file_type=ImportBatchFileType.air_tier,
@@ -51,12 +51,12 @@ def _add_tier_batch(session, *, destination, tier_prices, service_desc="平散�
     session.flush()
     session.add(
         AirTierRate(
-            origin="PVG",
+            origin=origin,
             destination=destination,
             service_desc=service_desc,
             tier_prices=tier_prices,
             effective_from=date(2026, 5, 21),
-            currency="CNY",
+            currency=currency,
             remark="以上价格均已包含附加费（燃油/战险/地面操作），但不含杂费",
             batch_id=batch.batch_id,
         )
@@ -64,12 +64,12 @@ def _add_tier_batch(session, *, destination, tier_prices, service_desc="平散�
     session.commit()
 
 
-def _pkg_row(*, destination_code="ATL", volume_desc, currency="CNY") -> PkgRow:
+def _pkg_row(*, destination_code="ATL", volume_desc, currency="CNY", section_code="PVG", origin_code="PVG") -> PkgRow:
     return PkgRow(
         row_idx=12,
         section_index=1,
-        section_code="PVG",
-        origin_code="PVG",
+        section_code=section_code,
+        origin_code=origin_code,
         origin_text_raw="中国 (上海)",
         destination_text_raw="アメリカ (アトランタ)",
         destination_code=destination_code,
@@ -124,3 +124,17 @@ def test_tier_no_weight_in_pkg_yields_no_rate(db_session):
     status, cands = matcher.match(row, effective_on=date(2026, 5, 25))
     assert status == RowStatus.NO_RATE
     assert cands == []
+
+
+def test_nrt_jpy_japan_segment_matches(db_session):
+    """日本段(NRT/JPY)手录档位 → 不再 NON_LOCAL_LEG，按想定平均重量选档命中。"""
+    _add_tier_batch(db_session, destination="ATL", tier_prices={"100": 450.0, "300": 430.0},
+                    origin="NRT", currency="JPY")
+    matcher = RateMatcher(Step1RateRepository(db_session))
+    row = _pkg_row(section_code="NRT", origin_code="NRT", currency="JPY",
+                   volume_desc="1件当たりの想定平均重量：150kg/shipment")
+    status, cands = matcher.match(row, effective_on=date(2026, 5, 25))
+    assert status == RowStatus.FILLED
+    assert len(cands) == 1
+    assert cands[0].cost_price == Decimal("450.0")  # 150kg → 100KG 档
+    assert cands[0].currency == "JPY"

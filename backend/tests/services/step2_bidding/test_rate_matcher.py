@@ -165,10 +165,11 @@ def _make_pkg_row(
 # ---------- V-B5-01..05 预过滤短路 ----------
 
 def test_v_b5_01_non_local_leg(db_session: Session):
-    """V-B5-01：section_code='NRT' → NON_LOCAL_LEG"""
+    """V-B5-01：未实装的起运段(如 AMS) → NON_LOCAL_LEG。
+    (NRT 自 2026-06 日本段 JPY 起改为已处理段，故本用例改用 AMS。)"""
     repo = Step1RateRepository(db_session)
     matcher = RateMatcher(repo)
-    row = _make_pkg_row(section_code="NRT")
+    row = _make_pkg_row(section_code="AMS")
     status, candidates = matcher.match(row, effective_on=date(2026, 4, 22))
     assert status == RowStatus.NON_LOCAL_LEG
     assert candidates == []

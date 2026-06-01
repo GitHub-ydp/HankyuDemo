@@ -18,7 +18,8 @@ from app.services.step2_bidding.protocols import RateRepository
 from app.services.step2_bidding.weight_tier import parse_assumed_weight, select_tier_price
 
 
-_LOCAL_SECTION_CODES: frozenset[str] = frozenset({"PVG"})
+# 我们处理(匹配+回填)的起运段：PVG 上海发 / NRT 成田发(日本段 JPY)。其余段(AMS/TPE/ICN)暂 NON_LOCAL_LEG。
+_LOCAL_SECTION_CODES: frozenset[str] = frozenset({"PVG", "NRT"})
 _DEFAULT_MAX_CANDIDATES = 5
 _SCORE_DEST_EXACT = 0.4
 _SCORE_CURRENCY_MATCH = 0.2
