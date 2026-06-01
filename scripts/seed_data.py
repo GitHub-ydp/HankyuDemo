@@ -214,6 +214,32 @@ PORTS = [
     ("GBFXTSOU", "FELIXSTOWE SOUTHAMPTON", "费利克斯托/南安普顿(组合)", "United Kingdom", "Europe"),
     ("USLAXLGB", "LOS ANGELES LONG BEACH", "洛杉矶/长滩(组合)", "USA", "North America"),
     ("USOAKSFO", "OAKLAND SAN FRANCISCO", "奥克兰/旧金山(组合)", "USA", "North America"),
+
+    # === 2026-06 ONE 合约覆盖缺口补充（locode 为 demo 临时值, 解析按 name 匹配）===
+    # 起运港（南亚/东亚/非洲）
+    ("INCOK", "Cochin", "科钦", "India", "South Asia"),
+    ("LKCMB", "Colombo", "科伦坡", "Sri Lanka", "South Asia"),
+    ("INCCU", "Kolkata", "加尔各答", "India", "South Asia"),
+    ("INNML", "Mangalore", "芒格洛尔", "India", "South Asia"),
+    ("INPAV", "Pipavav", "皮帕瓦沃", "India", "South Asia"),
+    ("PKBQM", "Muhammad Bin Qasim", "卡西姆港", "Pakistan", "South Asia"),
+    ("TWTYN", "Taoyuan", "桃园", "Taiwan", "East Asia"),
+    ("CNSHK", "Shekou", "蛇口", "China", "East Asia"),
+    ("JPNAH", "Naha", "那霸", "Japan", "East Asia"),
+    ("JPTYM", "Toyama Shinko", "富山新港", "Japan", "East Asia"),
+    ("MZBEW", "Beira", "贝拉", "Mozambique", "East Africa"),
+    ("ZACPT", "Cape Town", "开普敦", "South Africa", "Southern Africa"),
+    ("ZACOE", "Coega", "科加", "South Africa", "Southern Africa"),
+    ("ZADUR", "Durban", "德班", "South Africa", "Southern Africa"),
+    ("MZMPM", "Maputo", "马普托", "Mozambique", "East Africa"),
+    ("NAWVB", "Walvis Bay", "鲸湾港", "Namibia", "Southern Africa"),
+    # 目的港（美国/夏威夷）
+    ("USITO", "Hilo", "希洛", "USA", "North America"),
+    ("USOGG", "Kahului", "卡胡卢伊", "USA", "North America"),
+    ("USKWH", "Kawaihae", "卡瓦伊哈埃", "USA", "North America"),
+    ("USLIH", "Nawiliwili", "纳威利威利", "USA", "North America"),
+    ("USHVY", "Harvey", "哈维", "USA", "North America"),
+    ("USPHL", "Philadelphia", "费城", "USA", "North America"),
 ]
 
 
