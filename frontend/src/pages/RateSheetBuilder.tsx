@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
-import { Upload, Input, InputNumber, Table, Tooltip, message } from 'antd';
+import { Upload, Input, InputNumber, Table, Tooltip, message, Select } from 'antd';
 import type { UploadFile } from 'antd';
 import { useTranslation } from 'react-i18next';
 import Icon from '../components/Icon';
@@ -68,6 +68,9 @@ export default function RateSheetBuilder() {
   const [uploading, setUploading] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
   const [editedRows, setEditedRows] = useState<Record<number, Partial<PreviewRow>>>({});
+  // air 做表会话级起运港 + 币种(默认 PVG/CNY；日本段选 NRT/JPY)。中国段默认不变。
+  const [sessionOrigin, setSessionOrigin] = useState<string>('PVG');
+  const [sessionCurrency, setSessionCurrency] = useState<string>('CNY');
 
   const resetSession = () => {
     setFileList([]);
@@ -155,8 +158,29 @@ export default function RateSheetBuilder() {
             (merged.container_40gp as number | null) ?? (merged.container_40hq as number | null) ?? null;
           merged.transit = (merged.transit_days as number | null) ?? null;
         }
+        // air：会话级起运港/币种盖到每行(commit_tier_rows 读行 origin/currency；手录 NRT/JPY 据此入库)。
+        if (templateType === 'air') {
+          merged.origin = sessionOrigin;
+          merged.currency = sessionCurrency;
+        }
         return merged;
       });
+
+  // 手动添加一条 air 档位行(默认 5 档)，用于无文件来源的手录(如日本段 NRT/JPY)。
+  const handleAddRow = () => {
+    const nextRid = rows.length ? Math.max(...rows.map((r) => r._rid ?? 0)) + 1 : 0;
+    const newRow: PreviewRow = {
+      _rid: nextRid,
+      origin: sessionOrigin,
+      destination: '',
+      service: '',
+      currency: sessionCurrency,
+      tier_prices: { '45': null, '100': null, '300': null, '500': null, '1000': null },
+    };
+    setRows((prev) => [...prev, newRow]);
+    setSelectedRowKeys((prev) => [...prev, nextRid]);
+    setSummary((s) => s ?? { total_rows: 0, needs_review: 0 });
+  };
 
   const handleDownload = async () => {
     if (!sessionId) return;
@@ -429,6 +453,26 @@ export default function RateSheetBuilder() {
               </button>
             ))}
           </div>
+          {templateType === 'air' && (
+            <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span>{t('rateSheet.colOrigin')}</span>
+              <Select
+                size="small"
+                value={sessionOrigin}
+                onChange={setSessionOrigin}
+                style={{ width: 96 }}
+                options={[{ value: 'PVG', label: 'PVG' }, { value: 'NRT', label: 'NRT' }]}
+              />
+              <span>{t('rateSheet.colCurrency')}</span>
+              <Select
+                size="small"
+                value={sessionCurrency}
+                onChange={setSessionCurrency}
+                style={{ width: 96 }}
+                options={[{ value: 'CNY', label: 'CNY' }, { value: 'JPY', label: 'JPY' }]}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -483,11 +527,22 @@ export default function RateSheetBuilder() {
       <div className="card">
         <div className="card-head">
           <h3>{t('rateSheet.step3')}</h3>
-          {showCommit && (
+          {templateType === 'air' && (
             <button
               type="button"
               className="btn btn-ghost btn-sm"
               style={{ marginLeft: 'auto' }}
+              disabled={!sessionId}
+              onClick={handleAddRow}
+            >
+              {t('rateSheet.addRow')}
+            </button>
+          )}
+          {showCommit && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              style={{ marginLeft: templateType === 'air' ? 8 : 'auto' }}
               disabled={!summary || keptCount === 0}
               onClick={handleCommit}
             >
@@ -498,7 +553,7 @@ export default function RateSheetBuilder() {
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            style={{ marginLeft: showCommit ? 8 : 'auto' }}
+            style={{ marginLeft: showCommit || templateType === 'air' ? 8 : 'auto' }}
             disabled={!summary || keptCount === 0}
             onClick={handleDownload}
           >
@@ -507,7 +562,7 @@ export default function RateSheetBuilder() {
           </button>
         </div>
         <div className="card-body">
-          {summary ? (
+          {summary || rows.length > 0 ? (
             <>
               <div
                 className="kpi-grid"
@@ -518,7 +573,7 @@ export default function RateSheetBuilder() {
                     <span className="zh">{t('rateSheet.summaryTotal')}</span>
                   </div>
                   <div className="kpi-value">
-                    {keptCount} <span style={{ color: 'var(--ink-400)', fontWeight: 400 }}>/ {summary.total_rows}</span>
+                    {keptCount} <span style={{ color: 'var(--ink-400)', fontWeight: 400 }}>/ {summary?.total_rows || rows.length}</span>
                   </div>
                 </div>
                 <div className="kpi">
@@ -526,7 +581,7 @@ export default function RateSheetBuilder() {
                     <span className="zh">{t('rateSheet.summaryReview')}</span>
                   </div>
                   <div className="kpi-value" style={{ color: keptReview > 0 ? 'var(--warn)' : undefined }}>
-                    {keptReview} <span style={{ color: 'var(--ink-400)', fontWeight: 400 }}>/ {summary.needs_review}</span>
+                    {keptReview} <span style={{ color: 'var(--ink-400)', fontWeight: 400 }}>/ {summary?.needs_review ?? 0}</span>
                   </div>
                 </div>
               </div>

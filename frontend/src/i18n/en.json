@@ -51,6 +51,7 @@
     "download": "Download filled rate sheet",
     "downloadFailed": "Download failed",
     "commit": "Save to DB",
+    "addRow": "+ Add row",
     "commitSuccess": "Saved {{tier}} weight-tier rates to DB ({{skipped}} weekly rows skipped)",
     "commitSuccessOcean": "Saved {{fcl}} ocean FCL rates to DB (skipped: {{noPrice}} no-price, {{unresolved}} unresolved ports)",
     "commitFailed": "Save to DB failed",
