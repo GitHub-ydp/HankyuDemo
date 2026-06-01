@@ -518,3 +518,11 @@ def test_normalize_sea_passes_through_needs_review():
 
     assert out_coded["needs_review"] is True, "解析器设置的 needs_review 应透传"
     assert out_normal["needs_review"] is False, "无 needs_review 键时应默认 False"
+
+
+def test_normalize_sea_passes_through_currency():
+    from app.services.step1_rates.sheet_builder.orchestrator import _normalize_sea
+    # 行带 currency → 原样透传
+    assert _normalize_sea({"destination_port_name": "HILO", "currency": "USD"}, "")["currency"] == "USD"
+    # 行无 currency → 默认 USD
+    assert _normalize_sea({"destination_port_name": "HILO"}, "")["currency"] == "USD"

@@ -134,3 +134,11 @@ def test_commit_ocean_supersedes_prior_active(db_session):
     superseded = [b for b in batches if b.status == ImportBatchStatus.superseded]
     assert len(actives) == 1 and str(actives[0].batch_id) == res2.batch_id
     assert len(superseded) == 1
+
+
+def test_commit_ocean_uses_row_currency(db_session):
+    row = _row("HONG KONG", Decimal("250"), Decimal("500"))
+    row["currency"] = "CNY"
+    db_writer.commit_ocean_rows([row], db_session)
+    fr = db_session.execute(select(FreightRate)).scalars().one()
+    assert fr.currency == "CNY"

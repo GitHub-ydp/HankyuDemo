@@ -204,6 +204,7 @@ def _normalize_sea(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]
         "is_direct": row.get("is_direct", True),
         "commodity": row.get("commodity"),
         "source_type": row.get("source_type"),
+        "currency": row.get("currency") or "USD",
         "needs_review": row.get("needs_review", False),
     }
 

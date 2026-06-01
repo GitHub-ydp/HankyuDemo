@@ -193,7 +193,7 @@ def commit_ocean_rows(
                 is_direct=r.get("is_direct", True),
                 rmks=r.get("commodity"),
                 transit_days=_to_int(r.get("transit_days")),
-                currency="USD",
+                currency=r.get("currency") or "USD",
                 status=RateStatus.active,
                 source_type=SourceType(r["source_type"]) if r.get("source_type") else SourceType.excel,
                 source_file=source_file or r.get("source_file"),
