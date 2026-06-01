@@ -83,8 +83,13 @@ def commit_tier_rows(
                 service_desc=r.get("service"),
                 tier_prices=_norm_tiers(r["tier_prices"]),
                 effective_from=_to_date(r.get("effective_week_start")),
+                effective_to=_to_date(r.get("effective_to")),
                 currency=r.get("currency") or "CNY",
                 remark=r.get("remark"),
+                cargo_class=r.get("cargo_class"),
+                packing=r.get("packing"),
+                density=r.get("density"),
+                carrier=r.get("carrier"),
                 batch_id=batch_uuid,
             )
         )
