@@ -38,6 +38,9 @@ interface PreviewRow {
   transit_days?: number | string | null;
   transit?: number | string | null;
   service?: string;
+  cargo_class?: string | null;
+  packing?: string | null;
+  density?: string | null;
   day1?: number | string | null;
   day2?: number | string | null;
   day3?: number | string | null;
@@ -387,6 +390,11 @@ export default function RateSheetBuilder() {
   const airCols = [
     originCol,
     textCol(t('rateSheet.colDestination'), 'destination'),
+    // air 图片/文本多维列：该字段全表至少一行有值才显(seaHas 是泛型判定)；EES/周报行无 → 隐藏。
+    ...(seaHas('carrier') ? [textCol(t('rateSheet.colCarrier'), 'carrier')] : []),
+    ...(seaHas('cargo_class') ? [textCol(t('rateSheet.colCargoClass'), 'cargo_class')] : []),
+    ...(seaHas('packing') ? [textCol(t('rateSheet.colPacking'), 'packing')] : []),
+    ...(seaHas('density') ? [textCol(t('rateSheet.colDensity'), 'density')] : []),
     textCol(t('rateSheet.colService'), 'service'),
     // 档位模式 → 动态 KG 列；否则 day1-7 周表列(Market Price 周报)。
     ...(tierColumns.length > 0 ? tierColumns.map((kg) => tierCol(kg)) : airDayCols),
