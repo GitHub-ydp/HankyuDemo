@@ -71,7 +71,8 @@ _DEST_MAP: list[tuple[str, str]] = [
 ]
 
 # 本轮 Customer A 定义 PVG 段为本地（发自上海）段。架构扩展点见 §14。
-_LOCAL_SECTION_CODES = {"PVG"}
+# 我们处理(匹配+回填)的起运段：PVG 上海发 / NRT 成田发(日本段 JPY)。其余段暂不处理。
+_LOCAL_SECTION_CODES = {"PVG", "NRT"}
 
 _EXAMPLE_MARKER = "記入例"
 _CURRENCY_PATTERNS: list[tuple[str, str]] = [

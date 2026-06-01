@@ -109,3 +109,13 @@ def test_existing_price_parsed_as_decimal(parsed: ParsedPkg):
     # PVG 段首行 R13 为 0（未填）
     assert by_idx[13].existing_price == Decimal("0")
 
+
+def test_nrt_section_now_handled(parsed: ParsedPkg):
+    """日本段(NRT)自 2026-06 纳入处理段：is_local_section=True 且进入 fill 的 _pvg_rowset。"""
+    nrt = next(s for s in parsed.sections if s.section_code == "NRT")
+    assert nrt.is_local_section is True
+    rowset = CustomerAProfile._pvg_rowset(parsed)
+    nrt_row_idxs = [r.row_idx for r in parsed.rows if r.section_code == "NRT"]
+    assert nrt_row_idxs, "样本应有 NRT 段行"
+    assert all(idx in rowset for idx in nrt_row_idxs), "NRT 段行应全部进入 fill 行集"
+
