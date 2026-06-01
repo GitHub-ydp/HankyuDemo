@@ -147,3 +147,12 @@ def test_extract_air_rates_routes_ees_instead_of_error():
     parsed = air_extractor.extract_air_rates(str(_SAMPLE), None)
     assert parsed.get("parsed_rows"), "EES 应被第三路解析出行"
     assert "error" not in parsed, "认出 EES 后不应带 error"
+
+
+def test_clean_dest_returns_all_codes():
+    from app.services.step1_rates.sheet_builder.air_ees import _clean_dest
+    assert _clean_dest("KIX") == ["KIX"]                       # 单港
+    assert _clean_dest("NH-DFW") == ["DFW"]                    # 去航司前缀
+    assert _clean_dest("CK/MU-LAX") == ["LAX"]                 # 去多段航司前缀
+    assert _clean_dest("美国西部：SEA LAX SFO") == ["SEA", "LAX", "SFO"]  # 区域多港
+    assert _clean_dest("MEX,MTY,CUN") == ["MEX", "MTY", "CUN"]  # 逗号多港

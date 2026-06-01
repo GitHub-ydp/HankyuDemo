@@ -132,7 +132,7 @@ def _parse_sheet(
     out: list[dict[str, Any]] = []
     header_set = set(header_idxs)
     cmap: dict[str, Any] = {}
-    current_dest: str | None = None
+    current_dest: list[str] = []
 
     for i, row in enumerate(rows):
         if i in header_set:
@@ -144,26 +144,27 @@ def _parse_sheet(
 
         raw_dest = _clean(row[cmap["dest"]]) if cmap["dest"] < len(row) else None
         if raw_dest:
-            code = _clean_dest(raw_dest)
-            if code:
-                current_dest = code
+            codes = _clean_dest(raw_dest)
+            if codes:
+                current_dest = codes
 
         tier_prices = _row_tier_prices(row, cmap["tiers"])
-        if current_dest is None or not tier_prices:
+        if not current_dest or not tier_prices:
             continue
 
-        out.append(
-            {
-                "destination_port_name": current_dest,
-                "service_desc": _row_service(row, cmap),
-                # 稀疏档位 dict(KG 升序)：有哪档数字存哪档，取代单价×7天。
-                "tier_prices": tier_prices,
-                "remarks": _EES_FUEL_NOTE,  # 含油说明进备注(档位表「备注」列)
-                "multi_flight_pick": True,  # 同港多条 → 交审核台人工选一条
-                "source_file": source_file,
-                "effective_week_start": effective,  # 文件名报价日 → 下游改写表头/sheet 名
-            }
-        )
+        for dest in current_dest:  # 区域多港:每个码各发一行(同价)
+            out.append(
+                {
+                    "destination_port_name": dest,
+                    "service_desc": _row_service(row, cmap),
+                    # 稀疏档位 dict(KG 升序)：有哪档数字存哪档，取代单价×7天。
+                    "tier_prices": tier_prices,
+                    "remarks": _EES_FUEL_NOTE,  # 含油说明进备注(档位表「备注」列)
+                    "multi_flight_pick": True,  # 同港多条 → 交审核台人工选一条
+                    "source_file": source_file,
+                    "effective_week_start": effective,  # 文件名报价日 → 下游改写表头/sheet 名
+                }
+            )
     return out
 
 
@@ -216,11 +217,11 @@ def _filename_effective_date(name: str) -> date | None:
         return None
 
 
-def _clean_dest(raw: str) -> str | None:
-    """目的港单元格 → 机场三字码：先去航司前缀(NH- / CK/MU-)，再取首个三字码。"""
+def _clean_dest(raw: str) -> list[str]:
+    """目的港单元格 → 机场三字码列表：先去航司前缀(NH- / CK/MU-)，再取全部三字码。
+    单港→1 个码；区域/多港格(SEA LAX SFO / MEX,MTY,CUN)→多个码(下游每码发一行)。"""
     s = _AIRLINE_PREFIX.sub("", raw.strip())
-    m = _IATA.search(s)
-    return m.group(0) if m else None
+    return _IATA.findall(s)
 
 
 def _clean(value: Any) -> str | None:
