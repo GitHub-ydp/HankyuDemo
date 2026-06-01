@@ -57,19 +57,23 @@ def test_resolve_max_tokens_anthropic_bypasses_cap():
     assert ai_client._resolve_max_tokens(None, "default", "anthropic") == 4096
 
 
-def test_append_no_think_plain():
+def test_append_no_think_plain(monkeypatch):
+    # 显式启用，避免随 .env 的 AI_AUTO_NO_THINK 浮动（百炼测试期为 false）
+    monkeypatch.setattr(settings, "ai_auto_no_think", True)
     msgs = [{"role": "user", "content": "hello"}]
     out = ai_client._append_no_think([dict(m) for m in msgs])
     assert out[0]["content"].endswith("/no_think")
 
 
-def test_append_no_think_idempotent():
+def test_append_no_think_idempotent(monkeypatch):
+    monkeypatch.setattr(settings, "ai_auto_no_think", True)
     msgs = [{"role": "user", "content": "hello /no_think"}]
     out = ai_client._append_no_think([dict(m) for m in msgs])
     assert out[0]["content"].count("/no_think") == 1
 
 
-def test_append_no_think_multimodal():
+def test_append_no_think_multimodal(monkeypatch):
+    monkeypatch.setattr(settings, "ai_auto_no_think", True)
     import copy
     msgs = [{
         "role": "user",
