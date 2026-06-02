@@ -587,17 +587,54 @@ def test_air_image_routes_to_air_ai_extractor(monkeypatch):
     assert row["needs_review_by_destination"] is True
 
 
-def test_sea_image_still_routes_to_wechat_parser(monkeypatch):
-    from app.services import wechat_image_parser
-    fake = {"parsed_rows": [{"destination_port_name": "BUSAN", "carrier_name": "KMTC",
-            "container_20gp": 130}], "carrier_code": "KMTC", "warnings": []}
-    monkeypatch.setattr(wechat_image_parser, "parse_wechat_image", lambda p, db: fake)
+def test_sea_image_routes_to_ocean_ai_extractor(monkeypatch):
+    from app.services.step1_rates.sheet_builder import ocean_ai_extractor
+    fake = {
+        "parsed_rows": [{
+            "origin": "NINGBO", "destination": "ICD AHMEDABAD", "carrier": "KMTC",
+            "vessel_voyage": "X/1", "via": "NHAVA SHEVA", "is_direct": False,
+            "container_20gp": 1650.0, "container_40gp": 1700.0, "container_40hq": None,
+            "container_45": None, "currency": "USD", "valid_from": None, "valid_to": "2026-03-22",
+            "transit_days": None,
+            "surcharges": [{"code": "EIS", "amount_20": 150.0, "amount_40": 300.0,
+                            "currency": None, "payment": "collect", "included": False, "note": None}],
+            "remark": None, "needs_review": False,
+            "source_file": "ocean.png", "source_type": "ocean_image",
+        }],
+        "warnings": [], "source_type": "ocean_image", "file_name": "ocean.png",
+    }
+    monkeypatch.setattr(ocean_ai_extractor, "parse_ocean_image", lambda p, db: fake)
 
     s = orchestrator.create_session("sea")
     fr = orchestrator.add_file(s.session_id, "ocean.png", "/tmp/ocean.png", db=None)
 
-    assert fr.source_type == "wechat_image"
+    assert fr.status == "parsed"
+    assert fr.source_type == "ocean_image"
+    row = s.rows[0]
+    assert row["origin"] == "NINGBO"               # _normalize_sea origin 兜底到 row['origin']
+    assert row["destination"] == "ICD AHMEDABAD"
+    assert row["carrier"] == "KMTC"                # carrier 兜底到 row['carrier']
+    assert row["via"] == "NHAVA SHEVA"
+    assert row["vessel_voyage"] == "X/1"           # 新透传字段
+    assert row["surcharges"][0]["code"] == "EIS"   # 新透传字段
+    assert row["currency"] == "USD"
+
+
+def test_sea_text_routes_to_ocean_ai_extractor(tmp_path, monkeypatch):
+    from app.services.step1_rates.sheet_builder import ocean_ai_extractor
+    f = tmp_path / "ocean.txt"
+    f.write_text("海运报价文本", encoding="utf-8")
+    fake = {"parsed_rows": [{"origin": "SHANGHAI", "destination": "BUSAN", "carrier": "KMTC",
+            "container_20gp": 130.0, "currency": "USD", "surcharges": []}],
+            "warnings": [], "source_type": "ocean_text", "file_name": "ocean.txt"}
+    monkeypatch.setattr(ocean_ai_extractor, "parse_ocean_text", lambda text, db: fake)
+
+    s = orchestrator.create_session("sea")
+    fr = orchestrator.add_file(s.session_id, "ocean.txt", str(f), db=None)
+
+    assert fr.source_type == "ocean_text"
     assert s.rows[0]["destination"] == "BUSAN"
+    assert s.rows[0]["carrier"] == "KMTC"
 
 
 def test_air_text_routes_to_air_ai_extractor(tmp_path, monkeypatch):
