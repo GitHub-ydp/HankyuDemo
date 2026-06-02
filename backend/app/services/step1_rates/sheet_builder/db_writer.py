@@ -28,6 +28,25 @@ from app.models.import_batch import (
 )
 from app.services.step1_rates.activator_mappers import _resolve_port
 
+# ocean AI 抽取行带 source_type "ocean_image"/"ocean_text"，但 SourceType 枚举暂无这两个值
+# （SP2 范围不动 DB schema）。映射回枚举已有值——等于 SP2 前海运图片/文本的存储行为。
+# 正式的 ocean_image/ocean_text 枚举 + 迁移留给 SP3 入库棒。
+_SOURCE_TYPE_ALIASES = {
+    "ocean_image": SourceType.wechat_image,
+    "ocean_text": SourceType.email_text,
+}
+
+
+def _resolve_source_type(raw: str | None) -> SourceType:
+    if not raw:
+        return SourceType.excel
+    if raw in _SOURCE_TYPE_ALIASES:
+        return _SOURCE_TYPE_ALIASES[raw]
+    try:
+        return SourceType(raw)
+    except ValueError:
+        return SourceType.excel
+
 
 @dataclass
 class CommitResult:
@@ -200,7 +219,7 @@ def commit_ocean_rows(
                 transit_days=_to_int(r.get("transit_days")),
                 currency=r.get("currency") or "USD",
                 status=RateStatus.active,
-                source_type=SourceType(r["source_type"]) if r.get("source_type") else SourceType.excel,
+                source_type=_resolve_source_type(r.get("source_type")),
                 source_file=source_file or r.get("source_file"),
                 remarks=r.get("remark"),
                 batch_id=batch_uuid,

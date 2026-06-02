@@ -142,3 +142,23 @@ def test_commit_ocean_uses_row_currency(db_session):
     db_writer.commit_ocean_rows([row], db_session)
     fr = db_session.execute(select(FreightRate)).scalars().one()
     assert fr.currency == "CNY"
+
+
+def test_commit_ocean_rows_maps_ocean_image_source_type(db_session):
+    """ocean_image source_type 应映射回 SourceType.wechat_image（SP3 前的存储行为）。"""
+    row = _row("HONG KONG", Decimal("300"), Decimal("600"))
+    row["source_type"] = "ocean_image"
+    res = db_writer.commit_ocean_rows([row], db_session)
+    assert res.fcl_rows == 1
+    fr = db_session.execute(select(FreightRate)).scalars().one()
+    assert fr.source_type == SourceType.wechat_image
+
+
+def test_commit_ocean_rows_maps_ocean_text_source_type(db_session):
+    """ocean_text source_type 应映射回 SourceType.email_text。"""
+    row = _row("HONG KONG", Decimal("310"), Decimal("620"))
+    row["source_type"] = "ocean_text"
+    res = db_writer.commit_ocean_rows([row], db_session)
+    assert res.fcl_rows == 1
+    fr = db_session.execute(select(FreightRate)).scalars().one()
+    assert fr.source_type == SourceType.email_text
