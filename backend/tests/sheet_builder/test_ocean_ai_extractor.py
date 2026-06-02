@@ -75,3 +75,10 @@ def test_missing_carrier_marks_needs_review(monkeypatch):
     monkeypatch.setattr(ai_client, "chat_with_image", lambda *a, **k: fake)
     out = ocean_ai_extractor.parse_ocean_image("/tmp/o.png", db=None)
     assert out["parsed_rows"][0]["needs_review"] is True   # 缺 carrier
+
+
+def test_missing_valid_to_marks_needs_review(monkeypatch):
+    fake = json.dumps([{"destination": "BUSAN", "carrier": "OOCL", "container_20gp": 130}])
+    monkeypatch.setattr(ai_client, "chat_with_image", lambda *a, **k: fake)
+    out = ocean_ai_extractor.parse_ocean_image("/tmp/o.png", db=None)
+    assert out["parsed_rows"][0]["needs_review"] is True   # 缺 valid_to

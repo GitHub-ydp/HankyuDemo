@@ -174,13 +174,14 @@ def _norm_surcharges(raw: Any) -> list[dict[str, Any]]:
         code = str(item.get("code") or "").strip()
         if not code:
             continue
+        included = bool(item.get("included", False))
         out.append({
             "code": code,
-            "amount_20": _to_price(item.get("amount_20")),
-            "amount_40": _to_price(item.get("amount_40")),
+            "amount_20": None if included else _to_price(item.get("amount_20")),
+            "amount_40": None if included else _to_price(item.get("amount_40")),
             "currency": (str(item.get("currency")).strip() or None) if item.get("currency") else None,
             "payment": (str(item.get("payment")).strip() or None) if item.get("payment") else None,
-            "included": bool(item.get("included", False)),
+            "included": included,
             "note": (str(item.get("note")).strip() or None) if item.get("note") else None,
         })
     return out
