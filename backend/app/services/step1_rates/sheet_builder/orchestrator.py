@@ -6,8 +6,8 @@
 
 复用现有抽取能力（不改）：
   rate_parser.detect_and_parse   — 结构化 Excel(kmtc/nvo 等)
-  wechat_image_parser.parse_wechat_image — 微信/截图运价(AI 视觉)
-  email_text_parser.parse_email_text     — 邮件正文运价
+  ocean_ai_extractor.parse_ocean_image — 海运微信/截图运价(AI 视觉, 箱型价+结构化附加费)
+  ocean_ai_extractor.parse_ocean_text  — 海运邮件/文本运价
 
 会话存内存（与 ai_parse 的 _parse_cache 同一风格；demo 重启即失，可接受）。
 """
@@ -37,7 +37,7 @@ class FileResult:
     """单个上传文件的处理结果。"""
 
     name: str
-    source_type: str  # excel / wechat_image / email_text / unsupported / error
+    source_type: str  # excel / pdf / air_image / air_text / ocean_image / ocean_text / unsupported / error
     status: str  # parsed / skipped / error
     row_count: int = 0
     warnings: list[str] = field(default_factory=list)

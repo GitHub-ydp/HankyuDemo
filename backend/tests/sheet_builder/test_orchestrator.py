@@ -624,7 +624,8 @@ def test_sea_text_routes_to_ocean_ai_extractor(tmp_path, monkeypatch):
     from app.services.step1_rates.sheet_builder import ocean_ai_extractor
     f = tmp_path / "ocean.txt"
     f.write_text("海运报价文本", encoding="utf-8")
-    fake = {"parsed_rows": [{"origin": "SHANGHAI", "destination": "BUSAN", "carrier": "KMTC",
+    fake = {"parsed_rows": [{"origin_port_name": "TIANJIN", "origin": "SHANGHAI",
+            "destination": "BUSAN", "carrier": "KMTC",
             "container_20gp": 130.0, "currency": "USD", "surcharges": []}],
             "warnings": [], "source_type": "ocean_text", "file_name": "ocean.txt"}
     monkeypatch.setattr(ocean_ai_extractor, "parse_ocean_text", lambda text, db: fake)
@@ -635,6 +636,8 @@ def test_sea_text_routes_to_ocean_ai_extractor(tmp_path, monkeypatch):
     assert fr.source_type == "ocean_text"
     assert s.rows[0]["destination"] == "BUSAN"
     assert s.rows[0]["carrier"] == "KMTC"
+    assert s.rows[0]["origin"] == "TIANJIN"      # origin_port_name 优先于 origin(Excel 行依赖此不变量)
+    assert s.rows[0]["surcharges"] == []         # 文本路径 surcharges 透传(空列表)
 
 
 def test_air_text_routes_to_air_ai_extractor(tmp_path, monkeypatch):
