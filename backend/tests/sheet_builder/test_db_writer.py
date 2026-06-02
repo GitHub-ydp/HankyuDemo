@@ -128,3 +128,27 @@ def test_commit_all_weekly_creates_no_tier_batch(db_session):
     assert res.skipped_weekly == 1
     assert res.batch_id == ""
     assert db_session.execute(select(ImportBatch)).scalars().all() == []
+
+
+def test_air_tier_rate_has_multidim_columns():
+    from app.models.air_tier_rate import AirTierRate
+    cols = set(AirTierRate.__table__.columns.keys())
+    assert {"cargo_class", "packing", "density", "carrier"} <= cols
+
+
+def test_commit_persists_multidim_fields(db_session):
+    row = _tier_row(
+        "LAX", {"45": 60, "100": 60},
+        cargo_class="普货", packing="托", density="1:167",
+        carrier="CK/CA", currency="CNY", effective_to="2026-05-29",
+    )
+    res = db_writer.commit_tier_rows([row], db_session)
+    assert res.tier_rows == 1
+
+    rate = db_session.execute(select(AirTierRate)).scalars().one()
+    assert rate.cargo_class == "普货"
+    assert rate.packing == "托"
+    assert rate.density == "1:167"
+    assert rate.carrier == "CK/CA"
+    assert rate.currency == "CNY"
+    assert rate.effective_to == date(2026, 5, 29)

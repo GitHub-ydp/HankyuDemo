@@ -23,7 +23,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.services import rate_parser, wechat_image_parser
-from app.services.step1_rates.sheet_builder import air_extractor
+from app.services.step1_rates.sheet_builder import air_extractor, air_ai_extractor
 from app.services.step1_rates.sheet_builder.template_registry import get_template_config
 
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
@@ -103,15 +103,22 @@ def add_file(
             parsed = detect_and_parse_pdf(file_path, db)
             source_type = "pdf"
         elif ext in _IMAGE_EXTS:
-            parsed = wechat_image_parser.parse_wechat_image(file_path, db)
-            source_type = "wechat_image"
+            if session.template_type == "air":
+                parsed = air_ai_extractor.parse_air_image(file_path, db)
+                source_type = "air_image"
+            else:
+                parsed = wechat_image_parser.parse_wechat_image(file_path, db)
+                source_type = "wechat_image"
         else:  # 文本
-            from app.services.email_text_parser import parse_email_text
-
             with open(file_path, encoding="utf-8", errors="ignore") as fh:
                 text = fh.read()
-            parsed = parse_email_text(text, db)
-            source_type = "email_text"
+            if session.template_type == "air":
+                parsed = air_ai_extractor.parse_air_text(text, db)
+                source_type = "air_text"
+            else:
+                from app.services.email_text_parser import parse_email_text
+                parsed = parse_email_text(text, db)
+                source_type = "email_text"
     except Exception as exc:  # noqa: BLE001 — 单文件失败不该让整批崩
         result = FileResult(
             name=file_name,
@@ -140,6 +147,9 @@ def add_file(
     normalized = [
         _normalize(session.template_type, r, carrier_fallback) for r in raw_rows
     ]
+    # sea 多港格(如 'USLAX USLGB')拆成多行(同价)，审核台展示拆开后的行
+    if session.template_type == "sea" and db is not None:
+        normalized = expand_multi_port_sea(normalized, db)
     session.rows.extend(normalized)
     _mark_needs_review(session.rows)
 
@@ -204,19 +214,50 @@ def _normalize_sea(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]
         "is_direct": row.get("is_direct", True),
         "commodity": row.get("commodity"),
         "source_type": row.get("source_type"),
+        "currency": row.get("currency") or "USD",
         "needs_review": row.get("needs_review", False),
     }
 
 
+def expand_multi_port_sea(
+    rows: list[dict[str, Any]], db: Session
+) -> list[dict[str, Any]]:
+    """sea 归一行 destination 形如 'USLAX USLGB'(多 UN/LOCODE 空格拼接)→ 拆成多行(同价)。
+
+    仅当按空白拆出 >1 段、且每段都是已存在的 5 位 UN/LOCODE 才拆；否则原样
+    ('LOS ANGELES' 的 'LOS'/'ANGELES' 非 locode → 不拆，避开单港多词名被拆烂)。
+    """
+    from app.models.port import Port
+
+    def _is_locode(token: str) -> bool:
+        return (
+            len(token) == 5
+            and token.isalpha()
+            and token.isupper()
+            and db.query(Port).filter(Port.un_locode == token).first() is not None
+        )
+
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        dest = row.get("destination")
+        parts = str(dest).split() if dest else []
+        if len(parts) > 1 and all(_is_locode(p) for p in parts):
+            out.extend({**row, "destination": p} for p in parts)
+        else:
+            out.append(row)
+    return out
+
+
 def _normalize_air(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]:
-    """air_extractor 产两种形态，映射到模板字段后二选一：
-      - 周表源(Market Price)：price_dayN → day1..day7（按周给价）；
-      - 档位源(EES/唯凯)：tier_prices(稀疏 KG→价) 原样透传（值转 float），不发 day1-7。
-    Decimal 转 float 便于写表与 JSON。
+    """air_extractor/air_ai_extractor 产多形态，映射到模板字段：
+      - 周表源(Market Price)：price_dayN → day1..day7；
+      - 档位源(EES/唯凯/air 图片/文本)：tier_prices(稀疏 KG→价)原样透传(值转 float)。
+    air 图片/文本另带结构化多维字段(carrier/cargo_class/packing/density/currency/effective_to)，
+    EES/周表行无这些键 → None，不影响。Decimal 转 float 便于写表与 JSON。
     """
     normalized: dict[str, Any] = {
-        # 起运港：Air 默认上海 PVG（与 AirAdapter._DEFAULT_ORIGIN 一致；EES 等联运商均沪发）。
-        "origin": row.get("origin_port_name") or "PVG",
+        # 起运港：air 图片行带 origin；否则默认上海 PVG。
+        "origin": row.get("origin_port_name") or row.get("origin") or "PVG",
         "destination": row.get("destination_port_name") or row.get("destination"),
         "service": (
             row.get("service_desc")
@@ -225,16 +266,20 @@ def _normalize_air(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]
             or row.get("service")
             or carrier_fallback
         ),
+        # 结构化多维字段(air 图片/文本)；EES/周表行无 → None。
+        "carrier": row.get("carrier"),
+        "cargo_class": row.get("cargo_class"),
+        "packing": row.get("packing"),
+        "density": row.get("density"),
+        "currency": row.get("currency"),
         "remark": row.get("remarks") or row.get("remark"),
         "source_file": row.get("source_file"),
-        # 周起始日：随行带到填充器，按该周动态改写模板的 day1-7 日期表头/sheet 名（ISO 字符串便于 JSON 往返）。
         "effective_week_start": _to_week_str(row.get("effective_week_start")),
-        # 重量档报价(联运商)同港多航班 → 按目的港标 needs_review，交审核台人工选一条。
+        "effective_to": _to_week_str(row.get("effective_to")),
         "needs_review_by_destination": bool(row.get("multi_flight_pick")),
     }
     tier_prices = row.get("tier_prices")
     if tier_prices:
-        # 档位源：键归一为 int(KG)、值统一 float（前端动态档位列 + 程序生成档位表）。
         normalized["tier_prices"] = {
             int(kg): float(price)
             for kg, price in tier_prices.items()
@@ -269,16 +314,18 @@ def _review_key(row: dict[str, Any]) -> tuple[Any, ...]:
     # sea 行有 "carrier" 字段；air 周报行有 "service" 字段。
     # sea 分支扩展 key 加入 via 和 commodity：同 dest+carrier 但网关/commodity 不同的合约行不被误判重复。
     # kmtc/Excel 行 via=None, commodity=None → key 与原来等价，行为不变。
-    if "carrier" in row:
-        return (
-            row.get("origin"),
-            row.get("destination"),
-            row.get("carrier"),
-            row.get("via"),
-            row.get("commodity"),
-            row.get("valid_from"),
-        )
-    return (row.get("destination"), row.get("service"))
+    # air 行有 "service" 键(由 _normalize_air 恒设, 即使空串); sea 行从不设 → 用它区分聚合分支。
+    # 不能再用 "carrier" in row 判别——air 行现也带 carrier 键(会误判进 sea 分支)。
+    if "service" in row:
+        return (row.get("destination"), row.get("service"))
+    return (
+        row.get("origin"),
+        row.get("destination"),
+        row.get("carrier"),
+        row.get("via"),
+        row.get("commodity"),
+        row.get("valid_from"),
+    )
 
 
 def _mark_needs_review(rows: list[dict[str, Any]]) -> None:

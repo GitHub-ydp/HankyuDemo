@@ -518,3 +518,119 @@ def test_normalize_sea_passes_through_needs_review():
 
     assert out_coded["needs_review"] is True, "解析器设置的 needs_review 应透传"
     assert out_normal["needs_review"] is False, "无 needs_review 键时应默认 False"
+
+
+def test_normalize_sea_passes_through_currency():
+    from app.services.step1_rates.sheet_builder.orchestrator import _normalize_sea
+    # 行带 currency → 原样透传
+    assert _normalize_sea({"destination_port_name": "HILO", "currency": "USD"}, "")["currency"] == "USD"
+    # 行无 currency → 默认 USD
+    assert _normalize_sea({"destination_port_name": "HILO"}, "")["currency"] == "USD"
+
+
+def test_expand_multi_port_sea_splits_locode_pair():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    from app.models.base import Base
+    from app.models.port import Port
+    from app.services.step1_rates.sheet_builder.orchestrator import expand_multi_port_sea
+    import app.models  # noqa: F401
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(bind=engine)
+    s = Session(bind=engine)
+    s.add_all([
+        Port(un_locode="USLAX", name_en="Los Angeles", name_cn="洛杉矶"),
+        Port(un_locode="USLGB", name_en="Long Beach", name_cn="长滩"),
+    ])
+    s.commit()
+
+    rows = [{"destination": "USLAX USLGB", "container_20gp": 100}]
+    out = expand_multi_port_sea(rows, s)
+    assert len(out) == 2
+    assert {r["destination"] for r in out} == {"USLAX", "USLGB"}
+    assert all(r["container_20gp"] == 100 for r in out)
+
+    # 单港多词名不拆：'LOS'/'ANGELES' 非 5 位 locode → 保持整体
+    rows2 = [{"destination": "LOS ANGELES", "container_20gp": 100}]
+    out2 = expand_multi_port_sea(rows2, s)
+    assert len(out2) == 1 and out2[0]["destination"] == "LOS ANGELES"
+    s.close()
+    engine.dispose()
+
+
+def test_air_image_routes_to_air_ai_extractor(monkeypatch):
+    from app.services.step1_rates.sheet_builder import air_ai_extractor
+    fake = {"parsed_rows": [{
+        "origin": "PVG", "destination": "LAX", "carrier": "CK/CA",
+        "cargo_class": "普货", "packing": "托", "density": "1:167",
+        "tier_prices": {45: 60.0, 100: 60.0}, "currency": "CNY",
+        "effective_week_start": "2026-05-26", "effective_to": "2026-05-29",
+        "multi_flight_pick": True,
+    }], "warnings": [], "source_type": "air_image"}
+    monkeypatch.setattr(air_ai_extractor, "parse_air_image", lambda p, db: fake)
+
+    s = orchestrator.create_session("air")
+    fr = orchestrator.add_file(s.session_id, "air.png", "/tmp/air.png", db=None)
+
+    assert fr.status == "parsed"
+    assert fr.source_type == "air_image"
+    row = s.rows[0]
+    assert row["destination"] == "LAX"
+    assert row["carrier"] == "CK/CA"
+    assert row["cargo_class"] == "普货"
+    assert row["packing"] == "托"
+    assert row["density"] == "1:167"
+    assert row["currency"] == "CNY"
+    assert row["effective_to"] == "2026-05-29"
+    assert row["tier_prices"] == {45: 60.0, 100: 60.0}
+    assert row["needs_review_by_destination"] is True
+
+
+def test_sea_image_still_routes_to_wechat_parser(monkeypatch):
+    from app.services import wechat_image_parser
+    fake = {"parsed_rows": [{"destination_port_name": "BUSAN", "carrier_name": "KMTC",
+            "container_20gp": 130}], "carrier_code": "KMTC", "warnings": []}
+    monkeypatch.setattr(wechat_image_parser, "parse_wechat_image", lambda p, db: fake)
+
+    s = orchestrator.create_session("sea")
+    fr = orchestrator.add_file(s.session_id, "ocean.png", "/tmp/ocean.png", db=None)
+
+    assert fr.source_type == "wechat_image"
+    assert s.rows[0]["destination"] == "BUSAN"
+
+
+def test_air_text_routes_to_air_ai_extractor(tmp_path, monkeypatch):
+    from app.services.step1_rates.sheet_builder import air_ai_extractor
+    f = tmp_path / "air.txt"
+    f.write_text("空运报价文本", encoding="utf-8")
+    fake = {"parsed_rows": [{"origin": "PVG", "destination": "AMS",
+            "tier_prices": {100: 40.0}, "currency": "CNY", "multi_flight_pick": True}],
+            "warnings": [], "source_type": "air_text"}
+    monkeypatch.setattr(air_ai_extractor, "parse_air_text", lambda text, db: fake)
+
+    s = orchestrator.create_session("air")
+    fr = orchestrator.add_file(s.session_id, "air.txt", str(f), db=None)
+
+    assert fr.source_type == "air_text"
+    assert s.rows[0]["destination"] == "AMS"
+
+
+def test_normalize_air_carries_multidim_fields():
+    from app.services.step1_rates.sheet_builder.orchestrator import _normalize_air
+    row = {
+        "origin": "PVG", "destination": "LAX", "carrier": "CK/CA",
+        "cargo_class": "普货", "packing": "托", "density": "1:167",
+        "tier_prices": {45: 60.0}, "currency": "CNY",
+        "effective_week_start": "2026-05-26", "effective_to": "2026-05-29",
+        "multi_flight_pick": True,
+    }
+    out = _normalize_air(row, "")
+    assert out["origin"] == "PVG"
+    assert out["carrier"] == "CK/CA"
+    assert out["cargo_class"] == "普货"
+    assert out["packing"] == "托"
+    assert out["density"] == "1:167"
+    assert out["currency"] == "CNY"
+    assert out["effective_to"] == "2026-05-29"
+    assert out["tier_prices"] == {45: 60.0}

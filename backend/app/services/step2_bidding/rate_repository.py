@@ -244,6 +244,10 @@ class Step1RateRepository:
             upload_batch_id=str(batch.batch_id),
             extras={
                 "tier_prices": tiers,
+                "cargo_class": rate.cargo_class,
+                "packing": rate.packing,
+                "density": rate.density,
+                "carrier": rate.carrier,
                 "step2_record_id": rate.id,
                 "step2_batch_status": batch.status.value
                 if hasattr(batch.status, "value")

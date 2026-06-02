@@ -32,6 +32,10 @@ class AirTierRate(Base):
     effective_to: Mapped[date | None] = mapped_column(Date, comment="报价生效结束")
     currency: Mapped[str] = mapped_column(String(5), default="CNY", comment="币种")
     remark: Mapped[str | None] = mapped_column(Text, comment="备注")
+    cargo_class: Mapped[str | None] = mapped_column(String(20), comment="货类(普货/快件/9610-9710)")
+    packing: Mapped[str | None] = mapped_column(String(20), comment="包装(托/散/托散/混装)")
+    density: Mapped[str | None] = mapped_column(String(20), comment="泡比(如1:167)")
+    carrier: Mapped[str | None] = mapped_column(String(100), comment="航司代码")
     batch_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("import_batches.batch_id"),

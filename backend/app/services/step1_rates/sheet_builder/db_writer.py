@@ -83,8 +83,13 @@ def commit_tier_rows(
                 service_desc=r.get("service"),
                 tier_prices=_norm_tiers(r["tier_prices"]),
                 effective_from=_to_date(r.get("effective_week_start")),
+                effective_to=_to_date(r.get("effective_to")),
                 currency=r.get("currency") or "CNY",
                 remark=r.get("remark"),
+                cargo_class=r.get("cargo_class"),
+                packing=r.get("packing"),
+                density=r.get("density"),
+                carrier=r.get("carrier"),
                 batch_id=batch_uuid,
             )
         )
@@ -193,7 +198,7 @@ def commit_ocean_rows(
                 is_direct=r.get("is_direct", True),
                 rmks=r.get("commodity"),
                 transit_days=_to_int(r.get("transit_days")),
-                currency="USD",
+                currency=r.get("currency") or "USD",
                 status=RateStatus.active,
                 source_type=SourceType(r["source_type"]) if r.get("source_type") else SourceType.excel,
                 source_file=source_file or r.get("source_file"),

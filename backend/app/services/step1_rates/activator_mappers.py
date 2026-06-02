@@ -22,6 +22,7 @@ from app.models import (
 )
 from app.services.rate_parser import _resolve_port as _rp_resolve_port
 from app.services.step1_rates.entities import ParsedRateRecord
+from app.services.step1_rates.port_normalizer import canonicalize
 
 
 class ActivationError(Exception):
@@ -338,4 +339,14 @@ def _resolve_port(db: Session, name_raw: str | None) -> Port | None:
             hit = _resolve_port(db, part)
             if hit is not None:
                 return hit
+    # 规范化兜底：别名(PUSAN→BUSAN)/去尾缀(CITY/PORT)/去标点折叠后，对 alnum 折叠的 name_en 做包含匹配。
+    # 解决 "PUSAN"/"KAOHSIUNG CITY"/"SAINT LOUIS"(对 "St. Louis" 的句点) 等变体。
+    canon = canonicalize(name)
+    if len(canon) >= 3:
+        folded = func.replace(
+            func.replace(func.replace(Port.name_en, " ", ""), ".", ""), "-", ""
+        )
+        port = db.query(Port).filter(folded.ilike(f"%{canon}%")).first()
+        if port is not None:
+            return port
     return None
