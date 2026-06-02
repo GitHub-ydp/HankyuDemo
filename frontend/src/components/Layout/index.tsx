@@ -16,11 +16,11 @@ interface NavEntry {
 
 const OPS_NAV: NavEntry[] = [
   { to: '/', icon: 'dashboard', labelKey: 'menu.dashboard' },
+  { to: '/rate-sheet', icon: 'import', labelKey: 'rateSheet.menuLabel' },
   { to: '/upload', icon: 'import', labelKey: 'menu.upload' },
   { to: '/rates', icon: 'rates', labelKey: 'menu.rates' },
   { to: '/compare', icon: 'compare', labelKey: 'menu.compare' },
   { to: '/pkg', icon: 'package', labelKey: 'menu.pkg' },
-  { to: '/rate-sheet', icon: 'import', labelKey: 'rateSheet.menuLabel' },
 ];
 
 const DATA_NAV: NavEntry[] = [{ to: '/carriers', icon: 'carriers', labelKey: 'menu.carriers' }];
