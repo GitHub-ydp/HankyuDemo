@@ -43,6 +43,7 @@
     "colRateLevel": "编码",
     "colLss": "LSS/CIC",
     "colBaf": "BAF",
+    "colSurcharges": "附加费",
     "colTransit": "航程(天)",
     "colService": "服务 / 重量档",
     "colCargoClass": "货类",

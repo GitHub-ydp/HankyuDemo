@@ -43,6 +43,7 @@
     "colRateLevel": "Rate Code",
     "colLss": "LSS/CIC",
     "colBaf": "BAF",
+    "colSurcharges": "Surcharges",
     "colTransit": "Transit (d)",
     "colService": "Service / weight tier",
     "colCargoClass": "Cargo type",
