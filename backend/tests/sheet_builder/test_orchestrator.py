@@ -247,6 +247,40 @@ def test_parser_error_marked_not_crash(monkeypatch):
     assert s.rows == []
 
 
+def test_ocean_image_ai_failure_marked_skipped_not_parsed(monkeypatch):
+    """海运图片 AI 识别失败(0 行)应标 skipped 并透传原因，而非绿色 parsed(已抽取)。"""
+    from app.services import ai_client
+
+    def boom(*a, **k):
+        raise RuntimeError("网络炸")
+    monkeypatch.setattr(ai_client, "chat_with_image", boom)
+
+    s = orchestrator.create_session("sea")
+    fr = orchestrator.add_file(s.session_id, "rate.png", "/tmp/rate.png", db=None)
+
+    assert fr.status == "skipped", "AI 识别失败应标 skipped，而非 parsed(绿色成功)"
+    assert "失败" in fr.message
+    assert fr.row_count == 0
+    assert s.rows == []
+
+
+def test_air_image_ai_failure_marked_skipped_not_parsed(monkeypatch):
+    """空运图片 AI 识别失败(0 行)同样应标 skipped，而非绿色 parsed。"""
+    from app.services import ai_client
+
+    def boom(*a, **k):
+        raise RuntimeError("网络炸")
+    monkeypatch.setattr(ai_client, "chat_with_image", boom)
+
+    s = orchestrator.create_session("air")
+    fr = orchestrator.add_file(s.session_id, "rate.png", "/tmp/rate.png", db=None)
+
+    assert fr.status == "skipped", "AI 识别失败应标 skipped，而非 parsed(绿色成功)"
+    assert "失败" in fr.message
+    assert fr.row_count == 0
+    assert s.rows == []
+
+
 from decimal import Decimal
 from app.services.step1_rates.sheet_builder.orchestrator import _normalize_sea
 
