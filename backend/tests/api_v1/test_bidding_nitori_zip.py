@@ -70,3 +70,33 @@ def test_auto_fill_rejects_unknown_ext(client):
     )
     assert resp.status_code == 400
     assert "F7" in resp.text
+
+
+def test_auto_fill_accepts_xlsm_single_file(client):
+    """单文件 .xlsm 投标包应被受理(走内容识别)，不再被 F7 扩展名挡掉。
+
+    投标模板常是宏启用的 .xlsm；以前只放行 .xlsx/.zip，用户被迫把单文件打成 zip。
+    """
+    import io
+
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    wb.active["A1"] = "x"
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    resp = client.post(
+        "/api/v1/bidding/auto-fill",
+        files={
+            "file": (
+                "bid.xlsm",
+                buf,
+                "application/vnd.ms-excel.sheet.macroEnabled.12",
+            )
+        },
+    )
+    # 过了扩展名闸门：恒 200 + body(降级由 ok/error 区分)；不能是 400 F7。
+    assert resp.status_code == 200, resp.text
+    assert "F7_WRONG_EXTENSION" not in resp.text
