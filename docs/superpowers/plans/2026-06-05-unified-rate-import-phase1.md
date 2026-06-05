@@ -1100,12 +1100,22 @@ Expected: FAIL（currency=="USD" 默认值，或 rate_level/service_code 为 Non
 ```
 > `rate_level`/`service_code` 是 `Step1RateRow` 既有字段，原 payload 未设（默认 None），现按列写入。
 
-(d) `activator_mappers.to_freight_rate_from_ocean`：把硬编码的 `service_code=None`、`rate_level=None` 改为透传：
+(d) `activator_mappers.to_freight_rate_from_ocean`：把硬编码的 `service_code=None`、`rate_level=None` 改为透传，**并用 `_clip` 裁剪到列声明长度**（见下 (f)）：
 ```python
-        service_code=record.service_code,
+        service_code=_clip(record.service_code, 20),
         ...
-        rate_level=record.rate_level,
+        rate_level=_clip(record.rate_level, 10),
 ```
+
+(f)（对抗性校验发现的 Important 回归，必需）`FreightRate` 的 `currency=String(5)`/`rate_level=String(10)`/`service_code=String(20)` 有长度上限。新读出的自由文本（如 `rate_level="Named Account…"`、多币种 `"USD/CNY"`）超长后：SQLite 静默脏存；**PostgreSQL（生产）`db.commit()` 抛 `DataError`，非 `ActivationError` → 不被逐行软失败捕获 → 落入 `except Exception` → 整批 rollback(imported_rows=0)**。同文件 `to_lcl_rate` 已用 `_clip(...)` 兜底，ocean FCL 路径必须同样裁剪：
+```python
+        currency=_clip(record.currency or "USD", 5),
+        ...
+        rate_level=_clip(record.rate_level, 10),
+        ...
+        service_code=_clip(record.service_code, 20),
+```
+（`_clip` 已存在于 activator_mappers.py：None/空→None，否则 `str(value).strip()[:maxlen]`。）
 
 (e)（实测补充，必需）`ocean.py` 的 `OceanAdapter._to_date` 当前只认 `datetime`/`date`，对字符串返回 None。但**真实回流中 `valid_from`/`valid_to` 是字符串**（做表审核台 `RateSheetBuilder` 用 `textCol('valid_from')` 按文本编辑，下载行里就是字符串），所以必须让 `_to_date` 认 ISO 字符串，否则生效日回流丢失、回落模板 B3 日期。纯增量扩展（B3/D3 等 datetime 调用方不受影响）：
 ```python
