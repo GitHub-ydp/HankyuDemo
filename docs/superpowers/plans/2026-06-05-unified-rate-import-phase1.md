@@ -1107,6 +1107,23 @@ Expected: FAIL（currency=="USD" 默认值，或 rate_level/service_code 为 Non
         rate_level=record.rate_level,
 ```
 
+(e)（实测补充，必需）`ocean.py` 的 `OceanAdapter._to_date` 当前只认 `datetime`/`date`，对字符串返回 None。但**真实回流中 `valid_from`/`valid_to` 是字符串**（做表审核台 `RateSheetBuilder` 用 `textCol('valid_from')` 按文本编辑，下载行里就是字符串），所以必须让 `_to_date` 认 ISO 字符串，否则生效日回流丢失、回落模板 B3 日期。纯增量扩展（B3/D3 等 datetime 调用方不受影响）：
+```python
+    def _to_date(self, value: Any) -> date | None:
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        if isinstance(value, str):
+            text = value.strip()[:10]
+            for fmt in ("%Y-%m-%d", "%Y/%m/%d"):
+                try:
+                    return datetime.strptime(text, fmt).date()
+                except ValueError:
+                    continue
+        return None
+```
+
 - [ ] **Step 4: 跑测试确认通过 + 全量回归**
 
 Run: `cd backend && ../.venv/bin/python -m pytest tests/services/step1_rates/test_ocean_new_columns.py -v`
