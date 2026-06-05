@@ -731,7 +731,7 @@
       "f4_fill_failed": "解析成功，但自动填入失败。请重新上传或联系技术支持。",
       "f5_token_expired": "下载凭证已失效（超过 1 小时或已下载过）。请重新上传文件。",
       "f6_file_too_large": "文件大小超过 10 MB 限制。请压缩或拆分后重试。",
-      "f7_wrong_extension": "仅支持 .xlsx 格式。.xls / .xlsm / PDF / 图片等不被支持。",
+      "f7_wrong_extension": "仅支持 .xlsx / .xlsm / .zip 格式。.xls / PDF / 图片等不被支持。",
       "f8_network_error": "网络异常，请检查网络后重试。",
       "retryBtn": "重新上传",
       "detailLabel": "排障信息（可展开）"

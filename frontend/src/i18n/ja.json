@@ -730,7 +730,7 @@
       "f4_fill_failed": "解析は成功しましたが、自動入力に失敗しました。再アップロードしてください。",
       "f5_token_expired": "ダウンロード URL が失効しました（1 時間超過またはダウンロード済み）。再アップロードしてください。",
       "f6_file_too_large": "ファイルサイズが 10 MB を超えています。圧縮または分割してから再試行してください。",
-      "f7_wrong_extension": ".xlsx 形式のみ対応。.xls / .xlsm / PDF / 画像などは非対応。",
+      "f7_wrong_extension": ".xlsx / .xlsm / .zip 形式のみ対応。.xls / PDF / 画像などは非対応。",
       "f8_network_error": "ネットワーク異常です。接続を確認のうえ再試行してください。",
       "retryBtn": "再アップロード",
       "detailLabel": "詳細情報（展開可）"

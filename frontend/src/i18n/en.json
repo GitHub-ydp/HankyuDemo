@@ -730,7 +730,7 @@
       "f4_fill_failed": "Parsing succeeded, but auto-fill failed. Please re-upload or contact support.",
       "f5_token_expired": "Download token expired (over 1 hour or already used). Please re-upload the file.",
       "f6_file_too_large": "File size exceeds the 10 MB limit. Please compress or split it and retry.",
-      "f7_wrong_extension": "Only .xlsx is supported. .xls / .xlsm / PDF / images are not accepted.",
+      "f7_wrong_extension": "Only .xlsx / .xlsm / .zip are supported. .xls / PDF / images are not accepted.",
       "f8_network_error": "Network error. Please check connectivity and retry.",
       "retryBtn": "Re-upload",
       "detailLabel": "Debug info (expand)"

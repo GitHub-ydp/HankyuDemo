@@ -58,6 +58,15 @@ _ERROR_MESSAGE_KEYS: dict[BiddingErrorCode, str] = {
     BiddingErrorCode.F8_NETWORK_ERROR: "bidding.errors.f8_network_error",
 }
 
+# identify() 失败时还没有 identify_block，用这个占位（matched=unknown）走降级响应
+_UNKNOWN_IDENTIFY_BLOCK = IdentifyBlock(
+    matched_customer="unknown",
+    matched_dimensions=[],
+    confidence="low",
+    unmatched_reason=None,
+    warnings=[],
+)
+
 
 def run_auto_fill(
     input_path: Path,
@@ -69,7 +78,17 @@ def run_auto_fill(
 ) -> BiddingAutoFillResponse:
     temp_files.cleanup_expired(ttl=_TOKEN_TTL_SECONDS)
 
-    identify_result = identify(input_path)
+    # identify 也可能抛（损坏文件/openpyxl 异常）；绝不能让异常逃逸成裸 500
+    # （500 无 CORS 头 → 浏览器拦截 → 前端误报 Network Error）。统一归口降级响应。
+    try:
+        identify_result = identify(input_path)
+    except Exception as e:
+        return _resp_error(
+            bid_id=bid_id,
+            identify=_UNKNOWN_IDENTIFY_BLOCK,
+            code=BiddingErrorCode.F1_INVALID_XLSX,
+            detail=f"identify 失败 {type(e).__name__}: {e}",
+        )
     identify_block = _to_identify_block(identify_result)
 
     if identify_result.matched_customer == "unknown":
@@ -82,7 +101,19 @@ def run_auto_fill(
         )
 
     if identify_result.matched_customer == "nitori":
-        return _run_nitori(input_path, bid_id, bid_dir, identify_block, db)
+        # Nitori：整包(.zip)= 报价表 .xlsm + 成本邮件。但海运已改为「优先查 DB 运价」
+        # （福山口径），成本邮件只是兜底，所以单个 .xlsm 也能跑：报价表即上传文件本身，
+        # 纯按 DB 运价匹配（_run_nitori 内部对缺整包自动降级）。任何异常仍归口 F3，
+        # 绝不让它逃逸成裸 500/Network Error。
+        try:
+            return _run_nitori(input_path, bid_id, bid_dir, identify_block, db)
+        except Exception as e:
+            return _resp_error(
+                bid_id=bid_id,
+                identify=identify_block,
+                code=BiddingErrorCode.F3_PARSE_FAILED,
+                detail=f"Nitori 处理失败 {type(e).__name__}: {e}\n{traceback.format_exc(limit=3)}",
+            )
 
     profile = CustomerAProfile(markup_fn=default_markup_fn)
 
@@ -155,9 +186,23 @@ def _run_nitori(input_path, bid_id, bid_dir, identify_block, db):
     from app.services.step2_bidding.nitori_cost_book import NitoriCostBook
     from app.services.step2_bidding.customer_profiles.nitori import NitoriProfile
 
-    quote_path, cost_path = resolve_bundle(Path(bid_dir))
+    # 整包(.zip)→(报价表, 成本邮件)；单个 .xlsm→只有报价表本身，无成本邮件。
+    # 海运已优先查 DB 运价（福山口径），成本邮件仅兜底，故缺整包时降级为「纯 DB 匹配」。
+    extra_warnings: list[str] = []
+    try:
+        quote_path, cost_path = resolve_bundle(Path(bid_dir))
+        cost_book = NitoriCostBook.from_xlsx(cost_path)
+    except FileNotFoundError:
+        quote_path = input_path
+        cost_book = None
+        extra_warnings.append(
+            "未提供成本邮件（仅上传了单个 .xlsm）：本次仅按系统 DB 运价匹配；"
+            "DB 未覆盖的航线不会填价。如需成本邮件兜底，请上传完整 .zip 整包，"
+            "或先在『运价管理』导入对应海运运价。"
+        )
+
     profile = NitoriProfile(
-        cost_book=NitoriCostBook.from_xlsx(cost_path),
+        cost_book=cost_book,
         repo=Step1RateRepository(db) if db is not None else None,
     )
     parsed = profile.parse(quote_path, bid_id=bid_id, period="2026Q2")
@@ -171,7 +216,7 @@ def _run_nitori(input_path, bid_id, bid_dir, identify_block, db):
 
     fill_block = _to_fill_block(
         row_reports=reports,
-        fr_warnings=list(parsed.warnings),
+        fr_warnings=extra_warnings + list(parsed.warnings),
         markup_ratio=_MARKUP_RATIO,
     )
     cost_token = TOKEN_STORE.put(cost_out, cost_out.name, ttl=_TOKEN_TTL_SECONDS)
