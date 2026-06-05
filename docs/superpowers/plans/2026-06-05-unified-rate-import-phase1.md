@@ -1181,43 +1181,80 @@ git commit -m "test(step1): 海运 round-trip(40GP≠40HQ 拆分 + 元数据无�
 
 ---
 
-## Task 10: 空运周报入库口确认（下载交付物 vs 原始文件回流）
+## Task 10: 空运周报生成表补币种列（_fill_air）
 
-> ⚠️ **实现前先看这段（写计划时发现的事实，已改正原假设）：**
-> `air_blank` 模板（做表周报输出）布局为 `Origin (POL) | Destinations | Service/+100KG | 7 个日期列 | Remark`；
-> 而 `AirAdapter._parse_weekly_sheet` 读的是**另一套真实承运商布局**（A1=`"Destinations"`、无 origin 列、
-> 列整体左移一位）。**两者不兼容 → 做表生成的周报表无法被 AirAdapter 重新导入。**
-> 且空运周报的 DB 入库**从来不经做表**（旧 `db_writer` 一直 `skipped_weekly`）——它的入库口本就是
-> 「导入页直接导入原始承运商周报文件」（AirAdapter 已支持）。
->
-> **本任务采用 Option A（默认，低风险）：** 空运周报的导入页入口 = 导入**原始**承运商周报文件
-> （AirAdapter，已工作）；做表生成的 Market Price 周报表定位为**下载交付物**，不参与回流。
-> 故无新增解析代码，仅做「确认 + 文案引导」。
-> （**Option B** = 让做表生成的周报表本身可回流，需新增一个读 `air_blank` 布局的 air_weekly 适配器，
-> 工作量约等于 air_tier，**待用户拍板后才追加**，见计划末「待决」。）
+> 为 Task 13 的周报回流做准备（Option B）。给 `air_blank` 生成表加 Currency 列，让人工可调、回流不丢币种。
+> 周起始日已由 `_apply_week_headers` 写进 7 个日期表头（Task 13 据此解析周）。
 
 **Files:**
-- Modify: `frontend/src/i18n/{zh,ja,en}.json`（周报下载引导：提示「周报入库请在导入页上传原始承运商周报文件」）
-- Test: `backend/tests/services/step1_rates/test_air_adapter.py`（仅回归，确认 AirAdapter 直接导入未受本期改动影响）
+- Modify: `backend/app/services/step1_rates/sheet_builder/template_registry.py:36-39`（air columns 增 currency）
+- Modify: `backend/app/services/step1_rates/sheet_builder/template_filler.py:141-154`（`_fill_air` 写表头+值）
+- Test: `backend/tests/sheet_builder/test_air_weekly_currency.py`
 
-- [ ] **Step 1: 回归确认 AirAdapter 直接导入未退化**
+- [ ] **Step 1: 写失败测试**
 
-Run: `cd backend && ../.venv/bin/python -m pytest tests/services/step1_rates/test_air_adapter.py -v`
-Expected: 全 PASS（本期 air-tier / ocean 改动不应触及 weekly air 解析）
+```python
+from io import BytesIO
+from openpyxl import load_workbook
+from app.services.step1_rates.sheet_builder.template_filler import fill_template
 
-- [ ] **Step 2: 前端文案引导（区分两类空运）**
 
-在 Task 11 的做表页下载引导基础上，补一条针对周报的说明文案 `rateSheet.weeklyDownloadNote`（zh/ja/en 三份）：
-- zh: `"空运周报(Market Price)为对客下载表；如需入库，请在「运价导入」页上传原始承运商周报文件"`
-- ja: `"航空ウィークリー(Market Price)は対客ダウンロード表です。取込が必要な場合は「レート取込」で元の航空会社ウィークリーをアップロードしてください"`
-- en: `"Air weekly (Market Price) is a customer deliverable. To persist, upload the original carrier weekly file on the Rate Import page."`
-做表页 air 模板、且为周报模式（无 tier_prices）时，下载成功后 `message.info(t('rateSheet.weeklyDownloadNote'))`。
+def test_air_weekly_sheet_has_currency_column():
+    rows = [{
+        "origin": "PVG", "destination": "NRT", "service": "CA",
+        "currency": "JPY", "day1": 10, "day2": 11,
+        "effective_week_start": "2026-05-25",
+    }]
+    content, _ = fill_template("air", rows)  # 无 tier_prices → 走周表分支
+    ws = load_workbook(BytesIO(content)).active
+    header = [c.value for c in ws[1]]
+    assert "Currency" in header
+    cur_col = header.index("Currency") + 1
+    assert ws.cell(2, cur_col).value == "JPY"
+```
 
-- [ ] **Step 3: 提交**
+- [ ] **Step 2: 跑测试确认失败**
+
+Run: `cd backend && ../.venv/bin/python -m pytest tests/sheet_builder/test_air_weekly_currency.py -v`
+Expected: FAIL（无 Currency 列）
+
+- [ ] **Step 3: 实现**
+
+(a) `template_registry.py` `_AIR` columns 增 `"currency": 12`（K=11 是 remark，L=12 空）：
+```python
+                "remark": 11,
+                "currency": 12,
+```
+(b) `_fill_air` 写表头与值：
+```python
+def _fill_air(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) -> None:
+    ws = workbook[sheet_cfg.sheet_name]
+    _unmerge_data_area(ws, sheet_cfg.data_start_row)
+    _apply_week_headers(ws, sheet_cfg, rows)
+    col = sheet_cfg.columns
+    ws.cell(sheet_cfg.header_row, col["currency"]).value = "Currency"
+    r = sheet_cfg.data_start_row
+    for row in rows:
+        safe_set(ws.cell(r, col["origin"]), row.get("origin"))
+        safe_set(ws.cell(r, col["destination"]), row.get("destination"))
+        safe_set(ws.cell(r, col["service"]), row.get("service"))
+        for day in range(1, 8):
+            safe_set(ws.cell(r, col[f"day{day}"]), row.get(f"day{day}"))
+        safe_set(ws.cell(r, col["remark"]), row.get("remark"))
+        safe_set(ws.cell(r, col["currency"]), row.get("currency"))
+        r += 1
+```
+
+- [ ] **Step 4: 跑测试确认通过**
+
+Run: `cd backend && ../.venv/bin/python -m pytest tests/sheet_builder/test_air_weekly_currency.py -v`
+Expected: PASS
+
+- [ ] **Step 5: 提交**
 
 ```bash
-git add frontend/src/i18n/zh.json frontend/src/i18n/ja.json frontend/src/i18n/en.json
-git commit -m "docs(step1): 明确空运周报入库口=导入原始周报文件(做表周报为下载交付物)"
+git add backend/app/services/step1_rates/sheet_builder/template_registry.py backend/app/services/step1_rates/sheet_builder/template_filler.py backend/tests/sheet_builder/test_air_weekly_currency.py
+git commit -m "feat(step1): 空运周报生成表补币种列(为回流做准备)"
 ```
 
 ---
@@ -1351,21 +1388,287 @@ Expected: 通过
 | 做表页无任何入库入口 | Task 11 |
 | 下载的运价表能从导入页落库 | Task 4/6/8/9/12 |
 | 海运 40GP 与 40HQ 可区分 | Task 7（生成）+ Task 9（验证） |
-| 币种/生效日 round-trip 保留 | Task 5/6（空运档位）、7/8/9（海运）；空运周报见下「待决」 |
+| 币种/生效日 round-trip 保留 | Task 5/6（空运档位）、7/8/9（海运）、10/13（空运周报） |
 | step2 仍能取 AirTierRate | Task 2/3/4（air_tier 入库链路）+ 收尾冒烟 |
 | 全量 pytest 通过 + 海运不退化 | Task 8 回归 + 收尾全量 |
 
+> **空运周报已定 Option B**：做表生成的周报表本身可回流（Task 10 补币种列 + Task 13 新增 air_weekly 适配器）。
+
 ---
 
-## 待决（写计划时发现，需用户拍板）
+## Task 13: air_weekly 适配器（读 air_blank 布局回流）+ round-trip
 
-**空运周报（Market Price）是否要让「做表生成的周报表」本身可回流？**
+**Files:**
+- Create: `backend/app/services/step1_rates/adapters/air_weekly.py`
+- Modify: `backend/app/services/step1_rates/adapters/__init__.py`（导出 AirWeeklyAdapter）
+- Modify: `backend/app/services/step1_rates/service.py`（注册到默认 registry）
+- Test: `backend/tests/services/step1_rates/test_air_weekly_adapter.py`
 
-- **Option A（本计划当前采用，Task 10）**：做表周报表 = 下载交付物；周报入库走「导入页直接导入
-  原始承运商周报文件」（AirAdapter 已支持，零新增代码）。理由：周报 DB 入库本就从不经做表。
-- **Option B（追加）**：让做表生成的周报表（`air_blank` 布局：Origin/Destinations/Service+7日列）
-  本身可被导入页识别回流 → 需新增一个 air_weekly 适配器（读该布局 + 从日期表头解析周起始 +
-  Service/+100KG 语义 + 币种列），工作量约等于 air_tier（+0.5~1 人日）。
+读做表生成的周报表布局：`Origin (POL) | Destinations | Service/+100KG | <7 个日期列> | Remark (Selling) | Currency`。
+产 `record_kind="air_weekly"` 记录（activator 已接线 air→AirFreightRate，无需改 activator）。priority=6（air_tier=5 之后、air=10 之前），按表头内容识别。周起始日从首个日期列表头解析。
 
-若选 Option B，将在本计划追加「Task 13: air_weekly 适配器 + 周报表补币种列 + round-trip 测试」。
-海运 / 空运档位两类不受此决定影响，可照常先做。
+- [ ] **Step 1: 写失败测试（detect + parse + round-trip）**
+
+```python
+import uuid
+from app.services.step1_rates.sheet_builder.template_filler import fill_template
+from app.services.step1_rates.adapters.air_weekly import AirWeeklyAdapter
+from app.services.step1_rates.adapters.air import AirAdapter
+from app.services.step1_rates.activator_mappers import to_air_freight_rate
+from app.services.step1_rates.entities import Step1FileType
+
+
+def _make(tmp_path):
+    rows = [{
+        "origin": "PVG", "destination": "NRT", "service": "CA",
+        "currency": "JPY", "effective_week_start": "2026-05-25",
+        "day1": 10, "day2": 11, "day3": 12, "day4": 13,
+        "day5": 14, "day6": 15, "day7": 16, "remark": "wk",
+    }]
+    content, _ = fill_template("air", rows)  # 无 tier_prices → 周表分支
+    path = tmp_path / "air_weekly_rate_sheet_filled.xlsx"
+    path.write_bytes(content)
+    return path
+
+
+def test_detect_weekly_layout(tmp_path):
+    path = _make(tmp_path)
+    assert AirWeeklyAdapter().detect(path) is True
+
+
+def test_air_adapter_skips_generated_weekly(tmp_path):
+    # 既有 AirAdapter(读真实承运商布局)不应误吞做表生成表(无 A1=Destinations)
+    path = _make(tmp_path)
+    assert AirWeeklyAdapter().priority < AirAdapter().priority
+
+
+def test_parse_and_roundtrip(tmp_path):
+    path = _make(tmp_path)
+    batch = AirWeeklyAdapter().parse(path, db=None)
+    assert batch.file_type is Step1FileType.air
+    recs = [r for r in batch.records if r.record_kind == "air_weekly"]
+    assert len(recs) == 1
+    r = recs[0]
+    assert r.origin_port_name == "PVG"
+    assert r.destination_port_name == "NRT"
+    assert r.service_desc == "CA"
+    assert r.currency == "JPY"
+    assert str(r.effective_week_start) == "2026-05-25"
+    rate = to_air_freight_rate(r, uuid.uuid4())
+    assert rate.destination == "NRT"
+    assert rate.currency == "JPY"
+    assert str(rate.price_day1) == "10"
+    assert str(rate.price_day7) == "16"
+```
+
+- [ ] **Step 2: 跑测试确认失败**
+
+Run: `cd backend && ../.venv/bin/python -m pytest tests/services/step1_rates/test_air_weekly_adapter.py -v`
+Expected: FAIL（`ModuleNotFoundError: ...adapters.air_weekly`）
+
+- [ ] **Step 3: 实现**
+
+Create `backend/app/services/step1_rates/adapters/air_weekly.py`：
+```python
+"""Step1 空运周报(air_weekly)回流适配器。
+
+读「做表」生成的周报表布局(air_blank)：
+  Origin (POL) | Destinations | Service/+100KG | <7 个日期列> | Remark (Selling) | Currency
+产 record_kind="air_weekly" → activator 已接线 air→AirFreightRate。
+按表头内容识别(不靠文件名)；周起始日从首个日期列表头(形如 '2026/5/25 (Mon)')解析。
+注意与既有 AirAdapter(读真实承运商布局 A1='Destinations'、无 origin 列)区分：本适配器要求有 'origin' 表头。
+"""
+from __future__ import annotations
+
+import re
+from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
+from typing import Any
+
+from openpyxl import load_workbook
+from sqlalchemy.orm import Session
+
+from app.services.step1_rates.entities import (
+    ParsedRateBatch,
+    ParsedRateRecord,
+    Step1FileType,
+)
+
+_DATE_RE = re.compile(r"(\d{4})/(\d{1,2})/(\d{1,2})")
+_EXCEL_EXTS = {".xlsx", ".xlsm", ".xls"}
+
+
+class AirWeeklyAdapter:
+    """识别并解析做表生成的空运周报表(air_blank 布局)。"""
+
+    key = "air_weekly"
+    file_type = Step1FileType.air
+    priority = 6  # air_tier(5) 之后、air(10) 之前
+
+    def detect(self, path: Path, *, file_type_hint: Step1FileType | None = None) -> bool:
+        if file_type_hint is not None:
+            return False  # air hint 仍交给真实承运商 AirAdapter
+        if path.suffix.lower() not in _EXCEL_EXTS:
+            return False
+        try:
+            wb = load_workbook(path, data_only=True, read_only=True)
+        except Exception:
+            return False
+        try:
+            for ws in wb.worksheets:
+                if self._weekly_headers(ws) is not None:
+                    return True
+        finally:
+            wb.close()
+        return False
+
+    def parse(self, path: Path, db: Session | None = None) -> ParsedRateBatch:
+        wb = load_workbook(path, data_only=True)
+        records: list[ParsedRateRecord] = []
+        for ws in wb.worksheets:
+            headers = self._weekly_headers(ws)
+            if headers is None:
+                continue
+            records.extend(self._parse_sheet(ws, headers))
+        return ParsedRateBatch(
+            file_type=Step1FileType.air,
+            source_file=path.name,
+            records=records,
+            adapter_key=self.key,
+        )
+
+    def _weekly_headers(self, ws) -> dict[str, Any] | None:
+        """命中周报布局返回 {origin,destination,service,remark,currency,date_cols:[idx],week_start}，否则 None。"""
+        first = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), None)
+        if not first:
+            return None
+        named: dict[str, int] = {}
+        date_cols: list[int] = []
+        week_start: date | None = None
+        for idx, cell in enumerate(first):
+            text = str(cell).strip() if cell is not None else ""
+            if not text:
+                continue
+            m = _DATE_RE.search(text)
+            if m:
+                date_cols.append(idx)
+                if week_start is None:
+                    week_start = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            else:
+                named[text.lower()] = idx
+        has_origin = any(k.startswith("origin") for k in named)
+        has_dest = any(k.startswith("destination") for k in named)
+        has_service = any(k.startswith("service") for k in named)
+        if has_origin and has_dest and has_service and len(date_cols) >= 7:
+            return {
+                "origin": next(named[k] for k in named if k.startswith("origin")),
+                "destination": next(named[k] for k in named if k.startswith("destination")),
+                "service": next(named[k] for k in named if k.startswith("service")),
+                "remark": next((named[k] for k in named if k.startswith("remark")), None),
+                "currency": named.get("currency"),
+                "date_cols": date_cols[:7],
+                "week_start": week_start,
+            }
+        return None
+
+    def _parse_sheet(self, ws, h: dict[str, Any]) -> list[ParsedRateRecord]:
+        week_start: date | None = h["week_start"]
+        week_end = week_start + timedelta(days=6) if week_start else None
+        out: list[ParsedRateRecord] = []
+        for row_index, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            def v(i: int | None) -> Any:
+                return row[i] if i is not None and i < len(row) else None
+
+            origin = v(h["origin"])
+            dest = v(h["destination"])
+            prices = [self._dec(row[ci] if ci < len(row) else None) for ci in h["date_cols"]]
+            if not origin and not dest and not any(p is not None for p in prices):
+                continue
+            kw: dict[str, Any] = {f"price_day{i + 1}": prices[i] for i in range(7)}
+            out.append(
+                ParsedRateRecord(
+                    record_kind="air_weekly",
+                    origin_port_name=str(origin).strip() if origin else None,
+                    destination_port_name=str(dest).strip() if dest else None,
+                    service_desc=(str(v(h["service"])).strip() if v(h["service"]) else None),
+                    currency=(str(v(h["currency"])).strip() if v(h["currency"]) else "CNY"),
+                    effective_week_start=week_start,
+                    effective_week_end=week_end,
+                    remarks=(str(v(h["remark"])).strip() if v(h["remark"]) else None),
+                    source_type="excel",
+                    extras={"row_index": row_index},
+                    **kw,
+                )
+            )
+        return out
+
+    @staticmethod
+    def _dec(value: Any) -> Decimal | None:
+        if value is None or (isinstance(value, str) and value.strip() == ""):
+            return None
+        try:
+            return value if isinstance(value, Decimal) else Decimal(str(value))
+        except (InvalidOperation, ValueError):
+            return None
+```
+
+Modify `adapters/__init__.py`（加入 AirWeeklyAdapter 的 import 与 `__all__`）：
+```python
+from app.services.step1_rates.adapters.air import AirAdapter
+from app.services.step1_rates.adapters.air_tier import AirTierAdapter
+from app.services.step1_rates.adapters.air_weekly import AirWeeklyAdapter
+from app.services.step1_rates.adapters.kmtc import KmtcAdapter
+from app.services.step1_rates.adapters.nvo_fak import NvoFakAdapter
+from app.services.step1_rates.adapters.ocean import OceanAdapter
+from app.services.step1_rates.adapters.ocean_ngb import OceanNgbAdapter
+
+__all__ = [
+    "AirAdapter",
+    "AirTierAdapter",
+    "AirWeeklyAdapter",
+    "KmtcAdapter",
+    "NvoFakAdapter",
+    "OceanAdapter",
+    "OceanNgbAdapter",
+]
+```
+
+Modify `service.py` 的 `build_default_registry`，加入 `AirWeeklyAdapter()`（顺序不影响，registry 按 priority 排）：
+```python
+from app.services.step1_rates.adapters import (
+    AirAdapter,
+    AirTierAdapter,
+    AirWeeklyAdapter,
+    KmtcAdapter,
+    NvoFakAdapter,
+    OceanAdapter,
+    OceanNgbAdapter,
+)
+
+
+def build_default_registry() -> RateAdapterRegistry:
+    return RateAdapterRegistry(
+        adapters=[
+            AirAdapter(),
+            AirTierAdapter(),
+            AirWeeklyAdapter(),
+            KmtcAdapter(),
+            NvoFakAdapter(),
+            OceanAdapter(),
+            OceanNgbAdapter(),
+        ]
+    )
+```
+
+- [ ] **Step 4: 跑测试确认通过 + air 回归**
+
+Run: `cd backend && ../.venv/bin/python -m pytest tests/services/step1_rates/test_air_weekly_adapter.py tests/services/step1_rates/test_air_adapter.py -v`
+Expected: 全 PASS（既有 AirAdapter 真实承运商解析不退化——做表生成表无 A1='Destinations' 且本适配器优先级更高，两者互不干扰）
+
+- [ ] **Step 5: 提交**
+
+```bash
+git add backend/app/services/step1_rates/adapters/air_weekly.py backend/app/services/step1_rates/adapters/__init__.py backend/app/services/step1_rates/service.py backend/tests/services/step1_rates/test_air_weekly_adapter.py
+git commit -m "feat(step1): 新增 AirWeeklyAdapter(做表周报表回流→AirFreightRate)"
+```
