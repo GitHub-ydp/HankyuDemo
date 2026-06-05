@@ -680,9 +680,12 @@ git commit -m "feat(step1): activator 接线 air_tier(注册适配器+dispatch+�
 
 **Files:**
 - Modify: `backend/app/services/step1_rates/sheet_builder/template_filler.py:71-101`
+- Modify: `backend/tests/sheet_builder/test_template_filler.py`（既有 `test_build_air_tier_sheet_dynamic_columns` 断言的是旧表头契约，需同步到新契约——Remark 由 KG 列后移到元数据列之后第 16 列）
 - Test: `backend/tests/sheet_builder/test_tier_sheet_columns.py`
 
 按「表头契约」给档位表补 currency/effective_from/effective_to/carrier/cargo_class/packing/density 列。
+
+> **注（实测补充）**：改表头契约会让既有测试 `test_build_air_tier_sheet_dynamic_columns` 失败（它断言旧的「Remark 紧跟 KG 列」）。本任务须一并更新该测试到新契约，提交含 3 个文件。
 
 - [ ] **Step 1: 写失败测试**
 
