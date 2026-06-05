@@ -1305,7 +1305,7 @@ git commit -m "feat(step1): 空运周报生成表补币种列(为回流做准备
 > ⚠️ 必须在 Task 1–10 完成、回流路径全部就位后再做，避免出现「做表不能入库、导入又认不出」的空档。
 
 **Files:**
-- Modify: `frontend/src/pages/RateSheetBuilder.tsx`（删 `入库` 按钮、`handleCommit`、`showCommit`；下载后引导文案）
+- Modify: `frontend/src/pages/RateSheetBuilder.tsx`（删 `入库` 按钮、`handleCommit`、`showCommit`；下载后引导文案；**sea 下载文件名改为含 "ocean" 前缀**——否则 OceanAdapter 靠文件名识别不到、海运回流走不通自动识别）
 - Modify: `frontend/src/services/api.ts:257-258`（删 `rateSheetApi.commitToDb`）
 - Modify: `backend/app/api/v1/rate_sheet.py`（删 `/{session_id}/commit` 端点与 `_has_ocean_price`）
 - Delete: `backend/app/services/step1_rates/sheet_builder/db_writer.py`
