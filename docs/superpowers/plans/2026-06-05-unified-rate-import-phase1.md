@@ -125,11 +125,16 @@ def test_to_air_tier_rate_maps_fields():
 
 
 def test_to_air_tier_rate_defaults():
-    rec = ParsedRateRecord(record_kind="air_tier", extras={"tier_prices": {"45": 10.0}})
+    # 注意：ParsedRateRecord 继承 Step1RateRow.currency 默认值 "USD"(非 None)，省略 currency
+    # 得到的是 "USD" 而非空。真实回流中由 AirTierAdapter 对空币种格填 "CNY"；mapper 的
+    # `or "CNY"` 是兜底层，故这里显式传 currency=None 来验证兜底。
+    rec = ParsedRateRecord(
+        record_kind="air_tier", currency=None, extras={"tier_prices": {"45": 10.0}}
+    )
     rate = to_air_tier_rate(rec, uuid.uuid4())
     assert rate.origin == "PVG"        # 缺省起运港
     assert rate.destination == ""      # 缺省目的地
-    assert rate.currency == "CNY"      # 缺省币种
+    assert rate.currency == "CNY"      # currency=None → 兜底 CNY
 ```
 
 - [ ] **Step 2: 跑测试确认失败**
