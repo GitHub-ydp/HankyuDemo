@@ -28,7 +28,7 @@ class AirTierAdapter:
 
     key = "air_tier"
     file_type = Step1FileType.air_tier
-    priority = 5  # 必须先于 AirAdapter(10)
+    priority = 3  # 独占低值，先于 nvo_fak(5)/air_weekly(6)/air(10)
 
     def detect(self, path: Path, *, file_type_hint: Step1FileType | None = None) -> bool:
         if file_type_hint is not None:

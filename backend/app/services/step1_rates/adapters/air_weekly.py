@@ -54,14 +54,21 @@ class AirWeeklyAdapter:
     def parse(self, path: Path, db: Session | None = None) -> ParsedRateBatch:
         wb = load_workbook(path, data_only=True)
         records: list[ParsedRateRecord] = []
+        eff_from: date | None = None
+        eff_to: date | None = None
         for ws in wb.worksheets:
             headers = self._weekly_headers(ws)
             if headers is None:
                 continue
+            if eff_from is None and headers.get("week_start"):
+                eff_from = headers["week_start"]
+                eff_to = headers["week_start"] + timedelta(days=6)
             records.extend(self._parse_sheet(ws, headers))
         return ParsedRateBatch(
             file_type=Step1FileType.air,
             source_file=path.name,
+            effective_from=eff_from,
+            effective_to=eff_to,
             records=records,
             adapter_key=self.key,
         )
