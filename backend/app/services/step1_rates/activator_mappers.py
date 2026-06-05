@@ -51,10 +51,10 @@ def _row_index(record: ParsedRateRecord) -> int | None:
 
 def to_air_freight_rate(record: ParsedRateRecord, batch_id: uuid.UUID) -> AirFreightRate:
     return AirFreightRate(
-        origin=record.origin_port_name or "",
-        destination=record.destination_port_name or "",
-        airline_code=record.airline_code,
-        service_desc=record.service_desc,
+        origin=(record.origin_port_name or "")[:20],
+        destination=(record.destination_port_name or "")[:100],
+        airline_code=_clip(record.airline_code, 20),
+        service_desc=_clip(record.service_desc, 100),
         effective_week_start=record.effective_week_start,
         effective_week_end=record.effective_week_end,
         price_day1=record.price_day1,
@@ -64,7 +64,7 @@ def to_air_freight_rate(record: ParsedRateRecord, batch_id: uuid.UUID) -> AirFre
         price_day5=record.price_day5,
         price_day6=record.price_day6,
         price_day7=record.price_day7,
-        currency=record.currency or "CNY",
+        currency=(record.currency or "CNY")[:5],
         remark=record.remarks,
         batch_id=batch_id,
     )
@@ -98,18 +98,18 @@ def to_air_tier_rate(record: ParsedRateRecord, batch_id: uuid.UUID) -> AirTierRa
         if price is not None and str(price) != ""
     }
     return AirTierRate(
-        origin=record.origin_port_name or "PVG",
-        destination=record.destination_port_name or "",
-        service_desc=record.service_desc,
+        origin=(record.origin_port_name or "PVG")[:20],
+        destination=(record.destination_port_name or "")[:100],
+        service_desc=_clip(record.service_desc, 100),
         tier_prices=tier_prices,
         effective_from=record.valid_from,
         effective_to=record.valid_to,
-        currency=record.currency or "CNY",
+        currency=(record.currency or "CNY")[:5],
         remark=record.remarks,
-        cargo_class=extras.get("cargo_class"),
-        packing=extras.get("packing"),
-        density=extras.get("density"),
-        carrier=extras.get("carrier"),
+        cargo_class=_clip(extras.get("cargo_class"), 20),
+        packing=_clip(extras.get("packing"), 20),
+        density=_clip(extras.get("density"), 20),
+        carrier=_clip(extras.get("carrier"), 100),
         batch_id=batch_id,
     )
 
