@@ -204,7 +204,9 @@ def _fill_sea(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) 
             safe_set(ws.cell(r, col["yas_caf"]), row.get("yas_caf"))
             safe_set(ws.cell(r, col["sailing"]), row.get("sailing"))
             safe_set(ws.cell(r, col["via"]), row.get("via"))
-            safe_set(ws.cell(r, col["transit"]), row.get("transit"))
+            transit_cell = ws.cell(r, col["transit"])
+            safe_set(transit_cell, row.get("transit"))
+            transit_cell.number_format = "General"
             safe_set(ws.cell(r, col["booking"]), row.get("booking"))
             safe_set(ws.cell(r, col["rmks"]), row.get("remark"))
             for _, col_key, field_name in _SEA_META_COLS:
