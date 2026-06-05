@@ -853,9 +853,10 @@ git commit -m "test(step1): 空运档位 round-trip 无损回归(币种/生效�
 - Modify: `backend/app/services/step1_rates/sheet_builder/template_registry.py:52-69`（sea columns 增列）
 - Modify: `backend/app/services/step1_rates/sheet_builder/template_filler.py:31-32,157-177`（`_SEA_CONTAINER_ROWS` 改 3 行 + `_fill_sea` 写表头与元数据列）
 - Modify: `backend/tests/sheet_builder/test_template_filler.py`（既有 `test_fill_sea_expands_container_rows` 断言旧 2 行布局 + 旧 `freight_20/40` 键，需同步到新 3 行 `container_20gp/40gp/40hq` 契约）
+- Modify: `backend/tests/sheet_builder/test_rate_sheet_api.py`（既有 `test_download_post_fills_given_rows` 同样用旧 `freight_20/40` 键，需同步）
 - Test: `backend/tests/sheet_builder/test_sea_sheet_split.py`
 
-> **注（实测补充）**：`_SEA_CONTAINER_ROWS` 改 3 行 + 读 `container_*` 键后，既有 `test_fill_sea_expands_container_rows` 必失败（它用 `freight_20/40` 键、断言 20FT+40FT/40HQ 两行）。本任务一并更新它，提交含 4 个文件。
+> **注（实测补充）**：`_SEA_CONTAINER_ROWS` 改 3 行 + 读 `container_*` 键后，**两个**既有测试失败（`test_fill_sea_expands_container_rows` 与 `test_download_post_fills_given_rows`，都用旧 `freight_20/40` 键）。`test_orchestrator.py`/`test_rate_sheet_api.py:60` 断言的是 orchestrator 预览输出（仍带 `freight_20/40`，orchestrator 未改），不受影响。本任务提交含 5 个文件。
 
 - [ ] **Step 1: 写失败测试**
 
