@@ -8,6 +8,19 @@
 
 **Tech Stack:** Python 3.10 + SQLAlchemy 2.0 + openpyxl + pytest（后端）；React 19 + TS + AntD v6（前端）。
 
+> **✅ 已实现完成（2026-06-05）+ 最终对抗评审修复**
+> 13 个 Task 全部完成；后端 440 passed / 3 failed（仅本机无 vLLM 的 test_ai_client，无关）；前端 build 通过。
+> 三轮 Workflow 对抗评审发现并修复的真实缺陷（均含复现+测试）：
+> 1. (Task 8 对抗) `to_freight_rate_from_ocean` 漏裁 currency/rate_level/service_code → PG 整批失败 → 已修 + 跨切面硬化到 air_tier/air_weekly mapper。
+> 2. (最终评审) `to_freight_rate_from_ocean` 又漏裁 via/sailing_day/transit_time_text → 已补 _clip（commit 18485be）。
+> 3. (最终评审) 海运 transit 写入 sea_blank 'h:mm' 格式列 → 往返被损坏成 1900 日期 → _fill_sea 置 number_format='General'（commit 18485be）。
+> 4. (最终评审) 导入页 parser_hint='ocean' 被 KmtcAdapter 抢路 → 删 KMTC.detect 的 hint 短路（commit d06f8cb）。
+> 5. (最终评审 Minor) air_tier/nvo_fak priority 并列 → air_tier 改 priority=3；AirWeeklyAdapter 回填批次 effective_from/to（commit d06f8cb）。
+>
+> **仍遗留的 Minor（已评估、暂不修，记录备查）**：
+> - 空运周报往返丢失可编辑的 carrier/airline_code（_fill_air 周报无 Carrier 列）——纯 Market Price 周报无影响，仅 air 图片/EES 带承运商的行受影响；如需补需给周报模板加 Carrier 列 + air_weekly 读取。
+> - AirTierAdapter 表头含全角空格（用户手工改坏表头）时 col() 精确匹配不到 origin——系统生成表头恒 ASCII，仅手工损坏触发。
+
 **关键已验证事实（实现时可直接依赖）：**
 - `OceanAdapter._normalize_container_type` **已**把 `40GP→"40ft"`、`40HQ→"40hq"` 区分映射；`_merge_40_payload` 已按类型分别写 `container_40gp`/`container_40hq`；`_append_pending_record` 的交叉填充仅在某一侧为 None 时触发。→ **海运 40GP/40HQ 拆分只需模板改成发 3 行，解析器无需改逻辑**，由 round-trip 测试把关。
 - OceanAdapter 按**表头文本**自动发现列（`_build_fcl_column_map`），不依赖 `template_registry`。→ 新增海运列只要在生成表的表头行写出对应中/英文标签，并在 `_build_fcl_column_map` 加识别分支即可。
