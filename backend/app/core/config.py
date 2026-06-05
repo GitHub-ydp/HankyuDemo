@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     vllm_enable_thinking: bool = False
     # True 时请求体追加 chat_template_kwargs；切回阿里云百炼若被 400 拒绝可设 False
     vllm_enable_chat_template_kwargs: bool = True
+    # OpenAI 风格 reasoning_effort（none/low/medium/high）。非空时透传进请求体——
+    # 给「思考模型」(如 Ollama gemma)关思考用：设 none 可把单图抽取从分钟级降到秒级。
+    # 默认空=不发该字段，云端 Qwen-VL 等不认识此字段的端点不受影响。
+    vllm_reasoning_effort: str = ""
 
     # 旧 Qwen 保留别名（回滚到阿里云百炼用；兼容老 env）
     qwen_api_key: str = ""
