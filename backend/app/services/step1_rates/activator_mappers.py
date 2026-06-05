@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.models import (
     AirFreightRate,
     AirSurcharge,
+    AirTierRate,
     Carrier,
     FreightRate,
     LclRate,
@@ -83,6 +84,32 @@ def to_air_surcharge(record: ParsedRateRecord, batch_id: uuid.UUID) -> AirSurcha
         destination_scope=extras.get("destination_scope"),
         remarks=record.remarks,
         currency=record.currency or "CNY",
+        batch_id=batch_id,
+    )
+
+
+def to_air_tier_rate(record: ParsedRateRecord, batch_id: uuid.UUID) -> AirTierRate:
+    """air_tier record → AirTierRate（无港口/船司字典依赖，origin/dest 存字符串）。"""
+    extras = record.extras or {}
+    raw_tiers = extras.get("tier_prices") or {}
+    tier_prices = {
+        int(kg): float(price)
+        for kg, price in raw_tiers.items()
+        if price is not None and str(price) != ""
+    }
+    return AirTierRate(
+        origin=record.origin_port_name or "PVG",
+        destination=record.destination_port_name or "",
+        service_desc=record.service_desc,
+        tier_prices=tier_prices,
+        effective_from=record.valid_from,
+        effective_to=record.valid_to,
+        currency=record.currency or "CNY",
+        remark=record.remarks,
+        cargo_class=extras.get("cargo_class"),
+        packing=extras.get("packing"),
+        density=extras.get("density"),
+        carrier=extras.get("carrier"),
         batch_id=batch_id,
     )
 
