@@ -144,7 +144,7 @@ def to_freight_rate_from_ocean(
         carrier_id=carrier_id,
         origin_port_id=origin_port_id,
         destination_port_id=destination_port_id,
-        service_code=None,
+        service_code=record.service_code,
         container_20gp=record.container_20gp,
         container_40gp=record.container_40gp,
         container_40hq=record.container_40hq,
@@ -173,7 +173,7 @@ def to_freight_rate_from_ocean(
         source_file=source_file or record.source_file,
         batch_id=batch_id,
         status=RateStatus.active,
-        rate_level=None,
+        rate_level=record.rate_level,
     )
 
 
