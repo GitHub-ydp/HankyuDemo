@@ -1435,6 +1435,8 @@ Expected: 通过
 
 > **空运周报已定 Option B**：做表生成的周报表本身可回流（Task 10 补币种列 + Task 13 新增 air_weekly 适配器）。
 
+> **跨切面硬化（Task 13 评审 + Task 8 对抗校验发现）**：Phase 1 新增的三条入库路（air_tier / ocean-FCL / air_weekly）都把「人工可调/AI 抽取的自由文本」喂进有长度上限的 String 列。超长在 SQLite 静默脏存、在 **PostgreSQL（生产）`db.commit()` 抛 DataError → 整批 rollback**。Task 8 已修 `to_freight_rate_from_ocean`；硬化补丁再给 `to_air_tier_rate`(cargo_class/packing/density=String(20)、currency=String(5)、origin=String(20) 等) 与 `to_air_freight_rate`(currency=String(5)、origin=String(20)、airline_code/service_desc 等) 加界。非空列(origin/destination/currency-with-default)用 `(x or default)[:n]` 保非空；可空列用 `_clip`。
+
 ---
 
 ## Task 13: air_weekly 适配器（读 air_blank 布局回流）+ round-trip
