@@ -171,6 +171,7 @@ def _fill_air(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) 
     _unmerge_data_area(ws, sheet_cfg.data_start_row)
     _apply_week_headers(ws, sheet_cfg, rows)
     col = sheet_cfg.columns
+    ws.cell(sheet_cfg.header_row, col["currency"]).value = "Currency"
     r = sheet_cfg.data_start_row
     for row in rows:
         safe_set(ws.cell(r, col["origin"]), row.get("origin"))
@@ -179,6 +180,7 @@ def _fill_air(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) 
         for day in range(1, 8):
             safe_set(ws.cell(r, col[f"day{day}"]), row.get(f"day{day}"))
         safe_set(ws.cell(r, col["remark"]), row.get("remark"))
+        safe_set(ws.cell(r, col["currency"]), row.get("currency"))
         r += 1
 
 

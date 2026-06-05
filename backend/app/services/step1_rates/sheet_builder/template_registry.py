@@ -36,6 +36,7 @@ _AIR = TemplateConfig(
                 "day6": 9,
                 "day7": 10,
                 "remark": 11,
+                "currency": 13,
             },
         ),
     ),
