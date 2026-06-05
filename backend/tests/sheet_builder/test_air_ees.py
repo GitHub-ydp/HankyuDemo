@@ -60,6 +60,44 @@ def test_tiers_read_adaptively_from_block_header():
 
 
 @pytest.mark.skipif(not _SAMPLE.exists(), reason="EES 样本缺失，跳过")
+def test_carrier_forward_filled_across_merged_subrows():
+    """航司(航班列)在 EES 是合并单元格：只在每个航司块首行有值，托盘/散货泡比子行的航司格为空。
+    解析须把航司前向填充到块内每一行 → 每条 KIX 行都带 carrier，CK/MU 块的泡比子行 carrier 仍是 CK/MU。
+    (邓老师 2026-06-04 测试反馈 #1：航司丢在子行，审核台「航司」「比重」未分两列。)
+    真实文件「日本线」KIX 块逐行：CK/MU 基准行(≧45=17,≧100=14)；其下托盘1:200(≧500=13.5,≧1000=13)
+    /托盘1:300/散货1:200/散货1:300 的航班格均为合并空格。"""
+    rows = air_ees.parse_ees(str(_SAMPLE))["parsed_rows"]
+    kix = [r for r in rows if r["destination_port_name"] == "KIX"]
+    assert kix, "应抽到 KIX 行"
+
+    # 核心修复：CK/MU 航司格只在基准行有值，托盘/散货泡比子行为合并空格——子行航司须回填为 CK/MU。
+    sub_services = {"托盘1:200", "托盘1:300", "散货1:200", "散货1:300"}
+    sub_rows = [r for r in kix if r.get("service_desc") in sub_services]
+    assert len(sub_rows) == 4, f"应有 4 条 CK/MU 泡比子行, 实得 {len(sub_rows)}"
+    assert all(r.get("carrier") == "CK/MU" for r in sub_rows), "泡比子行的航司应前向填充为 CK/MU"
+
+    # 基准行(45/100)也归属 CK/MU
+    ckmu_tiers = [r["tier_prices"] for r in kix if r.get("carrier") == "CK/MU"]
+    assert {45: 17, 100: 14} in ckmu_tiers, "CK/MU 基准行应归属 CK/MU"
+    assert {500: 13.5, 1000: 13} in ckmu_tiers, "托盘1:200 子行的航司应被回填为 CK/MU"
+
+
+@pytest.mark.skipif(not _SAMPLE.exists(), reason="EES 样本缺失，跳过")
+def test_carrier_not_polluted_by_flight_schedule_columns():
+    """只有「日本线」那种档位列左侧的航班列(放航司码 CK/MU)才取作 carrier。
+    亚太/欧洲/美国线把航班时刻/二程航班/路线放在档位列右侧的「航班」或「航班信息」列——
+    那是排班信息不是航司，不得灌进 carrier(否则审核台「船司/航司」列变成一串时刻表)。"""
+    rows = air_ees.parse_ees(str(_SAMPLE))["parsed_rows"]
+    polluted = [
+        r["carrier"]
+        for r in rows
+        if r.get("carrier")
+        and ("二程" in r["carrier"] or "--" in r["carrier"] or "信息" in r["carrier"])
+    ]
+    assert not polluted, f"carrier 混入了航班时刻/二程排班文本: {polluted[:3]}"
+
+
+@pytest.mark.skipif(not _SAMPLE.exists(), reason="EES 样本缺失，跳过")
 def test_negotiation_rows_kept_when_any_tier_numeric():
     """美国线 NH-DFW 包板：议价行(100/500/1000 全「议价」)只有 45KGS=65 是数字 →
     新模型保留该行(只存 {45:65})；有完整价的行各自存全档。"""

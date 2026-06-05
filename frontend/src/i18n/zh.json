@@ -17,6 +17,7 @@
     "selectTemplate": "请先选择要生成的运价表模板",
     "uploadHint": "选择该模板对应的资料（Excel / 微信截图 / 邮件文本）",
     "uploadBtn": "上传并抽取",
+    "uploadingHint": "AI 正在识别并抽取运价，图片/复杂表格可能需要数十秒，请勿关闭页面…",
     "fileName": "文件",
     "sourceType": "来源",
     "status": "状态",
@@ -43,6 +44,7 @@
     "colRateLevel": "编码",
     "colLss": "LSS/CIC",
     "colBaf": "BAF",
+    "colSurcharges": "附加费",
     "colTransit": "航程(天)",
     "colService": "服务 / 重量档",
     "colCargoClass": "货类",
@@ -641,9 +643,9 @@
     "title": "投标包自动填表",
     "subtitle": "上传空白投标模板，自动识别客户、解析航线、匹配费率并产出成本价 / 销售价两版 Excel。",
     "upload": {
-      "dragText": "点击或拖拽上传：投标整包 (.zip) 或模板 (.xlsx)",
+      "dragText": "点击或拖拽上传：投标整包 (.zip) 或模板 (.xlsx/.xlsm)",
       "hint": "支持 Nitori 投标整包（.zip，含 TO GLOBAL 报价表 + 成本）与 Customer A 模板（.xlsx）；其它客户识别为 unknown 并阻断。",
-      "limitExt": "支持 .xlsx / .zip",
+      "limitExt": "支持 .xlsx / .xlsm / .zip",
       "limitSize": "单文件最大 10 MB",
       "uploading": "上传中 {{progress}}%",
       "processing": "AI 处理中：识别客户 → 解析段 → 匹配费率 → 生成两版 Excel..."

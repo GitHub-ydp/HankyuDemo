@@ -6,8 +6,8 @@
 
 复用现有抽取能力（不改）：
   rate_parser.detect_and_parse   — 结构化 Excel(kmtc/nvo 等)
-  wechat_image_parser.parse_wechat_image — 微信/截图运价(AI 视觉)
-  email_text_parser.parse_email_text     — 邮件正文运价
+  ocean_ai_extractor.parse_ocean_image — 海运微信/截图运价(AI 视觉, 箱型价+结构化附加费)
+  ocean_ai_extractor.parse_ocean_text  — 海运邮件/文本运价
 
 会话存内存（与 ai_parse 的 _parse_cache 同一风格；demo 重启即失，可接受）。
 """
@@ -22,8 +22,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.services import rate_parser, wechat_image_parser
-from app.services.step1_rates.sheet_builder import air_extractor, air_ai_extractor
+from app.services import rate_parser
+from app.services.step1_rates.sheet_builder import air_extractor, air_ai_extractor, ocean_ai_extractor
 from app.services.step1_rates.sheet_builder.template_registry import get_template_config
 
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
@@ -37,7 +37,7 @@ class FileResult:
     """单个上传文件的处理结果。"""
 
     name: str
-    source_type: str  # excel / wechat_image / email_text / unsupported / error
+    source_type: str  # excel / pdf / air_image / air_text / ocean_image / ocean_text / unsupported / error
     status: str  # parsed / skipped / error
     row_count: int = 0
     warnings: list[str] = field(default_factory=list)
@@ -107,8 +107,8 @@ def add_file(
                 parsed = air_ai_extractor.parse_air_image(file_path, db)
                 source_type = "air_image"
             else:
-                parsed = wechat_image_parser.parse_wechat_image(file_path, db)
-                source_type = "wechat_image"
+                parsed = ocean_ai_extractor.parse_ocean_image(file_path, db)
+                source_type = "ocean_image"
         else:  # 文本
             with open(file_path, encoding="utf-8", errors="ignore") as fh:
                 text = fh.read()
@@ -116,9 +116,8 @@ def add_file(
                 parsed = air_ai_extractor.parse_air_text(text, db)
                 source_type = "air_text"
             else:
-                from app.services.email_text_parser import parse_email_text
-                parsed = parse_email_text(text, db)
-                source_type = "email_text"
+                parsed = ocean_ai_extractor.parse_ocean_text(text, db)
+                source_type = "ocean_text"
     except Exception as exc:  # noqa: BLE001 — 单文件失败不该让整批崩
         result = FileResult(
             name=file_name,
@@ -188,9 +187,9 @@ def _normalize_sea(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]
     c40hq = row.get("container_40hq")
     return {
         # 起运港按文件，默认上海（Sea Net Rate 模板 From: Shanghai）
-        "origin": row.get("origin_port_name") or "SHANGHAI",
+        "origin": row.get("origin_port_name") or row.get("origin") or "SHANGHAI",
         "destination": row.get("destination_port_name") or row.get("destination"),
-        "carrier": row.get("carrier_name") or carrier_fallback,
+        "carrier": row.get("carrier_name") or row.get("carrier") or carrier_fallback,
         # 结构化箱型价：入库 FreightRate 用，不再合并丢失
         "container_20gp": c20,
         "container_40gp": c40gp,
@@ -204,6 +203,9 @@ def _normalize_sea(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]
         "transit": row.get("transit_days"),
         "remark": row.get("remark") or row.get("remarks"),
         "source_file": row.get("source_file"),
+        # ocean AI 抽取新字段（旧 Excel/PDF 行无这些键 → None/[]，不影响）
+        "surcharges": row.get("surcharges") or [],
+        "vessel_voyage": row.get("vessel_voyage"),
         # PDF(ONE 合约)透传字段：老 Excel 行无这些键 → None/默认，无影响
         "container_45": row.get("container_45"),
         "valid_from": row.get("valid_from"),

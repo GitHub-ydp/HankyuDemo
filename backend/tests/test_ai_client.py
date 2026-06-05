@@ -132,6 +132,46 @@ def test_chat_anthropic_without_key_raises(monkeypatch):
         ai_client.chat("sys", "hello", provider="anthropic", max_tokens=16)
 
 
+def _capture_vllm_body(monkeypatch):
+    """patch httpx.post 捕获请求体并返回假 200；返回捕获用的 dict。"""
+    captured: dict = {}
+
+    def fake_post(url, **kw):
+        captured["url"] = url
+        captured["body"] = kw.get("json")
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {"choices": [{"message": {"content": "[]"}}]}
+        return resp
+
+    monkeypatch.setattr(ai_client.httpx, "post", fake_post)
+    return captured
+
+
+def test_vllm_raw_sends_reasoning_effort_when_set(monkeypatch):
+    """vllm_reasoning_effort 非空时，请求体应带 reasoning_effort（给思考模型关思考用）。"""
+    monkeypatch.setattr(settings, "vllm_api_key", "k")
+    monkeypatch.setattr(settings, "vllm_reasoning_effort", "none")
+    captured = _capture_vllm_body(monkeypatch)
+
+    ai_client._vllm_raw([{"role": "user", "content": "x"}],
+                        model="m", temperature=0, max_tokens=16, timeout=5)
+
+    assert captured["body"].get("reasoning_effort") == "none"
+
+
+def test_vllm_raw_omits_reasoning_effort_when_empty(monkeypatch):
+    """默认空 → 不发 reasoning_effort 字段，云端不认识此字段的端点不受影响。"""
+    monkeypatch.setattr(settings, "vllm_api_key", "k")
+    monkeypatch.setattr(settings, "vllm_reasoning_effort", "")
+    captured = _capture_vllm_body(monkeypatch)
+
+    ai_client._vllm_raw([{"role": "user", "content": "x"}],
+                        model="m", temperature=0, max_tokens=16, timeout=5)
+
+    assert "reasoning_effort" not in captured["body"]
+
+
 # ---------- 单元：Anthropic timeout mock ----------
 
 def test_anthropic_timeout_propagates(monkeypatch):

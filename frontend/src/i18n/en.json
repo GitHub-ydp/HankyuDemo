@@ -17,6 +17,7 @@
     "selectTemplate": "Please select a rate sheet template first",
     "uploadHint": "Select sources for this template (Excel / WeChat image / email text)",
     "uploadBtn": "Upload & extract",
+    "uploadingHint": "AI is recognizing and extracting rates. Images / complex tables may take tens of seconds — please keep this page open…",
     "fileName": "File",
     "sourceType": "Source",
     "status": "Status",
@@ -43,6 +44,7 @@
     "colRateLevel": "Rate Code",
     "colLss": "LSS/CIC",
     "colBaf": "BAF",
+    "colSurcharges": "Surcharges",
     "colTransit": "Transit (d)",
     "colService": "Service / weight tier",
     "colCargoClass": "Cargo type",
@@ -640,9 +642,9 @@
     "title": "Tender PKG Auto-Fill",
     "subtitle": "Upload a blank tender template. The system will identify the customer, parse lanes, match rates, and produce cost / S-R variants in one go.",
     "upload": {
-      "dragText": "Click or drag to upload: bid package (.zip) or template (.xlsx)",
+      "dragText": "Click or drag to upload: bid package (.zip) or template (.xlsx/.xlsm)",
       "hint": "Supports Nitori bid package (.zip with TO GLOBAL quote + cost) and Customer A template (.xlsx). Other customers are flagged as unknown and blocked.",
-      "limitExt": ".xlsx / .zip",
+      "limitExt": ".xlsx / .xlsm / .zip",
       "limitSize": "Max file size 10 MB",
       "uploading": "Uploading {{progress}}%",
       "processing": "AI processing: identify → parse → match rates → generate two variants..."

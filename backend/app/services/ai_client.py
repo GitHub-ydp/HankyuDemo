@@ -191,6 +191,10 @@ def _vllm_raw(
     }
     if cfg.vllm_enable_chat_template_kwargs:
         body["chat_template_kwargs"] = {"enable_thinking": cfg.vllm_enable_thinking}
+    # 思考模型(如 Ollama gemma)关思考：非空时透传 OpenAI 风格 reasoning_effort（none/low/...）。
+    # 默认空=不发，不影响云端 Qwen-VL 等不认识此字段的端点。
+    if settings.vllm_reasoning_effort:
+        body["reasoning_effort"] = settings.vllm_reasoning_effort
 
     url = f"{cfg.vllm_base_url.rstrip('/')}/chat/completions"
     try:

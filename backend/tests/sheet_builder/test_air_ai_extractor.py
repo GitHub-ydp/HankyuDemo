@@ -53,7 +53,9 @@ def test_parse_air_image_ai_failure_returns_empty(monkeypatch):
     monkeypatch.setattr(ai_client, "chat_with_image", boom)
     out = air_ai_extractor.parse_air_image("/tmp/air.png", db=None)
     assert out["parsed_rows"] == []
-    assert any("失败" in w for w in out["warnings"])
+    # 识别失败要走 error 键(让 orchestrator 标 skipped 透传原因)，
+    # 而非只塞 warnings——后者会被当 parsed 显示绿色「已抽取」成功标签。
+    assert "失败" in out["error"]
 
 
 def test_default_currency_japan_origin(monkeypatch):

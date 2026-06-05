@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
-import { Upload, Input, InputNumber, Table, Tooltip, message, Select } from 'antd';
+import { Upload, Input, InputNumber, Table, Tooltip, message, Select, Spin } from 'antd';
 import type { UploadFile } from 'antd';
 import { useTranslation } from 'react-i18next';
 import Icon from '../components/Icon';
@@ -12,6 +12,16 @@ interface FileResult {
   row_count: number;
   warnings: string[];
   message: string;
+}
+
+interface SeaSurcharge {
+  code: string;
+  amount_20?: number | null;
+  amount_40?: number | null;
+  currency?: string | null;
+  payment?: string | null;
+  included?: boolean;
+  note?: string | null;
 }
 
 interface PreviewRow {
@@ -50,6 +60,7 @@ interface PreviewRow {
   day7?: number | string | null;
   // 档位源(EES/唯凯)：稀疏档位 dict(KG→价)。JSON 往返后键是字符串('45')。
   tier_prices?: Record<string, number | null>;
+  surcharges?: SeaSurcharge[];
   remark?: string | null;
   needs_review?: boolean;
 }
@@ -364,6 +375,32 @@ export default function RateSheetBuilder() {
   // 海运动态列：起运港/目的港/备注恒显；其余按该批次是否有数据出现。
   // 价格列绑结构化 container_*(入库读这些)；via/commodity/生效日可编辑(needs_review 行纠正目标)；
   // 起运港/币种/编码只读(标识性字段)。
+  // 海运结构化附加费 → 紧凑串：LSS 含 · EIS 150/300 到付 · 转运 稍等
+  const fmtSurcharge = (s: SeaSurcharge): string => {
+    if (s.included) return `${s.code} 含`;
+    if (s.note) return `${s.code} ${s.note}`;
+    const amt = [s.amount_20, s.amount_40].filter((v) => v !== null && v !== undefined).join('/');
+    const pay = s.payment === 'collect' ? ' 到付' : s.payment === 'prepaid' ? ' 预付' : '';
+    return amt ? `${s.code} ${amt}${pay}` : s.code;
+  };
+  // 任一行有非空 surcharges 数组才显该列（seaHas 对空数组会误判，单独判定）
+  const seaHasSurcharges = rows.some((r) => Array.isArray(r.surcharges) && r.surcharges.length > 0);
+  const surchargeCol = {
+    title: t('rateSheet.colSurcharges'),
+    key: 'surcharges',
+    width: 220,
+    render: (_: unknown, r: PreviewRow) => {
+      const list = (r.surcharges ?? []) as SeaSurcharge[];
+      if (!list.length) return '';
+      const hasTbd = list.some((s) => !!s.note);
+      return (
+        <span style={hasTbd ? { color: '#d46b08' } : undefined}>
+          {list.map(fmtSurcharge).join(' · ')}
+        </span>
+      );
+    },
+  };
+
   const seaCols = [
     originCol,
     textCol(t('rateSheet.colDestination'), 'destination'),
@@ -380,6 +417,7 @@ export default function RateSheetBuilder() {
     ...(seaHas('rate_level') ? [roCol(t('rateSheet.colRateLevel'), 'rate_level', 72)] : []),
     ...(seaHas('lss_cic') ? [numCol(t('rateSheet.colLss'), 'lss_cic')] : []),
     ...(seaHas('baf') ? [numCol(t('rateSheet.colBaf'), 'baf')] : []),
+    ...(seaHasSurcharges ? [surchargeCol] : []),
     ...(seaHas('transit_days') ? [numCol(t('rateSheet.colTransit'), 'transit_days')] : []),
     textCol(t('rateSheet.colRemark'), 'remark'),
     reviewCol,
@@ -516,6 +554,24 @@ export default function RateSheetBuilder() {
           >
             {uploading ? `${t('rateSheet.flow3')}…` : t('rateSheet.uploadBtn')}
           </button>
+
+          {uploading && (
+            <div
+              style={{
+                marginTop: 14,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '12px 16px',
+                background: 'var(--fill-2, #f5f7fa)',
+                border: '1px solid var(--border, #e5e8ee)',
+                borderRadius: 8,
+              }}
+            >
+              <Spin />
+              <span style={{ color: 'var(--text-2, #555)' }}>{t('rateSheet.uploadingHint')}</span>
+            </div>
+          )}
 
           {fileResults.length > 0 && (
             <div style={{ marginTop: 16 }}>

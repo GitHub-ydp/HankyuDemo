@@ -104,8 +104,10 @@ def _result(rates_json: Any, source_file: str, source_type: str) -> dict[str, An
 
 
 def _empty(source_file: str, source_type: str, msg: str) -> dict[str, Any]:
+    # 识别失败走 error 键(沿用 air_extractor/rate_parser 约定)：orchestrator 据此标 skipped 并
+    # 透传原因。早期塞进 warnings 会绕过 skipped 分支、被当 parsed 显示绿色「已抽取」成功标签。
     return {
-        "parsed_rows": [], "total_rows": 0, "warnings": [msg],
+        "parsed_rows": [], "total_rows": 0, "error": msg,
         "source_type": source_type, "file_name": source_file,
     }
 

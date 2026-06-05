@@ -23,8 +23,9 @@ from app.services.step2_bidding.token_store import TOKEN_STORE
 router = APIRouter(prefix="/bidding", tags=["Bidding"])
 
 _MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
-# .xlsx：单文件（customer_a）；.zip：整包（Nitori 等多文件投标包，含报价表+成本邮件）
-_ALLOWED_EXTS = (".xlsx", ".zip")
+# .xlsx/.xlsm：单文件投标包（customer_a；.xlsm 是宏启用模板，identify 按内容识别、不看扩展名）；
+# .zip：整包（Nitori 等多文件投标包，含报价表+成本邮件，单文件喂不了，须打包）
+_ALLOWED_EXTS = (".xlsx", ".xlsm", ".zip")
 _XLSX_MEDIA_TYPE = (
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
@@ -45,7 +46,7 @@ async def auto_fill(
     if not lower.endswith(_ALLOWED_EXTS):
         raise HTTPException(
             status_code=400,
-            detail=f"F7_WRONG_EXTENSION: only .xlsx / .zip allowed (got {filename!r})",
+            detail=f"F7_WRONG_EXTENSION: only .xlsx / .xlsm / .zip allowed (got {filename!r})",
         )
 
     content = await file.read()
