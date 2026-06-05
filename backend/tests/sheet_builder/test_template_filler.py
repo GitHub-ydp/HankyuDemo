@@ -15,33 +15,39 @@ def test_fill_sea_expands_container_rows():
         {
             "destination": "BUSAN",
             "carrier": "SJJ",
-            "freight_20": 130,
-            "freight_40": 260,
+            "container_20gp": 130,
+            "container_40gp": 260,
+            "container_40hq": 265,
             "lss_cic": "Incl.",
             "baf": 50,
             "transit": "2days",
             "remark": "直达",
         },
-        {"destination": "INCHON", "carrier": "COSCO", "freight_20": 300, "freight_40": 500},
+        {"destination": "INCHON", "carrier": "COSCO",
+         "container_20gp": 300, "container_40gp": 500, "container_40hq": 520},
     ]
     content, filename = fill_template("sea", rows)
     ws = _reload(content)["JP N RATE FCL & LCL"]
 
     # 表头未被破坏
     assert ws.cell(8, 1).value == "To"
-    # 第一条 BUSAN 展开 20FT / 40FT 两行，从 r9 开始
+    # 第一条 BUSAN 展开 20FT / 40GP / 40HQ 三行，从 r9 开始
     assert ws.cell(9, 1).value == "BUSAN"
     assert ws.cell(9, 2).value == "SJJ"
     assert ws.cell(9, 3).value == "20FT"
     assert ws.cell(9, 4).value == 130
     assert ws.cell(9, 5).value == "Incl."  # LSS+CIC
     assert ws.cell(9, 6).value == 50       # BAF
-    assert ws.cell(10, 3).value == "40FT/40HQ"
+    assert ws.cell(10, 3).value == "40GP"
     assert ws.cell(10, 4).value == 260
-    # 第二条 INCHON 从 r11
-    assert ws.cell(11, 1).value == "INCHON"
-    assert ws.cell(11, 4).value == 300
-    assert ws.cell(12, 4).value == 500
+    assert ws.cell(11, 3).value == "40HQ"
+    assert ws.cell(11, 4).value == 265
+    # 第二条 INCHON 从 r12，同样三行
+    assert ws.cell(12, 1).value == "INCHON"
+    assert ws.cell(12, 3).value == "20FT"
+    assert ws.cell(12, 4).value == 300
+    assert ws.cell(13, 4).value == 500   # 40GP
+    assert ws.cell(14, 4).value == 520   # 40HQ
     assert filename.endswith(".xlsx")
 
 

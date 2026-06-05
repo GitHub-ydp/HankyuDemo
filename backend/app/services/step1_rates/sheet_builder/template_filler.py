@@ -9,7 +9,7 @@
 
 normalized rate dict 字段约定：
   通用:  destination, carrier, remark
-  sea :  freight_20, freight_40, lss_cic, baf, ebs, yas_caf, sailing, via, transit, booking
+  sea :  container_20gp, container_40gp, container_40hq, lss_cic, baf, ebs, yas_caf, sailing, via, transit, booking
   air(周表源 Market Price):  service, day1..day7
   air(档位源 EES/唯凯):       service, tier_prices(稀疏 KG→价)
 
@@ -28,8 +28,21 @@ from app.services.step1_rates.sheet_builder.entities import SheetFillConfig
 from app.services.step1_rates.sheet_builder.template_registry import get_template_config
 from app.services.step1_rates.writers.base import safe_set
 
-# Sea FCL 一条运价展开为两行：(箱型标签, 取运费用的字段名)
-_SEA_CONTAINER_ROWS = (("20FT", "freight_20"), ("40FT/40HQ", "freight_40"))
+# Sea FCL 一条运价展开为三行：(箱型标签, 取运费用的字段名)
+_SEA_CONTAINER_ROWS = (
+    ("20FT", "container_20gp"),
+    ("40GP", "container_40gp"),
+    ("40HQ", "container_40hq"),
+)
+
+# (表头标签, 列键, 行字段) —— 新增海运元数据列(模板无表头,填充时一并写第8行表头)
+_SEA_META_COLS = (
+    ("Currency", "currency", "currency"),
+    ("Valid From", "valid_from", "valid_from"),
+    ("Valid To", "valid_to", "valid_to"),
+    ("Rate Level", "rate_level", "rate_level"),
+    ("Service Code", "service_code", "service_code"),
+)
 
 # 档位表元数据列：(表头标签, 取值的字段名)。顺序即列序，必须与 AirTierAdapter 解析契约一致。
 _TIER_META_COLS = (
@@ -173,6 +186,9 @@ def _fill_sea(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) 
     ws = workbook[sheet_cfg.sheet_name]
     _unmerge_data_area(ws, sheet_cfg.data_start_row)
     col = sheet_cfg.columns
+    # 模板无这些新列表头 → 填充时在表头行写英文标签，供重新导入时 OceanAdapter 按表头识别
+    for label, col_key, _ in _SEA_META_COLS:
+        ws.cell(sheet_cfg.header_row, col[col_key]).value = label
     r = sheet_cfg.data_start_row
     for row in rows:
         for container_label, freight_key in _SEA_CONTAINER_ROWS:
@@ -189,4 +205,6 @@ def _fill_sea(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) 
             safe_set(ws.cell(r, col["transit"]), row.get("transit"))
             safe_set(ws.cell(r, col["booking"]), row.get("booking"))
             safe_set(ws.cell(r, col["rmks"]), row.get("remark"))
+            for _, col_key, field_name in _SEA_META_COLS:
+                safe_set(ws.cell(r, col[col_key]), row.get(field_name))
             r += 1
