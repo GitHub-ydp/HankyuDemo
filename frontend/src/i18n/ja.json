@@ -17,6 +17,7 @@
     "selectTemplate": "作成するレート表のテンプレートを選択してください",
     "uploadHint": "テンプレートに対応する資料を選択（Excel / WeChat画像 / メール本文）",
     "uploadBtn": "アップロードして抽出",
+    "uploadingHint": "AI が運賃を認識・抽出中です。画像や複雑な表は数十秒かかる場合があります。ページを閉じないでください…",
     "fileName": "ファイル",
     "sourceType": "ソース",
     "status": "状態",

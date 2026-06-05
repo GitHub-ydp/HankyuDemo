@@ -17,6 +17,7 @@
     "selectTemplate": "请先选择要生成的运价表模板",
     "uploadHint": "选择该模板对应的资料（Excel / 微信截图 / 邮件文本）",
     "uploadBtn": "上传并抽取",
+    "uploadingHint": "AI 正在识别并抽取运价，图片/复杂表格可能需要数十秒，请勿关闭页面…",
     "fileName": "文件",
     "sourceType": "来源",
     "status": "状态",

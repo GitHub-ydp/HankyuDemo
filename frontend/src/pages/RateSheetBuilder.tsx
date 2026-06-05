@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
-import { Upload, Input, InputNumber, Table, Tooltip, message, Select } from 'antd';
+import { Upload, Input, InputNumber, Table, Tooltip, message, Select, Spin } from 'antd';
 import type { UploadFile } from 'antd';
 import { useTranslation } from 'react-i18next';
 import Icon from '../components/Icon';
@@ -554,6 +554,24 @@ export default function RateSheetBuilder() {
           >
             {uploading ? `${t('rateSheet.flow3')}…` : t('rateSheet.uploadBtn')}
           </button>
+
+          {uploading && (
+            <div
+              style={{
+                marginTop: 14,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '12px 16px',
+                background: 'var(--fill-2, #f5f7fa)',
+                border: '1px solid var(--border, #e5e8ee)',
+                borderRadius: 8,
+              }}
+            >
+              <Spin />
+              <span style={{ color: 'var(--text-2, #555)' }}>{t('rateSheet.uploadingHint')}</span>
+            </div>
+          )}
 
           {fileResults.length > 0 && (
             <div style={{ marginTop: 16 }}>

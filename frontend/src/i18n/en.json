@@ -17,6 +17,7 @@
     "selectTemplate": "Please select a rate sheet template first",
     "uploadHint": "Select sources for this template (Excel / WeChat image / email text)",
     "uploadBtn": "Upload & extract",
+    "uploadingHint": "AI is recognizing and extracting rates. Images / complex tables may take tens of seconds — please keep this page open…",
     "fileName": "File",
     "sourceType": "Source",
     "status": "Status",
