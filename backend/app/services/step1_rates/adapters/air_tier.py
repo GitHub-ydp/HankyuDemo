@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -50,20 +50,31 @@ class AirTierAdapter:
     def parse(self, path: Path, db: Session | None = None) -> ParsedRateBatch:
         wb = load_workbook(path, data_only=True)
         records: list[ParsedRateRecord] = []
-        for ws in wb.worksheets:
-            headers = self._tier_sheet_headers(ws)
-            if headers is None:
-                continue
-            records.extend(self._parse_sheet(ws, headers))
+        warnings: list[str] = []
+        try:
+            matched = False
+            for ws in wb.worksheets:
+                headers = self._tier_sheet_headers(ws)
+                if headers is None:
+                    continue
+                matched = True
+                records.extend(self._parse_sheet(ws, headers))
+            if not matched:
+                warnings.append(
+                    "未找到符合档位表表头契约的 sheet(Origin/Destination/Service/{kg}KG…)"
+                )
+        finally:
+            wb.close()
         return ParsedRateBatch(
             file_type=Step1FileType.air_tier,
             source_file=path.name,
             records=records,
+            warnings=warnings,
             adapter_key=self.key,
         )
 
     def _tier_sheet_headers(self, ws) -> dict[str, Any] | None:
-        """读第 1 行表头；命中档位表契约时返回 {name→col_index, "tiers":[(kg,col)]}，否则 None。"""
+        """读第 1 行表头；命中返回 {"named": {表头小写→列下标}, "tiers": [(kg, 列下标)]}，否则 None。"""
         first_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), None)
         if not first_row:
             return None
@@ -91,9 +102,6 @@ class AirTierAdapter:
             for n in names:
                 if n in named:
                     return named[n]
-            for key, idx in named.items():
-                if key.startswith(names[0]):
-                    return idx
             return None
 
         c_origin = col("origin (pol)", "origin")
@@ -119,9 +127,9 @@ class AirTierAdapter:
             dest = v(c_dest)
             tier_prices: dict[int, float] = {}
             for kg, ci in tiers:
-                price = row[ci] if ci < len(row) else None
-                if price is not None and str(price).strip() != "":
-                    tier_prices[kg] = float(price)
+                num = self._safe_float(row[ci] if ci < len(row) else None)
+                if num is not None:
+                    tier_prices[kg] = num
             if not origin and not dest and not tier_prices:
                 continue  # 跳过空行
             out.append(
@@ -151,12 +159,24 @@ class AirTierAdapter:
     def _to_date(value: Any) -> date | None:
         if not value:
             return None
-        if hasattr(value, "isoformat") and not isinstance(value, str):
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        text = str(value).strip()[:10]
+        for fmt in ("%Y-%m-%d", "%Y/%m/%d"):
             try:
-                return value.date() if hasattr(value, "date") else value
-            except Exception:
-                return None
+                return datetime.strptime(text, fmt).date()
+            except ValueError:
+                continue
+        return None
+
+    @staticmethod
+    def _safe_float(value: Any) -> float | None:
+        """数字格→float；空/非数字(如 'ASK'/'-'/'询价')返回 None，单格脏数据不炸整批。"""
+        if value is None or str(value).strip() == "":
+            return None
         try:
-            return date.fromisoformat(str(value)[:10])
-        except ValueError:
+            return float(value)
+        except (TypeError, ValueError):
             return None
