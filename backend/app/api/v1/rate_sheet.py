@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.core.config import settings
 from app.schemas.common import ApiResponse
-from app.services.step1_rates.sheet_builder import db_writer, orchestrator
+from app.services.step1_rates.sheet_builder import orchestrator
 from app.services.step1_rates.sheet_builder.template_filler import fill_template
 from app.services.step1_rates.sheet_builder.template_registry import (
     supported_template_types,
@@ -146,38 +146,3 @@ def download_rate_sheet_post(session_id: str, body: DownloadRequest):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
-
-
-@router.post("/{session_id}/commit")
-def commit_rate_sheet(
-    session_id: str, body: DownloadRequest, db: Session = Depends(get_db)
-):
-    """审核后的「勾选+编辑」行直接入库(save-from-session)。
-
-    按行形状分流：含箱型价(container_*)→海运 FreightRate；否则→air_tier。
-    """
-    try:
-        orchestrator.get_session(session_id)
-    except KeyError:
-        return ApiResponse(code=404, message="会话不存在或已过期，请重新创建")
-
-    rows = body.rows
-    if any(_has_ocean_price(r) for r in rows):
-        ocean = db_writer.commit_ocean_rows(rows, db)
-        return ApiResponse(data={
-            "batch_id": ocean.batch_id,
-            "fcl_rows": ocean.fcl_rows,
-            "skipped_no_price": ocean.skipped_no_price,
-            "skipped_unresolved": ocean.skipped_unresolved,
-        })
-
-    result = db_writer.commit_tier_rows(rows, db)
-    return ApiResponse(data={
-        "batch_id": result.batch_id,
-        "tier_rows": result.tier_rows,
-        "skipped_weekly": result.skipped_weekly,
-    })
-
-
-def _has_ocean_price(r: dict) -> bool:
-    return any(r.get(k) is not None for k in ("container_20gp", "container_40gp", "container_40hq"))
