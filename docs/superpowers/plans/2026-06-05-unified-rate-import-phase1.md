@@ -1261,10 +1261,10 @@ Expected: FAIL（无 Currency 列）
 
 - [ ] **Step 3: 实现**
 
-(a) `template_registry.py` `_AIR` columns 增 `"currency": 12`（K=11 是 remark，L=12 空）：
+(a) `template_registry.py` `_AIR` columns 增 `"currency": 13`（**实测修正**：col 12=L 是 Remark 的 `K1:L1` 合并块从属格、表头只读；col 13=M 是空闲普通 Cell、表头/数据均可写）：
 ```python
                 "remark": 11,
-                "currency": 12,
+                "currency": 13,
 ```
 (b) `_fill_air` 写表头与值：
 ```python
