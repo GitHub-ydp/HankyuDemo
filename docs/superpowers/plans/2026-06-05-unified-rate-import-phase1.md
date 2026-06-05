@@ -200,6 +200,8 @@ git commit -m "feat(step1): 新增 to_air_tier_rate 映射器(ParsedRateRecord�
 
 ---
 
+> **评审修正（commit 18c1c79，已落地）**：非数字档位价用 `_safe_float` 跳过不炸整批；`col()` 去掉前缀回退只精确匹配；`parse` 落空补 warning + `wb.close()`；`_to_date` 支持 `YYYY/MM/DD` 并简化。下方原始代码为初版，最终代码以该 fix 提交为准。
+
 ## Task 3: 空运档位导入适配器 AirTierAdapter
 
 **Files:**
