@@ -89,6 +89,17 @@ def _is_flight_label(c: str | None) -> bool:
     return bool(c) and "航班" in re.sub(r"\s", "", c)
 
 
+def _is_carrier_label(c: str | None) -> bool:
+    """航司列表头：「航司」或「航班」。日本线把航司码(CK/MU/NH中转)放在档位列左侧的「航班」列。
+    「航班信息」是航班时刻/路线列(亚太/欧洲/美国线放档位列右侧)，是排班不是航司 → 排除。"""
+    if not c:
+        return False
+    t = re.sub(r"\s", "", c)
+    if "信息" in t:
+        return False
+    return "航司" in t or "航班" in t
+
+
 def _tier_kg(value: str | None) -> int | None:
     """表头单元格 → 重量档 KG 整数；只认纯档位写法(可带 ≧/≥/> 比较符)，如
     ≧100KG / >1000KGS / 45K / 100KGS。「+100KG泡货」「37分泡比例1:100」这类尾部还带
@@ -106,6 +117,7 @@ def _column_map(header: list[Any]) -> dict[str, int | dict[int, int]]:
     first_tier(最靠左的档位列号，用来圈定装载方式列的搜索范围)。"""
     cmap: dict[str, Any] = {}
     tiers: dict[int, int] = {}
+    has_density = False  # 表头是否有「比重」列——日本线那种「航班+比重」布局的判据
     for j, cell in enumerate(header):
         c = _clean(cell)
         if not c:
@@ -113,13 +125,24 @@ def _column_map(header: list[Any]) -> dict[str, int | dict[int, int]]:
         kg = _tier_kg(c)
         if kg is not None:
             tiers.setdefault(kg, j)  # 同一档重复出现时取最左列
-        elif "dest" not in cmap and _is_dest_label(c):
+            continue
+        if "dest" not in cmap and _is_dest_label(c):
             cmap["dest"] = j
         elif "flight" not in cmap and _is_flight_label(c):
             cmap["flight"] = j
+        if "比重" in re.sub(r"\s", "", c):
+            has_density = True
+        # 航司列(独立判定，可与 flight 同列)：flight 供 service 兜底，carrier 供前向填充补合并空格。
+        if "carrier" not in cmap and _is_carrier_label(c):
+            cmap["carrier"] = j
     if tiers:
         cmap["tiers"] = tiers
         cmap["first_tier"] = min(tiers.values())
+    # 航司列仅在「航班+比重」布局(日本线那种,航司是合并单元格)才取：须有比重列、且航司列在档位列左侧。
+    # 别的 sheet「航班/航班信息」列放的是航班时刻/路线/二程航班(排班信息,非航司)——亚太线在档位右侧、
+    # 中南美无比重列——都不取，否则审核台「船司/航司」会被灌成一串时刻表。
+    if "carrier" in cmap and not (has_density and cmap.get("first_tier", 0) > cmap["carrier"]):
+        del cmap["carrier"]
     return cmap
 
 
@@ -133,11 +156,13 @@ def _parse_sheet(
     header_set = set(header_idxs)
     cmap: dict[str, Any] = {}
     current_dest: list[str] = []
+    current_carrier: str | None = None  # 航司合并单元格：块首行有值、泡比子行空 → 前向填充
 
     for i, row in enumerate(rows):
         if i in header_set:
             cmap = _column_map(row)
             current_dest = None  # 新航司块重置，避免把上一块的港口串到本块
+            current_carrier = None  # 同理重置航司，避免上一块航司渗入
             continue
         if "dest" not in cmap or not cmap.get("tiers"):
             continue
@@ -147,6 +172,13 @@ def _parse_sheet(
             codes = _clean_dest(raw_dest)
             if codes:
                 current_dest = codes
+                current_carrier = None  # 换目的港重置航司，防上一港尾航司渗入(本港首行航司格通常有值会即刻补回)
+
+        carrier_col = cmap.get("carrier")
+        if carrier_col is not None and carrier_col < len(row):
+            cell = _clean(row[carrier_col])
+            if cell:
+                current_carrier = cell  # 航司格有值→更新；空格→沿用上一行(合并单元格前向填充)
 
         tier_prices = _row_tier_prices(row, cmap["tiers"])
         if not current_dest or not tier_prices:
@@ -156,6 +188,7 @@ def _parse_sheet(
             out.append(
                 {
                     "destination_port_name": dest,
+                    "carrier": current_carrier,  # 前向填充后的航司(合并空格已补全)
                     "service_desc": _row_service(row, cmap),
                     # 稀疏档位 dict(KG 升序)：有哪档数字存哪档，取代单价×7天。
                     "tier_prices": tier_prices,
