@@ -538,6 +538,7 @@
     "parseImageFailed": "图片识别失败",
     "importFailed": "导入失败",
     "importSuccess": "成功导入 {{count}} 条运价",
+    "committingTip": "正在生成运价表，数据较多请耐心等待，请勿关闭页面…（已用时 {{seconds}} 秒）",
     "tabExcel": "Excel 文件",
     "tabInbox": "邮箱识别",
     "tabEmailText": "邮件文本",

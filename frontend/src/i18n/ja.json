@@ -538,6 +538,7 @@
     "parseImageFailed": "画像解析に失敗しました",
     "importFailed": "取込に失敗しました",
     "importSuccess": "{{count}} 件の運賃を取り込みました",
+    "committingTip": "運賃表を生成中です。データ量が多いため、しばらくお待ちください。ページを閉じないでください…（経過 {{seconds}} 秒）",
     "tabExcel": "Excel ファイル",
     "tabInbox": "メール取得",
     "tabEmailText": "メール本文",

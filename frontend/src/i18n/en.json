@@ -538,6 +538,7 @@
     "parseImageFailed": "Failed to analyze the image",
     "importFailed": "Import failed",
     "importSuccess": "Imported {{count}} rate records",
+    "committingTip": "Generating rate sheet — this may take a while for large imports. Please don't close the page… ({{seconds}}s elapsed)",
     "tabExcel": "Excel File",
     "tabInbox": "Mailbox",
     "tabEmailText": "Email Text",

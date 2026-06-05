@@ -163,3 +163,8 @@ cd backend
 - `启动说明.md` — Mac / Windows 本地启动速查
 - `DEPLOYMENT.md` — 生产部署 + 升级 checklist（必读）
 - `AGENTS.md` — OMX 多智能体编排合约（工具生成，勿手改）
+
+
+## 特殊要求
+
+- 中文回复
