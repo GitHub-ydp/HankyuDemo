@@ -144,7 +144,7 @@ def to_freight_rate_from_ocean(
         carrier_id=carrier_id,
         origin_port_id=origin_port_id,
         destination_port_id=destination_port_id,
-        service_code=record.service_code,
+        service_code=_clip(record.service_code, 20),
         container_20gp=record.container_20gp,
         container_40gp=record.container_40gp,
         container_40hq=record.container_40hq,
@@ -162,7 +162,7 @@ def to_freight_rate_from_ocean(
         doc=record.doc,
         isps=record.isps,
         equipment_mgmt=record.equipment_mgmt,
-        currency=record.currency or "USD",
+        currency=_clip(record.currency or "USD", 5),
         valid_from=record.valid_from,
         valid_to=record.valid_to,
         sailing_day=record.sailing_day,
@@ -173,7 +173,7 @@ def to_freight_rate_from_ocean(
         source_file=source_file or record.source_file,
         batch_id=batch_id,
         status=RateStatus.active,
-        rate_level=record.rate_level,
+        rate_level=_clip(record.rate_level, 10),
     )
 
 

@@ -42,3 +42,24 @@ def test_ocean_reads_new_columns(tmp_path, db):
     assert str(r.valid_from) == "2026-06-01"
     assert r.rate_level == "NAC"
     assert r.service_code == "EC1"
+
+
+def test_ocean_overlong_fields_clipped(tmp_path, db):
+    import uuid
+    from app.services.step1_rates.activator_mappers import to_freight_rate_from_ocean
+    rows = [{
+        "destination": "USLAX", "carrier": "ONE",
+        "container_20gp": 1000, "container_40gp": 1800, "container_40hq": 1850,
+        "currency": "USD/CNY/EUR", "rate_level": "Named Account Premium",
+        "service_code": "TRANSPACIFIC-EXPRESS-WEEKLY-AE7",
+    }]
+    content, _ = fill_template("sea", rows)
+    path = tmp_path / "ocean_overlong.xlsx"
+    path.write_bytes(content)
+    batch = OceanAdapter().parse(path, db=db)
+    fcl = [r for r in batch.records if r.record_kind == "fcl"]
+    assert fcl
+    fr = to_freight_rate_from_ocean(fcl[0], uuid.uuid4(), db, source_file="x")
+    assert len(fr.currency) <= 5
+    assert len(fr.rate_level) <= 10
+    assert len(fr.service_code) <= 20
