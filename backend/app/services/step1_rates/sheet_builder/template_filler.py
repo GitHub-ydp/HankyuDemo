@@ -31,6 +31,17 @@ from app.services.step1_rates.writers.base import safe_set
 # Sea FCL 一条运价展开为两行：(箱型标签, 取运费用的字段名)
 _SEA_CONTAINER_ROWS = (("20FT", "freight_20"), ("40FT/40HQ", "freight_40"))
 
+# 档位表元数据列：(表头标签, 取值的字段名)。顺序即列序，必须与 AirTierAdapter 解析契约一致。
+_TIER_META_COLS = (
+    ("Currency", "currency"),
+    ("Effective From", "effective_week_start"),
+    ("Effective To", "effective_to"),
+    ("Carrier", "carrier"),
+    ("Cargo Class", "cargo_class"),
+    ("Packing", "packing"),
+    ("Density", "density"),
+)
+
 
 def fill_template(template_type: str, rows: list[dict[str, Any]]) -> tuple[bytes, str]:
     """把 rows 填进对应空白模板，返回 (xlsx_bytes, 建议文件名)。"""
@@ -69,7 +80,7 @@ def _tier_sheet_name(rows: list[dict[str, Any]]) -> str:
 
 
 def _build_tier_sheet(rows: list[dict[str, Any]]) -> tuple[bytes, str]:
-    """程序生成档位表：起运港|目的港|服务|动态 KG 列(全表并集升序)|备注。稀疏档某行缺的留空。"""
+    """程序生成档位表：起运港|目的港|服务|动态 KG 列|元数据列|备注。"""
     tiers = sorted({kg for row in rows for kg in _row_tiers(row)})
     wb = Workbook()
     ws = wb.active
@@ -78,11 +89,13 @@ def _build_tier_sheet(rows: list[dict[str, Any]]) -> tuple[bytes, str]:
     header = (
         ["Origin (POL)", "Destination", "Service"]
         + [f"{kg}KG" for kg in tiers]
+        + [label for label, _ in _TIER_META_COLS]
         + ["Remark"]
     )
     for c, label in enumerate(header, start=1):
         ws.cell(1, c).value = label
 
+    meta_start = 4 + len(tiers)  # KG 列之后第一列
     r = 2
     for row in rows:
         ws.cell(r, 1).value = row.get("origin")
@@ -91,14 +104,16 @@ def _build_tier_sheet(rows: list[dict[str, Any]]) -> tuple[bytes, str]:
         row_tiers = _row_tiers(row)
         for i, kg in enumerate(tiers):
             price = row_tiers.get(kg)
-            if price is not None:  # 稀疏：缺的档留空，不写
+            if price is not None:
                 ws.cell(r, 4 + i).value = price
-        ws.cell(r, 4 + len(tiers)).value = row.get("remark")
+        for j, (_, field_name) in enumerate(_TIER_META_COLS):
+            ws.cell(r, meta_start + j).value = row.get(field_name)
+        ws.cell(r, meta_start + len(_TIER_META_COLS)).value = row.get("remark")
         r += 1
 
     buffer = BytesIO()
     wb.save(buffer)
-    return buffer.getvalue(), "air_rate_sheet_filled.xlsx"
+    return buffer.getvalue(), "air_tier_rate_sheet_filled.xlsx"
 
 
 def _unmerge_data_area(ws, data_start_row: int) -> None:

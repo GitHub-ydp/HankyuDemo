@@ -117,11 +117,13 @@ def test_build_air_tier_sheet_dynamic_columns():
     wb = _reload(content)
     ws = wb[wb.sheetnames[0]]
 
-    # 表头：固定列 + 全表档位并集(45/100/300/500/1000)升序 + 备注
-    header = [ws.cell(1, c).value for c in range(1, 10)]
+    # 表头：固定列 + 全表档位并集(45/100/300/500/1000)升序 + 元数据列 + 备注
+    header = [ws.cell(1, c).value for c in range(1, 17)]
     assert header == [
         "Origin (POL)", "Destination", "Service",
-        "45KG", "100KG", "300KG", "500KG", "1000KG", "Remark",
+        "45KG", "100KG", "300KG", "500KG", "1000KG",
+        "Currency", "Effective From", "Effective To",
+        "Carrier", "Cargo Class", "Packing", "Density", "Remark",
     ]
     # KIX 行(r2)：45=17 / 100=14，其余档留空
     assert ws.cell(2, 1).value == "PVG"
@@ -130,7 +132,7 @@ def test_build_air_tier_sheet_dynamic_columns():
     assert ws.cell(2, 4).value == 17.0           # 45KG
     assert ws.cell(2, 5).value == 14.0           # 100KG
     assert ws.cell(2, 6).value in (None, "")     # 300KG 留空
-    assert ws.cell(2, 9).value == "含油"          # 备注
+    assert ws.cell(2, 16).value == "含油"          # 备注(移到元数据列之后)
     # BKK 行(r3)：100/300/500/1000=16，45 留空
     assert ws.cell(3, 4).value in (None, "")     # 45KG 留空
     assert ws.cell(3, 5).value == 16.0
