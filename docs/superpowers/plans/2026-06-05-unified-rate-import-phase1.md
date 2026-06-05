@@ -1307,10 +1307,11 @@ git commit -m "feat(step1): 空运周报生成表补币种列(为回流做准备
 **Files:**
 - Modify: `frontend/src/pages/RateSheetBuilder.tsx`（删 `入库` 按钮、`handleCommit`、`showCommit`；下载后引导文案；**sea 下载文件名改为含 "ocean" 前缀**——否则 OceanAdapter 靠文件名识别不到、海运回流走不通自动识别）
 - Modify: `frontend/src/services/api.ts:257-258`（删 `rateSheetApi.commitToDb`）
-- Modify: `backend/app/api/v1/rate_sheet.py`（删 `/{session_id}/commit` 端点与 `_has_ocean_price`）
-- Delete: `backend/app/services/step1_rates/sheet_builder/db_writer.py`
-- Delete: `backend/tests/api_v1/test_rate_sheet_commit.py`（端点已删）+ `backend/tests/services/step1_rates/test_commit_ocean_bilingual.py`（commit_ocean 已删）
+- Modify: `backend/app/api/v1/rate_sheet.py`（删 `/{session_id}/commit` 端点与 `_has_ocean_price`；import 去掉 db_writer）
+- Delete: `backend/tests/api_v1/test_rate_sheet_commit.py`（测的是已删端点）
 - Modify: `frontend/src/i18n/{zh,ja,en}.json`（删 `rateSheet.commit*`；加 `rateSheet.downloadThenImportHint`）
+
+> **实测修正（db_writer 不删）**：原计划要删 `db_writer.py`，但 grep `backend/tests/` 发现 `commit_ocean_rows`/`commit_tier_rows` 还被 4 个测试当「入库造数据」工具用（`test_db_writer` / `test_ocean_writer` / `test_freight_rate_stats` / **`test_ocean_chain_e2e`（step2 Nitori 海运闭环 e2e）**）。Task 11 的真实目标是**拆掉做表的 DB 写入入口（/commit 端点 + UI 按钮）**——字段映射早已迁到新适配器/mapper，删端点后 db_writer **无生产调用方**，仅作测试 helper 保留即可。删它需重写 step2 e2e 造数，范围/风险过大 → **保留 db_writer.py，仅删 `test_rate_sheet_commit.py`（测已删端点的那个）**，`test_commit_ocean_bilingual` 等保留（其被测函数仍在）。db_writer 的彻底移除作为独立清理项后置。
 
 - [ ] **Step 1: 后端删端点与 db_writer**
 
