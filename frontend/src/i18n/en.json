@@ -520,6 +520,12 @@
   },
   "upload": {
     "title": "Rate Data Import",
+    "parserHintLabel": "Parser",
+    "parserAuto": "Auto-detect",
+    "parserOcean": "Ocean",
+    "parserAir": "Air Weekly",
+    "parserAirTier": "Air Tier",
+    "parserHintTip": "Usually auto-detected; pick Ocean for generated sea sheets",
     "stepSelectSource": "Select Source",
     "stepPreview": "Preview & Confirm",
     "stepDone": "Import Complete",

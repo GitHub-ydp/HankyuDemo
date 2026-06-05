@@ -520,6 +520,12 @@
   },
   "upload": {
     "title": "運賃データ取込",
+    "parserHintLabel": "パーサー",
+    "parserAuto": "自動判定",
+    "parserOcean": "海運 Ocean",
+    "parserAir": "航空ウィークリー Air",
+    "parserAirTier": "航空重量帯 Air Tier",
+    "parserHintTip": "通常は自動判定。海運の作表ファイルは Ocean を選択してください",
     "stepSelectSource": "データソース選択",
     "stepPreview": "プレビュー確認",
     "stepDone": "取込完了",

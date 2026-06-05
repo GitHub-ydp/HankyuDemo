@@ -520,6 +520,12 @@
   },
   "upload": {
     "title": "运价数据导入",
+    "parserHintLabel": "解析器",
+    "parserAuto": "自动识别",
+    "parserOcean": "海运 Ocean",
+    "parserAir": "空运周报 Air",
+    "parserAirTier": "空运档位 Air Tier",
+    "parserHintTip": "通常自动识别；海运做表生成表请手选 Ocean",
     "stepSelectSource": "选择数据源",
     "stepPreview": "预览确认",
     "stepDone": "导入完成",

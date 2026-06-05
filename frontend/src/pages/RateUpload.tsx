@@ -235,6 +235,7 @@ export default function RateUpload() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<SourceTab>('excel');
+  const [parserHint, setParserHint] = useState<string>('auto');
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [draftResult, setDraftResult] = useState<DraftBatchResult | null>(null);
@@ -278,7 +279,7 @@ export default function RateUpload() {
   const handleExcelUpload = async (file: File) => {
     setLoading(true);
     try {
-      const res = await rateBatchApi.upload(file);
+      const res = await rateBatchApi.upload(file, parserHint === 'auto' ? undefined : parserHint);
       const envelope = res as { code?: number; message?: string; data?: RateBatchDetail };
       if (envelope.code === 422 && envelope.message === 'NO_RATES_IN_FILE') {
         message.warning(t('upload.noRatesFound'));
@@ -508,20 +509,42 @@ export default function RateUpload() {
               </div>
 
               {activeTab === 'excel' && (
-                <DropZone
-                  icon="import"
-                  text={t('upload.excelDragText')}
-                  hint={
-                    <>
-                      {t('upload.excelHint')}
-                      <br />
-                      {t('upload.excelHint2')}
-                    </>
-                  }
-                  accept=".xlsx,.xls,.csv"
-                  disabled={loading}
-                  onFile={handleExcelUpload}
-                />
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12.5, color: 'var(--ink-700)' }}>
+                      {t('upload.parserHintLabel')}
+                    </span>
+                    <select
+                      className="input"
+                      style={{ width: 'auto', minWidth: 180 }}
+                      value={parserHint}
+                      onChange={(e) => setParserHint(e.target.value)}
+                      disabled={loading}
+                    >
+                      <option value="auto">{t('upload.parserAuto')}</option>
+                      <option value="ocean">{t('upload.parserOcean')}</option>
+                      <option value="air">{t('upload.parserAir')}</option>
+                      <option value="air_tier">{t('upload.parserAirTier')}</option>
+                    </select>
+                    <span style={{ fontSize: 12, color: 'var(--ink-500)' }}>
+                      {t('upload.parserHintTip')}
+                    </span>
+                  </div>
+                  <DropZone
+                    icon="import"
+                    text={t('upload.excelDragText')}
+                    hint={
+                      <>
+                        {t('upload.excelHint')}
+                        <br />
+                        {t('upload.excelHint2')}
+                      </>
+                    }
+                    accept=".xlsx,.xls,.csv"
+                    disabled={loading}
+                    onFile={handleExcelUpload}
+                  />
+                </>
               )}
 
               {activeTab === 'inbox' && (
