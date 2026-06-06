@@ -156,11 +156,12 @@ export type RateType =
   | 'ocean_fcl'
   | 'ocean_ngb'
   | 'air_weekly'
+  | 'air_tier'
   | 'air_surcharge'
   | 'lcl';
 
-// 4 tab 比价类型（不含 air_surcharge）
-export type CompareRateType = 'ocean_fcl' | 'ocean_ngb' | 'air_weekly' | 'lcl';
+// 5 tab 比价类型（不含 air_surcharge）
+export type CompareRateType = 'ocean_fcl' | 'ocean_ngb' | 'air_weekly' | 'air_tier' | 'lcl';
 
 // 空运周价
 export interface AirWeeklyRate {
@@ -178,6 +179,24 @@ export interface AirWeeklyRate {
   price_day5?: string | null;
   price_day6?: string | null;
   price_day7?: string | null;
+  currency: string;
+  remark?: string | null;
+  batch_id: string;
+}
+
+// 空运重量档（air_tier）
+export interface AirTierRate {
+  id: number;
+  origin: string;
+  destination: string;
+  carrier?: string | null;
+  service_desc?: string | null;
+  tier_prices: Record<string, number | null>;
+  cargo_class?: string | null;
+  packing?: string | null;
+  density?: string | null;
+  effective_from?: string | null;
+  effective_to?: string | null;
   currency: string;
   remark?: string | null;
   batch_id: string;
@@ -255,10 +274,25 @@ export interface LclCompareItem {
   valid_to?: string | null;
 }
 
+// 空运重量档比价条目
+export interface AirTierCompareItem {
+  rate_id: number;
+  carrier?: string | null;
+  service_desc?: string | null;
+  tier_prices: Record<string, number | null>;
+  cargo_class?: string | null;
+  packing?: string | null;
+  density?: string | null;
+  effective_from?: string | null;
+  effective_to?: string | null;
+  currency: string;
+  remark?: string | null;
+}
+
 export interface CompareResult {
   origin: Port | string;
   destination: Port | string;
-  rates: OceanCompareItem[] | AirWeeklyCompareItem[] | LclCompareItem[];
+  rates: OceanCompareItem[] | AirWeeklyCompareItem[] | AirTierCompareItem[] | LclCompareItem[];
   total: number;
   rate_type?: CompareRateType;
 }
@@ -307,6 +341,11 @@ export interface RateBatchPreviewRow {
   price_day5?: string | null;
   price_day6?: string | null;
   price_day7?: string | null;
+  // 空运档位（air_tier）
+  tier_prices?: Record<string, number | null> | null;
+  cargo_class?: string | null;
+  packing?: string | null;
+  density?: string | null;
   // 空运附加费
   area?: string | null;
   from_region?: string | null;

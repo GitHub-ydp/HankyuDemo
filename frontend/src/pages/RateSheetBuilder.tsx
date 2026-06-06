@@ -180,22 +180,6 @@ export default function RateSheetBuilder() {
         return merged;
       });
 
-  // 手动添加一条 air 档位行(默认 5 档)，用于无文件来源的手录(如日本段 NRT/JPY)。
-  const handleAddRow = () => {
-    const nextRid = rows.length ? Math.max(...rows.map((r) => r._rid ?? 0)) + 1 : 0;
-    const newRow: PreviewRow = {
-      _rid: nextRid,
-      origin: sessionOrigin,
-      destination: '',
-      service: '',
-      currency: sessionCurrency,
-      tier_prices: { '45': null, '100': null, '300': null, '500': null, '1000': null },
-    };
-    setRows((prev) => [...prev, newRow]);
-    setSelectedRowKeys((prev) => [...prev, nextRid]);
-    setSummary((s) => s ?? { total_rows: 0, needs_review: 0 });
-  };
-
   const handleDownload = async () => {
     if (!sessionId) return;
     try {
@@ -243,9 +227,10 @@ export default function RateSheetBuilder() {
   const editCell = (rid: number, field: keyof PreviewRow, value: unknown) =>
     setEditedRows((prev) => ({ ...prev, [rid]: { ...prev[rid], [field]: value } }));
 
-  const textCol = (title: string, field: keyof PreviewRow) => ({
+  const textCol = (title: string, field: keyof PreviewRow, width = 100) => ({
     title,
     key: field as string,
+    width,
     render: (_: unknown, r: PreviewRow) => (
       <Input
         size="small"
@@ -259,7 +244,7 @@ export default function RateSheetBuilder() {
   const numCol = (title: string, field: keyof PreviewRow) => ({
     title,
     key: field as string,
-    width: 92,
+    width: 78,
     render: (_: unknown, r: PreviewRow) => (
       <InputNumber
         size="small"
@@ -299,7 +284,7 @@ export default function RateSheetBuilder() {
   const tierCol = (kg: number) => ({
     title: `${kg}KG`,
     key: `tier_${kg}`,
-    width: 88,
+    width: 74,
     render: (_: unknown, r: PreviewRow) => (
       <InputNumber
         size="small"
@@ -325,7 +310,7 @@ export default function RateSheetBuilder() {
       </Tooltip>
     ),
     key: 'needs_review',
-    width: 44,
+    width: 40,
     align: 'center' as const,
     render: (_: unknown, r: PreviewRow) =>
       r.needs_review ? (
@@ -339,7 +324,7 @@ export default function RateSheetBuilder() {
   const originCol = {
     title: t('rateSheet.colOrigin'),
     key: 'origin',
-    width: 72,
+    width: 60,
     render: (_: unknown, r: PreviewRow) => r.origin ?? '',
   };
   // 海运动态列：起运港/目的港/备注恒显；其余按该批次是否有数据出现。
@@ -358,7 +343,7 @@ export default function RateSheetBuilder() {
   const surchargeCol = {
     title: t('rateSheet.colSurcharges'),
     key: 'surcharges',
-    width: 220,
+    width: 190,
     render: (_: unknown, r: PreviewRow) => {
       const list = (r.surcharges ?? []) as SeaSurcharge[];
       if (!list.length) return '';
@@ -373,23 +358,23 @@ export default function RateSheetBuilder() {
 
   const seaCols = [
     originCol,
-    textCol(t('rateSheet.colDestination'), 'destination'),
-    ...(seaHas('via') ? [textCol(t('rateSheet.colVia'), 'via')] : []),
-    textCol(t('rateSheet.colCarrier'), 'carrier'),
+    textCol(t('rateSheet.colDestination'), 'destination', 96),
+    ...(seaHas('via') ? [textCol(t('rateSheet.colVia'), 'via', 90)] : []),
+    textCol(t('rateSheet.colCarrier'), 'carrier', 84),
     ...(seaHas('container_20gp') ? [numCol(t('rateSheet.colFreight20'), 'container_20gp')] : []),
     ...(seaHas('container_40gp') ? [numCol(t('rateSheet.col40gp'), 'container_40gp')] : []),
     ...(seaHas('container_40hq') ? [numCol(t('rateSheet.col40hq'), 'container_40hq')] : []),
     ...(seaHas('container_45') ? [numCol(t('rateSheet.col45'), 'container_45')] : []),
-    ...(seaHas('currency') ? [roCol(t('rateSheet.colCurrency'), 'currency', 64)] : []),
-    ...(seaHas('valid_from') ? [textCol(t('rateSheet.colValidFrom'), 'valid_from')] : []),
-    ...(seaHas('valid_to') ? [textCol(t('rateSheet.colValidTo'), 'valid_to')] : []),
-    ...(seaHas('commodity') ? [textCol(t('rateSheet.colCommodity'), 'commodity')] : []),
-    ...(seaHas('rate_level') ? [roCol(t('rateSheet.colRateLevel'), 'rate_level', 72)] : []),
+    ...(seaHas('currency') ? [roCol(t('rateSheet.colCurrency'), 'currency', 60)] : []),
+    ...(seaHas('valid_from') ? [textCol(t('rateSheet.colValidFrom'), 'valid_from', 96)] : []),
+    ...(seaHas('valid_to') ? [textCol(t('rateSheet.colValidTo'), 'valid_to', 96)] : []),
+    ...(seaHas('commodity') ? [textCol(t('rateSheet.colCommodity'), 'commodity', 110)] : []),
+    ...(seaHas('rate_level') ? [roCol(t('rateSheet.colRateLevel'), 'rate_level', 68)] : []),
     ...(seaHas('lss_cic') ? [numCol(t('rateSheet.colLss'), 'lss_cic')] : []),
     ...(seaHas('baf') ? [numCol(t('rateSheet.colBaf'), 'baf')] : []),
     ...(seaHasSurcharges ? [surchargeCol] : []),
     ...(seaHas('transit_days') ? [numCol(t('rateSheet.colTransit'), 'transit_days')] : []),
-    textCol(t('rateSheet.colRemark'), 'remark'),
+    textCol(t('rateSheet.colRemark'), 'remark', 150),
     reviewCol,
   ];
   const airDayCols = Array.from({ length: 7 }, (_, i) =>
@@ -397,13 +382,13 @@ export default function RateSheetBuilder() {
   );
   const airCols = [
     originCol,
-    textCol(t('rateSheet.colDestination'), 'destination'),
+    textCol(t('rateSheet.colDestination'), 'destination', 96),
     // air 图片/文本多维列：该字段全表至少一行有值才显(seaHas 是泛型判定)；EES/周报行无 → 隐藏。
-    ...(seaHas('carrier') ? [textCol(t('rateSheet.colCarrier'), 'carrier')] : []),
-    ...(seaHas('cargo_class') ? [textCol(t('rateSheet.colCargoClass'), 'cargo_class')] : []),
-    ...(seaHas('packing') ? [textCol(t('rateSheet.colPacking'), 'packing')] : []),
-    ...(seaHas('density') ? [textCol(t('rateSheet.colDensity'), 'density')] : []),
-    textCol(t('rateSheet.colService'), 'service'),
+    ...(seaHas('carrier') ? [textCol(t('rateSheet.colCarrier'), 'carrier', 84)] : []),
+    ...(seaHas('cargo_class') ? [textCol(t('rateSheet.colCargoClass'), 'cargo_class', 84)] : []),
+    ...(seaHas('packing') ? [textCol(t('rateSheet.colPacking'), 'packing', 84)] : []),
+    ...(seaHas('density') ? [textCol(t('rateSheet.colDensity'), 'density', 84)] : []),
+    textCol(t('rateSheet.colService'), 'service', 130),
     // 档位模式 → 动态 KG 列；否则 day1-7 周表列(Market Price 周报)。
     ...(tierColumns.length > 0 ? tierColumns.map((kg) => tierCol(kg)) : airDayCols),
     textCol(t('rateSheet.colRemark'), 'remark'),
@@ -557,21 +542,10 @@ export default function RateSheetBuilder() {
       <div className="card">
         <div className="card-head">
           <h3>{t('rateSheet.step3')}</h3>
-          {templateType === 'air' && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              style={{ marginLeft: 'auto' }}
-              disabled={!sessionId}
-              onClick={handleAddRow}
-            >
-              {t('rateSheet.addRow')}
-            </button>
-          )}
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            style={{ marginLeft: templateType === 'air' ? 8 : 'auto' }}
+            style={{ marginLeft: 'auto' }}
             disabled={!summary || keptCount === 0}
             onClick={handleDownload}
           >
@@ -610,10 +584,12 @@ export default function RateSheetBuilder() {
               <Table
                 className="rs-table"
                 size="small"
+                tableLayout="fixed"
                 rowKey={(r: PreviewRow) => r._rid as number}
                 rowSelection={{
                   selectedRowKeys,
                   onChange: (keys) => setSelectedRowKeys(keys as number[]),
+                  columnWidth: 36,
                 }}
                 columns={previewCols}
                 dataSource={rows}
@@ -624,7 +600,6 @@ export default function RateSheetBuilder() {
                       ? 'row-needs-review'
                       : ''
                 }
-                scroll={{ x: 'max-content' }}
                 pagination={{ pageSize: 20 }}
               />
             </>

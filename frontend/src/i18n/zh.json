@@ -435,6 +435,7 @@
       "ocean_fcl": "海运 FCL",
       "ocean_ngb": "海运 NGB",
       "air_weekly": "空运周价",
+      "air_tier": "空运重量档",
       "air_surcharge": "空运附加费",
       "lcl": "拼箱 LCL"
     },
@@ -509,6 +510,7 @@
       "ocean_fcl": "海运 FCL",
       "ocean_ngb": "海运 NGB",
       "air_weekly": "空运周价",
+      "air_tier": "空运重量档",
       "lcl": "拼箱 LCL"
     },
     "ngbTag": "NGB 半月更新",

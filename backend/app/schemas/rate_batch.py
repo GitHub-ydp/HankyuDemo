@@ -42,6 +42,11 @@ class RateBatchPreviewRow(BaseModel):
     price_day5: str | None = None
     price_day6: str | None = None
     price_day7: str | None = None
+    # 空运档位（air_tier）：档位价本体 + 货类/包装/泡比
+    tier_prices: dict[str, float | None] | None = None
+    cargo_class: str | None = None
+    packing: str | None = None
+    density: str | None = None
     # 空运附加费
     area: str | None = None
     from_region: str | None = None

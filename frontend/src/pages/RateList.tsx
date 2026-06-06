@@ -6,6 +6,7 @@ import Icon from '../components/Icon';
 import { carrierApi, rateApi } from '../services/api';
 import type {
   AirSurchargeRate,
+  AirTierRate,
   AirWeeklyRate,
   Carrier,
   FreightRate,
@@ -27,6 +28,7 @@ const RATE_TYPE_TABS: RateType[] = [
   'ocean_fcl',
   'ocean_ngb',
   'air_weekly',
+  'air_tier',
   'air_surcharge',
   'lcl',
 ];
@@ -358,6 +360,69 @@ function AirWeeklyTable({
   );
 }
 
+function AirTierTable({
+  items,
+  loading,
+  t,
+}: {
+  items: AirTierRate[];
+  loading: boolean;
+  t: (key: string, opts?: Record<string, unknown>) => string;
+}) {
+  // 动态档位列：全表 tier_prices 键并集，升序
+  const tierKgs = Array.from(
+    new Set(items.flatMap((r) => Object.keys(r.tier_prices || {}).map(Number))),
+  )
+    .filter((n) => !Number.isNaN(n))
+    .sort((a, b) => a - b);
+  const colSpan = 5 + tierKgs.length + 1;
+  return (
+    <table className="rtable" style={{ minWidth: 1100 }}>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>{t('rates.cols.air_weekly.airline')}</th>
+          <th>{t('rates.originText')}</th>
+          <th>{t('rates.destinationText')}</th>
+          <th>{t('rates.cols.air_weekly.service')}</th>
+          {tierKgs.map((kg) => (
+            <th key={kg} className="c-right">{kg}KG</th>
+          ))}
+          <th>{t('rates.currency')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((r) => (
+          <tr key={r.id}>
+            <td className="num" style={{ color: 'var(--ink-700)' }}>AT-{r.id}</td>
+            <td style={{ fontFamily: 'var(--font-en)', fontWeight: 500 }}>{r.carrier || '—'}</td>
+            <td style={{ fontFamily: 'var(--font-en)' }}>{r.origin}</td>
+            <td style={{ fontFamily: 'var(--font-en)' }}>{r.destination}</td>
+            <td style={{ fontSize: 12, color: 'var(--ink-700)' }}>{r.service_desc || '—'}</td>
+            {tierKgs.map((kg) => {
+              const v = r.tier_prices?.[String(kg)];
+              return (
+                <td key={kg} className="c-right num">
+                  {v === null || v === undefined ? '—' : v}
+                </td>
+              );
+            })}
+            <td style={{ color: 'var(--ink-500)' }}>{r.currency}</td>
+          </tr>
+        ))}
+        {items.length === 0 && !loading && (
+          <tr>
+            <td colSpan={colSpan} style={{ textAlign: 'center', padding: 48, color: 'var(--ink-500)' }}>
+              <div style={{ fontWeight: 500 }}>{t('rates.empty.title')}</div>
+              <div style={{ fontSize: 12, marginTop: 6 }}>{t('rates.empty.hint')}</div>
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  );
+}
+
 function AirSurchargeTable({
   items,
   loading,
@@ -476,7 +541,7 @@ export default function RateList() {
   const { t } = useTranslation();
   const [rateType, setRateType] = useState<RateType>('ocean_fcl');
   const [data, setData] = useState<
-    FreightRate[] | AirWeeklyRate[] | AirSurchargeRate[] | LclRate[]
+    FreightRate[] | AirWeeklyRate[] | AirTierRate[] | AirSurchargeRate[] | LclRate[]
   >([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -491,6 +556,7 @@ export default function RateList() {
 
   const isOcean = rateType === 'ocean_fcl' || rateType === 'ocean_ngb';
   const isAirWeekly = rateType === 'air_weekly';
+  const isAirTier = rateType === 'air_tier';
   const isAirSurcharge = rateType === 'air_surcharge';
   const isLcl = rateType === 'lcl';
 
@@ -518,7 +584,7 @@ export default function RateList() {
       if (destination) params.destination = destination;
       if (carrierId) params.carrier_id = carrierId;
       if (status !== 'all') params.status = status;
-    } else if (isAirWeekly) {
+    } else if (isAirWeekly || isAirTier) {
       if (origin) params.origin_text = origin;
       if (destination) params.destination_text = destination;
       if (airlineCode) params.airline_code = airlineCode;
@@ -572,6 +638,9 @@ export default function RateList() {
   const handleTabChange = (next: RateType) => {
     if (next === rateType) return;
     setRateType(next);
+    // 切 tab 立刻清空旧类型数据：避免上一类型的行(字段形状不同)被新表格渲染
+    setData([]);
+    setTotal(0);
     setPage(1);
     setOrigin('');
     setDestination('');
@@ -665,7 +734,7 @@ export default function RateList() {
             </div>
           </>
         )}
-        {isAirWeekly && (
+        {(isAirWeekly || isAirTier) && (
           <>
             <div className="field">
               <label>{t('rates.originText')}</label>
@@ -750,6 +819,9 @@ export default function RateList() {
           )}
           {isAirWeekly && (
             <AirWeeklyTable items={data as AirWeeklyRate[]} loading={loading} t={t} />
+          )}
+          {isAirTier && (
+            <AirTierTable items={data as AirTierRate[]} loading={loading} t={t} />
           )}
           {isAirSurcharge && (
             <AirSurchargeTable items={data as AirSurchargeRate[]} loading={loading} t={t} />

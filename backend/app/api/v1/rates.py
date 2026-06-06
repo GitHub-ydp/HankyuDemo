@@ -9,6 +9,7 @@ from app.models import RateStatus
 from app.schemas.common import ApiResponse, PaginatedData
 from app.schemas.freight_rate import (
     AirSurchargeResponse,
+    AirTierRateResponse,
     AirWeeklyRateResponse,
     FreightRateDetail,
     LclRateResponse,
@@ -89,6 +90,8 @@ def list_rates(
         serialized = [FreightRateDetail.model_validate(i) for i in items]
     elif rate_type == RateType.air_weekly:
         serialized = [AirWeeklyRateResponse.model_validate(i) for i in items]
+    elif rate_type == RateType.air_tier:
+        serialized = [AirTierRateResponse.model_validate(i) for i in items]
     elif rate_type == RateType.air_surcharge:
         serialized = [AirSurchargeResponse.model_validate(i) for i in items]
     elif rate_type == RateType.lcl:

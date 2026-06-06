@@ -140,6 +140,15 @@ def list_rates_by_type(
             page=page,
             page_size=page_size,
         )
+    if rate_type == RateType.air_tier:
+        return _list_air_tier(
+            db,
+            origin_text=origin_text,
+            destination_text=destination_text,
+            airline_code=airline_code,
+            page=page,
+            page_size=page_size,
+        )
     if rate_type == RateType.air_surcharge:
         return _list_air_surcharge(
             db,
@@ -259,6 +268,38 @@ def _list_air_weekly(
     total = q.count()
     items = (
         q.order_by(AirFreightRate.effective_week_start.desc().nullslast(), AirFreightRate.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return items, total
+
+
+def _list_air_tier(
+    db: Session,
+    *,
+    origin_text: str | None = None,
+    destination_text: str | None = None,
+    airline_code: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> tuple[list[AirTierRate], int]:
+    """空运重量档列表：返回所有已导入档位行（航司过滤走 AirTierRate.carrier）。"""
+    q = db.query(AirTierRate)
+    if origin_text:
+        q = q.filter(AirTierRate.origin.ilike(f"%{origin_text}%"))
+    if destination_text:
+        q = q.filter(AirTierRate.destination.ilike(f"%{destination_text}%"))
+    if airline_code:
+        q = q.filter(AirTierRate.carrier == airline_code)
+
+    total = q.count()
+    items = (
+        q.order_by(
+            AirTierRate.origin.asc(),
+            AirTierRate.destination.asc(),
+            AirTierRate.id.asc(),
+        )
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
@@ -391,6 +432,12 @@ def compare_rates_by_type(
             origin_text=origin_text,
             destination_text=destination_text,
         )
+    if rate_type == RateType.air_tier:
+        return _compare_air_tier(
+            db,
+            origin_text=origin_text,
+            destination_text=destination_text,
+        )
     if rate_type == RateType.lcl:
         return _compare_lcl(
             db,
@@ -501,6 +548,45 @@ def _compare_air_weekly(
             "price_day5": r.price_day5,
             "price_day6": r.price_day6,
             "price_day7": r.price_day7,
+            "currency": r.currency,
+            "remark": r.remark,
+        })
+
+    return {
+        "origin": origin_text or "",
+        "destination": destination_text or "",
+        "rates": items,
+        "total": len(items),
+    }
+
+
+def _compare_air_tier(
+    db: Session,
+    *,
+    origin_text: str | None,
+    destination_text: str | None,
+) -> dict:
+    """空运重量档比价：同航线多航司的档位价一览。"""
+    q = db.query(AirTierRate)
+    if origin_text:
+        q = q.filter(AirTierRate.origin.ilike(f"{origin_text}%"))
+    if destination_text:
+        q = q.filter(AirTierRate.destination.ilike(f"{destination_text}%"))
+
+    rates = q.order_by(AirTierRate.carrier.asc().nullslast(), AirTierRate.id.asc()).all()
+
+    items = []
+    for r in rates:
+        items.append({
+            "rate_id": r.id,
+            "carrier": r.carrier,
+            "service_desc": r.service_desc,
+            "tier_prices": {str(k): v for k, v in (r.tier_prices or {}).items()},
+            "cargo_class": r.cargo_class,
+            "packing": r.packing,
+            "density": r.density,
+            "effective_from": r.effective_from,
+            "effective_to": r.effective_to,
             "currency": r.currency,
             "remark": r.remark,
         })

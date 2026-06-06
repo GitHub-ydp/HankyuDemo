@@ -435,6 +435,7 @@
       "ocean_fcl": "Ocean FCL",
       "ocean_ngb": "Ocean NGB",
       "air_weekly": "Air Weekly",
+      "air_tier": "Air Tier",
       "air_surcharge": "Air Surcharge",
       "lcl": "LCL"
     },
@@ -509,6 +510,7 @@
       "ocean_fcl": "Ocean FCL",
       "ocean_ngb": "Ocean NGB",
       "air_weekly": "Air Weekly",
+      "air_tier": "Air Tier",
       "lcl": "LCL"
     },
     "ngbTag": "NGB Bi-Weekly",

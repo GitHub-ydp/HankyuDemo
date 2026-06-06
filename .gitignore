@@ -75,3 +75,9 @@ toyota_steel_quality_report.html
 web/
 /instancePrice.xlsx
 docs/TJTS*.pptx
+
+# QA / 浏览器测试产物（勿入库）
+.playwright-mcp/
+test-artifacts/
+.claude/settings.local.json
+/*.png
