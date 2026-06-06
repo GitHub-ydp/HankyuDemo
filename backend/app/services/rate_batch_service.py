@@ -541,10 +541,15 @@ def _collect_rows(parse_result: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _normalize_row(row: dict[str, Any], row_index: int) -> dict[str, Any]:
+    # tier_prices 键归一为字符串：JSON 对象键必须是 str，而 adapter 产出的是 int 档位键
+    # （否则响应 schema dict[str,...] 校验 int 键直接 400，整条 detail 返回失败）
+    _tp = row.get("tier_prices")
+    tier_prices = {str(k): v for k, v in _tp.items()} if isinstance(_tp, dict) else None
     preview = {
         "row_index": row_index,
         "record_kind": row.get("record_kind"),
-        "carrier": row.get("carrier_name"),
+        # air_tier 的航司经 extras 并入 row（carrier 键），carrier_name 为空时回退取之
+        "carrier": row.get("carrier_name") or row.get("carrier"),
         "origin_port": row.get("origin_port_name"),
         "destination_port": row.get("destination_port_name"),
         "service_code": row.get("service_code"),
@@ -570,6 +575,11 @@ def _normalize_row(row: dict[str, Any], row_index: int) -> dict[str, Any]:
         "price_day5": _stringify(row.get("price_day5")),
         "price_day6": _stringify(row.get("price_day6")),
         "price_day7": _stringify(row.get("price_day7")),
+        # 空运档位字段（air_tier：档位价本体 + 货类/包装/泡比，经 extras 透传到 row）
+        "tier_prices": tier_prices,
+        "cargo_class": row.get("cargo_class"),
+        "packing": row.get("packing"),
+        "density": row.get("density"),
         # 空运附加费字段（由 adapter 通过 extras 透传到 row）
         "area": row.get("area"),
         "from_region": row.get("from_region"),

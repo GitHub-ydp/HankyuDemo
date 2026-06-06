@@ -4,6 +4,7 @@ import { message } from 'antd';
 import Icon from '../components/Icon';
 import { portApi, rateApi } from '../services/api';
 import type {
+  AirTierCompareItem,
   AirWeeklyCompareItem,
   CompareRateItem,
   CompareRateType,
@@ -13,7 +14,7 @@ import type {
   Port,
 } from '../types';
 
-const COMPARE_TABS: CompareRateType[] = ['ocean_fcl', 'ocean_ngb', 'air_weekly', 'lcl'];
+const COMPARE_TABS: CompareRateType[] = ['ocean_fcl', 'ocean_ngb', 'air_weekly', 'air_tier', 'lcl'];
 
 function formatPrice(value?: string | null) {
   if (!value) return '—';
@@ -51,6 +52,8 @@ export default function RateCompare() {
   const [loading, setLoading] = useState(false);
 
   const isAirWeekly = rateType === 'air_weekly';
+  const isAirTier = rateType === 'air_tier';
+  const isAirText = isAirWeekly || isAirTier; // 空运两类都用文本输入起运/目的
   const isNgb = rateType === 'ocean_ngb';
 
   useEffect(() => {
@@ -126,7 +129,7 @@ export default function RateCompare() {
   };
 
   const handleCompare = async () => {
-    if (isAirWeekly) {
+    if (isAirText) {
       if (!originText || !destText) {
         message.warning(t('compare.missingAirports'));
         return;
@@ -140,7 +143,7 @@ export default function RateCompare() {
     setLoading(true);
     try {
       const res = await rateApi.compare(
-        isAirWeekly
+        isAirText
           ? { rateType, originText, destinationText: destText }
           : {
               rateType,
@@ -191,7 +194,7 @@ export default function RateCompare() {
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-body" style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
-          {isAirWeekly ? (
+          {isAirText ? (
             <>
               <div className="field" style={{ flex: 1, minWidth: 260 }}>
                 <label>{t('rates.originText')}</label>
@@ -296,7 +299,7 @@ export default function RateCompare() {
           </div>
 
           <div className="table-scroll">
-            {!isAirWeekly && rateType !== 'lcl' && (
+            {!isAirText && rateType !== 'lcl' && (
               <table className="rtable" style={{ minWidth: 1100 }}>
                 <thead>
                   <tr>
@@ -441,6 +444,65 @@ export default function RateCompare() {
                 </tbody>
               </table>
             )}
+
+            {isAirTier && (() => {
+              const rows = result.rates as AirTierCompareItem[];
+              const tierKgs = Array.from(
+                new Set(rows.flatMap((r) => Object.keys(r.tier_prices || {}).map(Number))),
+              )
+                .filter((n) => !Number.isNaN(n))
+                .sort((a, b) => a - b);
+              const mins = tierKgs.map((kg) =>
+                rows.reduce((m, r) => {
+                  const v = Number(r.tier_prices?.[String(kg)] ?? 0);
+                  return v > 0 && v < m ? v : m;
+                }, Infinity),
+              );
+              return (
+                <table className="rtable" style={{ minWidth: 1100 }}>
+                  <thead>
+                    <tr>
+                      <th>{t('rates.cols.air_weekly.airline')}</th>
+                      <th>{t('rates.cols.air_weekly.service')}</th>
+                      {tierKgs.map((kg) => (
+                        <th key={kg} className="c-right">{kg}KG</th>
+                      ))}
+                      <th>{t('rates.currency')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.rate_id}>
+                        <td style={{ fontFamily: 'var(--font-en)', fontWeight: 500 }}>{r.carrier || '—'}</td>
+                        <td style={{ fontSize: 12, color: 'var(--ink-700)' }}>{r.service_desc || '—'}</td>
+                        {tierKgs.map((kg, idx) => {
+                          const raw = r.tier_prices?.[String(kg)];
+                          const v = Number(raw ?? 0);
+                          const best = v > 0 && v === mins[idx];
+                          return (
+                            <td
+                              key={kg}
+                              className="c-right num"
+                              style={{ color: best ? 'var(--success)' : 'var(--ink-900)', fontWeight: best ? 600 : 500 }}
+                            >
+                              {raw === null || raw === undefined ? '—' : raw}
+                            </td>
+                          );
+                        })}
+                        <td style={{ color: 'var(--ink-500)' }}>{r.currency}</td>
+                      </tr>
+                    ))}
+                    {rows.length === 0 && (
+                      <tr>
+                        <td colSpan={tierKgs.length + 3} style={{ textAlign: 'center', padding: 48, color: 'var(--ink-500)' }}>
+                          {t('compare.noData')}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              );
+            })()}
 
             {rateType === 'lcl' && (
               <table className="rtable" style={{ minWidth: 1180 }}>

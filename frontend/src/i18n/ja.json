@@ -435,6 +435,7 @@
       "ocean_fcl": "海上 FCL",
       "ocean_ngb": "海上 NGB",
       "air_weekly": "空輸 週次",
+      "air_tier": "空輸 重量帯",
       "air_surcharge": "空輸 サーチャージ",
       "lcl": "混載 LCL"
     },
@@ -509,6 +510,7 @@
       "ocean_fcl": "海上 FCL",
       "ocean_ngb": "海上 NGB",
       "air_weekly": "空輸 週次",
+      "air_tier": "空輸 重量帯",
       "lcl": "混載 LCL"
     },
     "ngbTag": "NGB 半月更新",

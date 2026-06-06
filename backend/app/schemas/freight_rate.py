@@ -16,6 +16,7 @@ class RateType(str, enum.Enum):
     ocean_fcl = "ocean_fcl"
     ocean_ngb = "ocean_ngb"
     air_weekly = "air_weekly"
+    air_tier = "air_tier"
     air_surcharge = "air_surcharge"
     lcl = "lcl"
 
@@ -177,6 +178,40 @@ class AirWeeklyRateResponse(BaseModel):
     currency: str = "CNY"
     remark: str | None = None
     batch_id: str
+
+    @field_validator("batch_id", mode="before")
+    @classmethod
+    def _stringify_batch_id(cls, v):
+        return str(v) if isinstance(v, uuid.UUID) else v
+
+    class Config:
+        from_attributes = True
+
+
+class AirTierRateResponse(BaseModel):
+    """空运重量档运价列表响应（RateList air_tier tab）"""
+    id: int
+    origin: str
+    destination: str
+    carrier: str | None = None
+    service_desc: str | None = None
+    tier_prices: dict[str, float | None] = {}
+    cargo_class: str | None = None
+    packing: str | None = None
+    density: str | None = None
+    effective_from: date | None = None
+    effective_to: date | None = None
+    currency: str = "CNY"
+    remark: str | None = None
+    batch_id: str
+
+    @field_validator("tier_prices", mode="before")
+    @classmethod
+    def _str_keys(cls, v):
+        # JSON 档位键归一为 str（与 import 预览同理，防 int 键校验 400）
+        if isinstance(v, dict):
+            return {str(k): val for k, val in v.items()}
+        return v
 
     @field_validator("batch_id", mode="before")
     @classmethod

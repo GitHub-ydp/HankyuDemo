@@ -7,7 +7,7 @@ interface Props {
   fontSize?: number;
 }
 
-type Layout = 'air_weekly' | 'air_surcharge' | 'ocean';
+type Layout = 'air_weekly' | 'air_surcharge' | 'air_tier' | 'ocean';
 
 function pickLayout(rows: RateBatchPreviewRow[]): Layout {
   const counts: Record<string, number> = {};
@@ -18,18 +18,35 @@ function pickLayout(rows: RateBatchPreviewRow[]): Layout {
   const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
   if (top === 'air_weekly') return 'air_weekly';
   if (top === 'air_surcharge') return 'air_surcharge';
+  if (top === 'air_tier') return 'air_tier';
   return 'ocean';
+}
+
+// air_tier 档位列（动态）：全表 tier_prices 键的并集，升序
+function collectTierKgs(rows: RateBatchPreviewRow[]): number[] {
+  const set = new Set<number>();
+  for (const r of rows) {
+    for (const k of Object.keys(r.tier_prices ?? {})) {
+      const n = Number(k);
+      if (!Number.isNaN(n)) set.add(n);
+    }
+  }
+  return Array.from(set).sort((a, b) => a - b);
 }
 
 export default function RatePreviewTable({ rows, minWidth = 720, fontSize = 12 }: Props) {
   const { t } = useTranslation();
   const layout = pickLayout(rows);
+  const tierKgs = layout === 'air_tier' ? collectTierKgs(rows) : [];
+  // air_tier 列数：# 航司 起运 目的 重量档 + 各档位列 + 币种
+  const airTierCols = 5 + tierKgs.length + 1;
 
   return (
     <div className="table-scroll">
       <table className="rtable" style={{ minWidth, fontSize }}>
         {layout === 'air_weekly' && <AirWeeklyHead t={t} />}
         {layout === 'air_surcharge' && <AirSurchargeHead t={t} />}
+        {layout === 'air_tier' && <AirTierHead t={t} tierKgs={tierKgs} />}
         {layout === 'ocean' && <OceanHead t={t} />}
         <tbody>
           {rows.map((row) => {
@@ -40,10 +57,20 @@ export default function RatePreviewTable({ rows, minWidth = 720, fontSize = 12 }
             if (layout === 'air_surcharge' && kind === 'air_surcharge') {
               return <AirSurchargeRow key={row.row_index} row={row} />;
             }
+            if (layout === 'air_tier' && kind === 'air_tier') {
+              return <AirTierRow key={row.row_index} row={row} tierKgs={tierKgs} />;
+            }
             if (layout === 'ocean' && (kind === '' || kind.startsWith('fcl') || kind.startsWith('ocean'))) {
               return <OceanRow key={row.row_index} row={row} />;
             }
-            return <MismatchRow key={row.row_index} row={row} layout={layout} />;
+            return (
+              <MismatchRow
+                key={row.row_index}
+                row={row}
+                layout={layout}
+                cols={layout === 'air_tier' ? airTierCols : undefined}
+              />
+            );
           })}
           {rows.length === 0 && (
             <tr>
@@ -179,9 +206,49 @@ function AirSurchargeRow({ row }: { row: RateBatchPreviewRow }) {
   );
 }
 
-function MismatchRow({ row, layout }: { row: RateBatchPreviewRow; layout: Layout }) {
+function AirTierHead({ t, tierKgs }: { t: TFn; tierKgs: number[] }) {
+  return (
+    <thead>
+      <tr>
+        <th style={{ width: 40 }}>#</th>
+        <th>{t('rates.cols.air_weekly.airline')}</th>
+        <th>{t('batches.col.origin')}</th>
+        <th>{t('batches.col.destination')}</th>
+        <th>{t('rateSheet.colService')}</th>
+        {tierKgs.map((kg) => (
+          <th key={kg} className="c-right">{kg}KG</th>
+        ))}
+        <th>{t('rateSheet.colCurrency')}</th>
+      </tr>
+    </thead>
+  );
+}
+
+function AirTierRow({ row, tierKgs }: { row: RateBatchPreviewRow; tierKgs: number[] }) {
+  const tiers = row.tier_prices ?? {};
+  return (
+    <tr>
+      <td className="num" style={{ color: 'var(--ink-500)' }}>{row.row_index}</td>
+      <td>{row.carrier ? <span className="tag tag-teal">{row.carrier}</span> : '—'}</td>
+      <td>{row.origin_port || '—'}</td>
+      <td>{row.destination_port || '—'}</td>
+      <td style={{ fontSize: 11.5, color: 'var(--ink-700)' }}>{row.service_desc || '—'}</td>
+      {tierKgs.map((kg) => {
+        const v = tiers[String(kg)];
+        return (
+          <td key={kg} className="c-right num">
+            {v === null || v === undefined ? '—' : v}
+          </td>
+        );
+      })}
+      <td className="num" style={{ color: 'var(--ink-500)', fontSize: 11 }}>{row.currency || '—'}</td>
+    </tr>
+  );
+}
+
+function MismatchRow({ row, layout, cols }: { row: RateBatchPreviewRow; layout: Layout; cols?: number }) {
   const span =
-    layout === 'air_weekly' ? 14 : layout === 'air_surcharge' ? 10 : 9;
+    cols ?? (layout === 'air_weekly' ? 14 : layout === 'air_surcharge' ? 10 : 9);
   return (
     <tr>
       <td className="num" style={{ color: 'var(--ink-500)' }}>{row.row_index}</td>
