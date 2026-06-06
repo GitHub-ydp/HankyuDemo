@@ -265,6 +265,24 @@ def get_rate_batch_diff(batch_id: str, db: Session) -> dict[str, Any] | None:
     if not draft:
         return None
 
+    if (draft.legacy_payload or {}).get("file_type") == "air_tier":
+        return {
+            "batch_id": draft.batch_id,
+            "batch_status": draft.batch_status,
+            "diff_status": "ready",
+            "generated_at": _now(),
+            "summary": {
+                "total_rows": draft.total_rows,
+                "new_rows": draft.total_rows,
+                "changed_rows": 0,
+                "unchanged_rows": 0,
+                "unmatched_rows": 0,
+            },
+            "items": [],
+            "is_stub": False,
+            "message": "空运重量档(air_tier)按独立批次入库，不与 freight_rates 比对。",
+        }
+
     counters = {
         "total_rows": draft.total_rows,
         "new_rows": 0,

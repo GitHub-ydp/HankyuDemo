@@ -17,6 +17,7 @@ class RateSourceKind(str, Enum):
 
 class Step1FileType(str, Enum):
     air = "air"
+    air_tier = "air_tier"
     ocean = "ocean"
     ocean_ngb = "ocean_ngb"
 

@@ -84,14 +84,20 @@ def test_download_post_fills_given_rows(client):
     r = client.post("/api/v1/rate-sheet/session", data={"template_type": "sea"})
     sid = r.json()["data"]["session_id"]
 
-    rows = [{"destination": "OSAKA", "carrier": "ONE", "freight_20": 111, "freight_40": 222}]
+    rows = [{"destination": "OSAKA", "carrier": "ONE",
+             "container_20gp": 111, "container_40gp": 222, "container_40hq": 225}]
     r = client.post(f"/api/v1/rate-sheet/{sid}/download", json={"rows": rows})
 
     assert r.status_code == 200
     assert r.content[:2] == b"PK"  # xlsx = zip
     ws = load_workbook(BytesIO(r.content))["JP N RATE FCL & LCL"]
-    assert ws.cell(9, 1).value == "OSAKA"  # 数据起始行 r9, A=目的港
-    assert ws.cell(9, 4).value == 111      # D=运费, 20FT 行取 freight_20
+    assert ws.cell(9, 1).value == "OSAKA"   # 数据起始行 r9, A=目的港
+    assert ws.cell(9, 3).value == "20FT"
+    assert ws.cell(9, 4).value == 111       # D=运费, 20FT 取 container_20gp
+    assert ws.cell(10, 3).value == "40GP"
+    assert ws.cell(10, 4).value == 222
+    assert ws.cell(11, 3).value == "40HQ"
+    assert ws.cell(11, 4).value == 225
 
 
 def test_download_post_unknown_session_404(client):

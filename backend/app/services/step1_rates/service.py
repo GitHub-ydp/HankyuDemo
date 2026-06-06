@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.services.step1_rates.adapters import (
     AirAdapter,
+    AirTierAdapter,
+    AirWeeklyAdapter,
     KmtcAdapter,
     NvoFakAdapter,
     OceanAdapter,
@@ -20,6 +22,8 @@ def build_default_registry() -> RateAdapterRegistry:
     return RateAdapterRegistry(
         adapters=[
             AirAdapter(),
+            AirTierAdapter(),
+            AirWeeklyAdapter(),
             KmtcAdapter(),
             NvoFakAdapter(),
             OceanAdapter(),

@@ -15,33 +15,39 @@ def test_fill_sea_expands_container_rows():
         {
             "destination": "BUSAN",
             "carrier": "SJJ",
-            "freight_20": 130,
-            "freight_40": 260,
+            "container_20gp": 130,
+            "container_40gp": 260,
+            "container_40hq": 265,
             "lss_cic": "Incl.",
             "baf": 50,
             "transit": "2days",
             "remark": "直达",
         },
-        {"destination": "INCHON", "carrier": "COSCO", "freight_20": 300, "freight_40": 500},
+        {"destination": "INCHON", "carrier": "COSCO",
+         "container_20gp": 300, "container_40gp": 500, "container_40hq": 520},
     ]
     content, filename = fill_template("sea", rows)
     ws = _reload(content)["JP N RATE FCL & LCL"]
 
     # 表头未被破坏
     assert ws.cell(8, 1).value == "To"
-    # 第一条 BUSAN 展开 20FT / 40FT 两行，从 r9 开始
+    # 第一条 BUSAN 展开 20FT / 40GP / 40HQ 三行，从 r9 开始
     assert ws.cell(9, 1).value == "BUSAN"
     assert ws.cell(9, 2).value == "SJJ"
     assert ws.cell(9, 3).value == "20FT"
     assert ws.cell(9, 4).value == 130
     assert ws.cell(9, 5).value == "Incl."  # LSS+CIC
     assert ws.cell(9, 6).value == 50       # BAF
-    assert ws.cell(10, 3).value == "40FT/40HQ"
+    assert ws.cell(10, 3).value == "40GP"
     assert ws.cell(10, 4).value == 260
-    # 第二条 INCHON 从 r11
-    assert ws.cell(11, 1).value == "INCHON"
-    assert ws.cell(11, 4).value == 300
-    assert ws.cell(12, 4).value == 500
+    assert ws.cell(11, 3).value == "40HQ"
+    assert ws.cell(11, 4).value == 265
+    # 第二条 INCHON 从 r12，同样三行
+    assert ws.cell(12, 1).value == "INCHON"
+    assert ws.cell(12, 3).value == "20FT"
+    assert ws.cell(12, 4).value == 300
+    assert ws.cell(13, 4).value == 500   # 40GP
+    assert ws.cell(14, 4).value == 520   # 40HQ
     assert filename.endswith(".xlsx")
 
 
@@ -117,11 +123,13 @@ def test_build_air_tier_sheet_dynamic_columns():
     wb = _reload(content)
     ws = wb[wb.sheetnames[0]]
 
-    # 表头：固定列 + 全表档位并集(45/100/300/500/1000)升序 + 备注
-    header = [ws.cell(1, c).value for c in range(1, 10)]
+    # 表头：固定列 + 全表档位并集(45/100/300/500/1000)升序 + 元数据列 + 备注
+    header = [ws.cell(1, c).value for c in range(1, 17)]
     assert header == [
         "Origin (POL)", "Destination", "Service",
-        "45KG", "100KG", "300KG", "500KG", "1000KG", "Remark",
+        "45KG", "100KG", "300KG", "500KG", "1000KG",
+        "Currency", "Effective From", "Effective To",
+        "Carrier", "Cargo Class", "Packing", "Density", "Remark",
     ]
     # KIX 行(r2)：45=17 / 100=14，其余档留空
     assert ws.cell(2, 1).value == "PVG"
@@ -130,7 +138,7 @@ def test_build_air_tier_sheet_dynamic_columns():
     assert ws.cell(2, 4).value == 17.0           # 45KG
     assert ws.cell(2, 5).value == 14.0           # 100KG
     assert ws.cell(2, 6).value in (None, "")     # 300KG 留空
-    assert ws.cell(2, 9).value == "含油"          # 备注
+    assert ws.cell(2, 16).value == "含油"          # 备注(移到元数据列之后)
     # BKK 行(r3)：100/300/500/1000=16，45 留空
     assert ws.cell(3, 4).value in (None, "")     # 45KG 留空
     assert ws.cell(3, 5).value == 16.0

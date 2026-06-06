@@ -9,7 +9,7 @@
 
 normalized rate dict 字段约定：
   通用:  destination, carrier, remark
-  sea :  freight_20, freight_40, lss_cic, baf, ebs, yas_caf, sailing, via, transit, booking
+  sea :  container_20gp, container_40gp, container_40hq, lss_cic, baf, ebs, yas_caf, sailing, via, transit, booking
   air(周表源 Market Price):  service, day1..day7
   air(档位源 EES/唯凯):       service, tier_prices(稀疏 KG→价)
 
@@ -28,8 +28,32 @@ from app.services.step1_rates.sheet_builder.entities import SheetFillConfig
 from app.services.step1_rates.sheet_builder.template_registry import get_template_config
 from app.services.step1_rates.writers.base import safe_set
 
-# Sea FCL 一条运价展开为两行：(箱型标签, 取运费用的字段名)
-_SEA_CONTAINER_ROWS = (("20FT", "freight_20"), ("40FT/40HQ", "freight_40"))
+# Sea FCL 一条运价展开为三行：(箱型标签, 取运费用的字段名)
+_SEA_CONTAINER_ROWS = (
+    ("20FT", "container_20gp"),
+    ("40GP", "container_40gp"),
+    ("40HQ", "container_40hq"),
+)
+
+# (表头标签, 列键, 行字段) —— 新增海运元数据列(模板无表头,填充时一并写第8行表头)
+_SEA_META_COLS = (
+    ("Currency", "currency", "currency"),
+    ("Valid From", "valid_from", "valid_from"),
+    ("Valid To", "valid_to", "valid_to"),
+    ("Rate Level", "rate_level", "rate_level"),
+    ("Service Code", "service_code", "service_code"),
+)
+
+# 档位表元数据列：(表头标签, 取值的字段名)。顺序即列序，必须与 AirTierAdapter 解析契约一致。
+_TIER_META_COLS = (
+    ("Currency", "currency"),
+    ("Effective From", "effective_week_start"),
+    ("Effective To", "effective_to"),
+    ("Carrier", "carrier"),
+    ("Cargo Class", "cargo_class"),
+    ("Packing", "packing"),
+    ("Density", "density"),
+)
 
 
 def fill_template(template_type: str, rows: list[dict[str, Any]]) -> tuple[bytes, str]:
@@ -69,7 +93,7 @@ def _tier_sheet_name(rows: list[dict[str, Any]]) -> str:
 
 
 def _build_tier_sheet(rows: list[dict[str, Any]]) -> tuple[bytes, str]:
-    """程序生成档位表：起运港|目的港|服务|动态 KG 列(全表并集升序)|备注。稀疏档某行缺的留空。"""
+    """程序生成档位表：起运港|目的港|服务|动态 KG 列|元数据列|备注。"""
     tiers = sorted({kg for row in rows for kg in _row_tiers(row)})
     wb = Workbook()
     ws = wb.active
@@ -78,11 +102,13 @@ def _build_tier_sheet(rows: list[dict[str, Any]]) -> tuple[bytes, str]:
     header = (
         ["Origin (POL)", "Destination", "Service"]
         + [f"{kg}KG" for kg in tiers]
+        + [label for label, _ in _TIER_META_COLS]
         + ["Remark"]
     )
     for c, label in enumerate(header, start=1):
         ws.cell(1, c).value = label
 
+    meta_start = 4 + len(tiers)  # KG 列之后第一列
     r = 2
     for row in rows:
         ws.cell(r, 1).value = row.get("origin")
@@ -91,14 +117,16 @@ def _build_tier_sheet(rows: list[dict[str, Any]]) -> tuple[bytes, str]:
         row_tiers = _row_tiers(row)
         for i, kg in enumerate(tiers):
             price = row_tiers.get(kg)
-            if price is not None:  # 稀疏：缺的档留空，不写
+            if price is not None:
                 ws.cell(r, 4 + i).value = price
-        ws.cell(r, 4 + len(tiers)).value = row.get("remark")
+        for j, (_, field_name) in enumerate(_TIER_META_COLS):
+            ws.cell(r, meta_start + j).value = row.get(field_name)
+        ws.cell(r, meta_start + len(_TIER_META_COLS)).value = row.get("remark")
         r += 1
 
     buffer = BytesIO()
     wb.save(buffer)
-    return buffer.getvalue(), "air_rate_sheet_filled.xlsx"
+    return buffer.getvalue(), "air_tier_rate_sheet_filled.xlsx"
 
 
 def _unmerge_data_area(ws, data_start_row: int) -> None:
@@ -143,6 +171,7 @@ def _fill_air(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) 
     _unmerge_data_area(ws, sheet_cfg.data_start_row)
     _apply_week_headers(ws, sheet_cfg, rows)
     col = sheet_cfg.columns
+    ws.cell(sheet_cfg.header_row, col["currency"]).value = "Currency"
     r = sheet_cfg.data_start_row
     for row in rows:
         safe_set(ws.cell(r, col["origin"]), row.get("origin"))
@@ -151,6 +180,7 @@ def _fill_air(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) 
         for day in range(1, 8):
             safe_set(ws.cell(r, col[f"day{day}"]), row.get(f"day{day}"))
         safe_set(ws.cell(r, col["remark"]), row.get("remark"))
+        safe_set(ws.cell(r, col["currency"]), row.get("currency"))
         r += 1
 
 
@@ -158,6 +188,9 @@ def _fill_sea(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) 
     ws = workbook[sheet_cfg.sheet_name]
     _unmerge_data_area(ws, sheet_cfg.data_start_row)
     col = sheet_cfg.columns
+    # 模板无这些新列表头 → 填充时在表头行写英文标签，供重新导入时 OceanAdapter 按表头识别
+    for label, col_key, _ in _SEA_META_COLS:
+        ws.cell(sheet_cfg.header_row, col[col_key]).value = label
     r = sheet_cfg.data_start_row
     for row in rows:
         for container_label, freight_key in _SEA_CONTAINER_ROWS:
@@ -171,7 +204,11 @@ def _fill_sea(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) 
             safe_set(ws.cell(r, col["yas_caf"]), row.get("yas_caf"))
             safe_set(ws.cell(r, col["sailing"]), row.get("sailing"))
             safe_set(ws.cell(r, col["via"]), row.get("via"))
-            safe_set(ws.cell(r, col["transit"]), row.get("transit"))
+            transit_cell = ws.cell(r, col["transit"])
+            safe_set(transit_cell, row.get("transit"))
+            transit_cell.number_format = "General"
             safe_set(ws.cell(r, col["booking"]), row.get("booking"))
             safe_set(ws.cell(r, col["rmks"]), row.get("remark"))
+            for _, col_key, field_name in _SEA_META_COLS:
+                safe_set(ws.cell(r, col[col_key]), row.get(field_name))
             r += 1

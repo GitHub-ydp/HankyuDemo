@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.models import (
     AirFreightRate,
     AirSurcharge,
+    AirTierRate,
     Carrier,
     FreightRate,
     LclRate,
@@ -50,10 +51,10 @@ def _row_index(record: ParsedRateRecord) -> int | None:
 
 def to_air_freight_rate(record: ParsedRateRecord, batch_id: uuid.UUID) -> AirFreightRate:
     return AirFreightRate(
-        origin=record.origin_port_name or "",
-        destination=record.destination_port_name or "",
-        airline_code=record.airline_code,
-        service_desc=record.service_desc,
+        origin=(record.origin_port_name or "")[:20],
+        destination=(record.destination_port_name or "")[:100],
+        airline_code=_clip(record.airline_code, 20),
+        service_desc=_clip(record.service_desc, 100),
         effective_week_start=record.effective_week_start,
         effective_week_end=record.effective_week_end,
         price_day1=record.price_day1,
@@ -63,7 +64,7 @@ def to_air_freight_rate(record: ParsedRateRecord, batch_id: uuid.UUID) -> AirFre
         price_day5=record.price_day5,
         price_day6=record.price_day6,
         price_day7=record.price_day7,
-        currency=record.currency or "CNY",
+        currency=(record.currency or "CNY")[:5],
         remark=record.remarks,
         batch_id=batch_id,
     )
@@ -83,6 +84,32 @@ def to_air_surcharge(record: ParsedRateRecord, batch_id: uuid.UUID) -> AirSurcha
         destination_scope=extras.get("destination_scope"),
         remarks=record.remarks,
         currency=record.currency or "CNY",
+        batch_id=batch_id,
+    )
+
+
+def to_air_tier_rate(record: ParsedRateRecord, batch_id: uuid.UUID) -> AirTierRate:
+    """air_tier record → AirTierRate（无港口/船司字典依赖，origin/dest 存字符串）。"""
+    extras = record.extras or {}
+    raw_tiers = extras.get("tier_prices") or {}
+    tier_prices = {
+        int(kg): float(price)
+        for kg, price in raw_tiers.items()
+        if price is not None and str(price) != ""
+    }
+    return AirTierRate(
+        origin=(record.origin_port_name or "PVG")[:20],
+        destination=(record.destination_port_name or "")[:100],
+        service_desc=_clip(record.service_desc, 100),
+        tier_prices=tier_prices,
+        effective_from=record.valid_from,
+        effective_to=record.valid_to,
+        currency=(record.currency or "CNY")[:5],
+        remark=record.remarks,
+        cargo_class=_clip(extras.get("cargo_class"), 20),
+        packing=_clip(extras.get("packing"), 20),
+        density=_clip(extras.get("density"), 20),
+        carrier=_clip(extras.get("carrier"), 100),
         batch_id=batch_id,
     )
 
@@ -117,7 +144,7 @@ def to_freight_rate_from_ocean(
         carrier_id=carrier_id,
         origin_port_id=origin_port_id,
         destination_port_id=destination_port_id,
-        service_code=None,
+        service_code=_clip(record.service_code, 20),
         container_20gp=record.container_20gp,
         container_40gp=record.container_40gp,
         container_40hq=record.container_40hq,
@@ -135,18 +162,18 @@ def to_freight_rate_from_ocean(
         doc=record.doc,
         isps=record.isps,
         equipment_mgmt=record.equipment_mgmt,
-        currency=record.currency or "USD",
+        currency=_clip(record.currency or "USD", 5),
         valid_from=record.valid_from,
         valid_to=record.valid_to,
-        sailing_day=record.sailing_day,
-        via=record.via,
-        transit_time_text=record.transit_time_text,
+        sailing_day=_clip(record.sailing_day, 50),
+        via=_clip(record.via, 100),
+        transit_time_text=_clip(record.transit_time_text, 100),
         remarks=record.remarks,
         source_type=SourceType.excel,
         source_file=source_file or record.source_file,
         batch_id=batch_id,
         status=RateStatus.active,
-        rate_level=None,
+        rate_level=_clip(record.rate_level, 10),
     )
 
 

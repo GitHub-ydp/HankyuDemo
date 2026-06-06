@@ -136,7 +136,7 @@ class OceanAdapter:
         current_origin_port = self._resolve_port_ref(current_origin_name, db)
 
         for row_index in range(1, worksheet.max_row + 1):
-            row = [worksheet.cell(row=row_index, column=column).value for column in range(1, 18)]
+            row = [worksheet.cell(row=row_index, column=column).value for column in range(1, 23)]
             if self._is_empty_row(row):
                 continue
 
@@ -377,6 +377,11 @@ class OceanAdapter:
         isps = _safe_decimal(self._get_layout_value(row, layout, "isps"))
         equipment_mgmt = _safe_decimal(self._get_layout_value(row, layout, "equipment_mgmt"))
         remarks = self._normalize_text(self._get_layout_value(row, layout, "remarks"))
+        col_currency = self._normalize_text(self._get_layout_value(row, layout, "currency"))
+        col_valid_from = self._to_date(self._get_layout_value(row, layout, "valid_from"))
+        col_valid_to = self._to_date(self._get_layout_value(row, layout, "valid_to"))
+        col_rate_level = self._normalize_text(self._get_layout_value(row, layout, "rate_level"))
+        col_service_code = self._normalize_text(self._get_layout_value(row, layout, "service_code"))
 
         extras = {
             "sheet_name": sheet_name,
@@ -477,9 +482,11 @@ class OceanAdapter:
             "lss_40": lss_40,
             "baf_20": baf_20,
             "baf_40": baf_40,
-            "currency": "USD",
-            "valid_from": effective_from,
-            "valid_to": effective_to,
+            "currency": col_currency or "USD",
+            "valid_from": col_valid_from or effective_from,
+            "valid_to": col_valid_to or effective_to,
+            "rate_level": col_rate_level,
+            "service_code": col_service_code,
             "sailing_day": self._normalize_text(self._get_layout_value(row, layout, "sailing_day")),
             "via": self._normalize_text(self._get_layout_value(row, layout, "via")),
             "transit_time_text": self._normalize_text(
@@ -605,6 +612,11 @@ class OceanAdapter:
             "isps": None,
             "equipment_mgmt": None,
             "remarks": None,
+            "currency": None,
+            "valid_from": None,
+            "valid_to": None,
+            "rate_level": None,
+            "service_code": None,
         }
 
         for index, cell in enumerate(normalized):
@@ -640,6 +652,16 @@ class OceanAdapter:
                 layout["equipment_mgmt"] = index
             elif cell == "rmks":
                 layout["remarks"] = index
+            elif cell == "currency":
+                layout["currency"] = index
+            elif cell == "valid from":
+                layout["valid_from"] = index
+            elif cell == "valid to":
+                layout["valid_to"] = index
+            elif cell == "rate level":
+                layout["rate_level"] = index
+            elif cell == "service code":
+                layout["service_code"] = index
 
         required_fields = ("destination", "shipping_line", "freight")
         if any(layout[field] is None for field in required_fields):
@@ -811,6 +833,13 @@ class OceanAdapter:
             return value.date()
         if isinstance(value, date):
             return value
+        if isinstance(value, str):
+            text = value.strip()[:10]
+            for fmt in ("%Y-%m-%d", "%Y/%m/%d"):
+                try:
+                    return datetime.strptime(text, fmt).date()
+                except ValueError:
+                    continue
         return None
 
     def _dedupe_warnings(self, warnings: Iterable[str]) -> list[str]:

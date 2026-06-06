@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.models import (
     AirFreightRate,
     AirSurcharge,
+    AirTierRate,
     FreightRate,
     ImportBatch,
     ImportBatchFileType,
@@ -25,6 +26,7 @@ from app.services.step1_rates.activator_mappers import (
     ActivationError,
     to_air_freight_rate,
     to_air_surcharge,
+    to_air_tier_rate,
     to_freight_rate_from_ngb,
     to_freight_rate_from_ocean,
     to_lcl_rate,
@@ -62,6 +64,7 @@ class ActivationResult:
 
 _FILE_TYPE_MAP = {
     "air": ImportBatchFileType.air,
+    "air_tier": ImportBatchFileType.air_tier,
     "ocean": ImportBatchFileType.ocean,
     "ocean_ngb": ImportBatchFileType.ocean_ngb,
 }
@@ -159,6 +162,7 @@ def activate(
 
             air_objs: list[AirFreightRate] = []
             sur_objs: list[AirSurcharge] = []
+            tier_objs: list[AirTierRate] = []
             freight_objs: list[FreightRate] = []
             lcl_objs: list[LclRate] = []
 
@@ -170,6 +174,8 @@ def activate(
                         air_objs.append(to_air_freight_rate(record, batch_uuid))
                     elif kind == "air_surcharge":
                         sur_objs.append(to_air_surcharge(record, batch_uuid))
+                    elif kind == "air_tier":
+                        tier_objs.append(to_air_tier_rate(record, batch_uuid))
                     elif kind == "fcl":
                         freight_objs.append(
                             to_freight_rate_from_ocean(
@@ -211,6 +217,9 @@ def activate(
             if sur_objs:
                 db.add_all(sur_objs)
                 imported_detail["air_surcharges"] = len(sur_objs)
+            if tier_objs:
+                db.add_all(tier_objs)
+                imported_detail["air_tier_rates"] = len(tier_objs)
             if freight_objs:
                 db.add_all(freight_objs)
                 imported_detail["freight_rates"] = len(freight_objs)
@@ -219,7 +228,8 @@ def activate(
                 imported_detail["lcl_rates"] = len(lcl_objs)
 
             imported_rows = (
-                len(air_objs) + len(sur_objs) + len(freight_objs) + len(lcl_objs)
+                len(air_objs) + len(sur_objs) + len(tier_objs)
+                + len(freight_objs) + len(lcl_objs)
             )
             db.execute(
                 update(ImportBatch)
@@ -350,6 +360,8 @@ def _plan_imported_detail(
         detail["air_freight_rates"] = kind_counts["air_weekly"]
     if kind_counts.get("air_surcharge"):
         detail["air_surcharges"] = kind_counts["air_surcharge"]
+    if kind_counts.get("air_tier"):
+        detail["air_tier_rates"] = kind_counts["air_tier"]
     ocean_count = kind_counts.get("fcl", 0) + kind_counts.get("ocean_ngb_fcl", 0)
     if ocean_count:
         detail["freight_rates"] = ocean_count

@@ -1,11 +1,11 @@
 import { Fragment, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { message } from 'antd';
+import { message, Spin } from 'antd';
 import Icon from '../components/Icon';
 import type { IconName } from '../components/Icon';
 import BatchesPanel from '../components/BatchesPanel';
-import { aiParseApi, rateApi, rateBatchApi } from '../services/api';
+import { aiParseApi, rateBatchApi } from '../services/api';
 import type { ParsePreviewRow, RateBatchDetail } from '../types';
 
 interface InboxImageMeta {
@@ -235,6 +235,7 @@ export default function RateUpload() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<SourceTab>('excel');
+  const [parserHint, setParserHint] = useState<string>('auto');
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [draftResult, setDraftResult] = useState<DraftBatchResult | null>(null);
@@ -249,6 +250,10 @@ export default function RateUpload() {
   const [msgUploading, setMsgUploading] = useState(false);
   const [batchesReloadKey, setBatchesReloadKey] = useState(0);
   const [focusBatchId, setFocusBatchId] = useState<string | null>(null);
+  // 入库（生成运价表）专用：大数据量同步入库较慢，用全屏遮罩+秒数告知"系统在跑"，消除卡死错觉
+  const [committing, setCommitting] = useState(false);
+  const [commitSeconds, setCommitSeconds] = useState(0);
+  const commitTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleParseSuccess = (res: unknown) => {
     const envelope = res as { code?: number; message?: string; data?: ParseResult & { message?: string } };
@@ -274,7 +279,7 @@ export default function RateUpload() {
   const handleExcelUpload = async (file: File) => {
     setLoading(true);
     try {
-      const res = await rateBatchApi.upload(file);
+      const res = await rateBatchApi.upload(file, parserHint === 'auto' ? undefined : parserHint);
       const envelope = res as { code?: number; message?: string; data?: RateBatchDetail };
       if (envelope.code === 422 && envelope.message === 'NO_RATES_IN_FILE') {
         message.warning(t('upload.noRatesFound'));
@@ -417,12 +422,13 @@ export default function RateUpload() {
   const handleConfirm = async () => {
     if (!parseResult) return;
     setLoading(true);
+    // 启动入库遮罩与秒数计时器（同步入库期间持续告知用户系统在运行）
+    setCommitSeconds(0);
+    setCommitting(true);
+    if (commitTimerRef.current) clearInterval(commitTimerRef.current);
+    commitTimerRef.current = setInterval(() => setCommitSeconds((s) => s + 1), 1000);
     try {
-      const isAi = ['email_text', 'wechat_image', 'inbox_email', 'inbox_attachment'].includes(
-        parseResult.source_type
-      );
-      const fn = isAi ? aiParseApi.confirmImport : rateApi.confirmImport;
-      const res = await fn(parseResult.batch_id);
+      const res = await aiParseApi.confirmImport(parseResult.batch_id);
       const envelope = res as { code?: number; message?: string; data?: ImportResult };
       if (envelope.code !== 0 && envelope.code !== undefined) {
         message.error(envelope.message || t('upload.importFailed'));
@@ -437,6 +443,11 @@ export default function RateUpload() {
       message.error(error instanceof Error ? error.message : t('upload.importFailed'));
     } finally {
       setLoading(false);
+      if (commitTimerRef.current) {
+        clearInterval(commitTimerRef.current);
+        commitTimerRef.current = null;
+      }
+      setCommitting(false);
     }
   };
 
@@ -494,20 +505,42 @@ export default function RateUpload() {
               </div>
 
               {activeTab === 'excel' && (
-                <DropZone
-                  icon="import"
-                  text={t('upload.excelDragText')}
-                  hint={
-                    <>
-                      {t('upload.excelHint')}
-                      <br />
-                      {t('upload.excelHint2')}
-                    </>
-                  }
-                  accept=".xlsx,.xls,.csv"
-                  disabled={loading}
-                  onFile={handleExcelUpload}
-                />
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12.5, color: 'var(--ink-700)' }}>
+                      {t('upload.parserHintLabel')}
+                    </span>
+                    <select
+                      className="input"
+                      style={{ width: 'auto', minWidth: 180 }}
+                      value={parserHint}
+                      onChange={(e) => setParserHint(e.target.value)}
+                      disabled={loading}
+                    >
+                      <option value="auto">{t('upload.parserAuto')}</option>
+                      <option value="ocean">{t('upload.parserOcean')}</option>
+                      <option value="air">{t('upload.parserAir')}</option>
+                      <option value="air_tier">{t('upload.parserAirTier')}</option>
+                    </select>
+                    <span style={{ fontSize: 12, color: 'var(--ink-500)' }}>
+                      {t('upload.parserHintTip')}
+                    </span>
+                  </div>
+                  <DropZone
+                    icon="import"
+                    text={t('upload.excelDragText')}
+                    hint={
+                      <>
+                        {t('upload.excelHint')}
+                        <br />
+                        {t('upload.excelHint2')}
+                      </>
+                    }
+                    accept=".xlsx,.xls,.csv"
+                    disabled={loading}
+                    onFile={handleExcelUpload}
+                  />
+                </>
               )}
 
               {activeTab === 'inbox' && (
@@ -911,6 +944,13 @@ export default function RateUpload() {
       </div>
 
       <BatchesPanel reloadKey={batchesReloadKey} focusBatchId={focusBatchId} />
+
+      {/* 入库（生成运价表）全屏遮罩：大数据量同步入库期间持续提示，避免误以为卡死 */}
+      <Spin
+        spinning={committing}
+        fullscreen
+        description={t('upload.committingTip', { seconds: commitSeconds })}
+      />
     </div>
   );
 }

@@ -88,8 +88,6 @@ class KmtcAdapter:
     # ------------------------------------------------------------------
 
     def detect(self, path: Path, *, file_type_hint: Step1FileType | None = None) -> bool:
-        if file_type_hint == self.file_type:
-            return True
         name_raw = path.name
         name_lower = name_raw.lower()
         if any(kw in name_lower for kw in self._DETECT_NAME_KEYWORDS_LOWER):

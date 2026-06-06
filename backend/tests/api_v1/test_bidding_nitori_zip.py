@@ -100,3 +100,55 @@ def test_auto_fill_accepts_xlsm_single_file(client):
     # 过了扩展名闸门：恒 200 + body(降级由 ok/error 区分)；不能是 400 F7。
     assert resp.status_code == 200, resp.text
     assert "F7_WRONG_EXTENSION" not in resp.text
+
+
+def test_auto_fill_nitori_single_xlsm_db_only(client):
+    """单个 Nitori 报价表 .xlsm（无成本邮件）应按「纯 DB 运价匹配」处理，绝不能裸 500。
+
+    回归 bug：d297c85 放开 .xlsm 闸门后，单个「TO GLOBAL 見積り書.xlsm」被 identify
+    判成 nitori → 走未加 try 的 _run_nitori → resolve_bundle 找不到整包而抛异常 →
+    裸 500（无 CORS 头）→ 浏览器拦截 → 前端显示「网络异常 / Network Error」。
+
+    新行为（福山口径：海运优先查 DB 运价，成本邮件仅兜底）：单 .xlsm 也能跑——
+    报价表即上传文件本身，纯按 DB 匹配；缺成本邮件时给出 warning 而非报错。
+    本测试 DB 为空 → filled=0，但仍 ok=True + 可下载 + warning，且绝不是 500/F8。
+    """
+    import io
+    import zipfile
+
+    if not NITORI_ZIP.exists():
+        pytest.skip(f"Nitori zip 不可用：{NITORI_ZIP}")
+
+    # 从整包里抠出单个 TO GLOBAL 报价表 .xlsm，模拟用户只传了这一个文件
+    with zipfile.ZipFile(NITORI_ZIP) as zf:
+        name = next(
+            n
+            for n in zf.namelist()
+            if "GLOBAL" in n
+            and n.lower().endswith(".xlsm")
+            and "__MACOSX" not in n
+            and not Path(n).name.startswith("._")
+        )
+        data = zf.read(name)
+
+    resp = client.post(
+        "/api/v1/bidding/auto-fill",
+        files={
+            "file": (
+                "見積り書.xlsm",
+                io.BytesIO(data),
+                "application/vnd.ms-excel.sheet.macroEnabled.12",
+            )
+        },
+    )
+
+    # 关键断言：绝不能是 500（500 无 CORS → 浏览器里就是 Network Error）
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["identify"]["matched_customer"] == "nitori"
+    assert body["ok"] is True, body            # 单文件也被处理，而不是报错
+    assert body["download"]["cost_token"]      # 产出可下载
+    assert body["download"]["sr_token"]
+    # 缺成本邮件 → 必有「仅按 DB 匹配」的 warning
+    assert any("成本邮件" in w for w in body["fill"]["global_warnings"]), body
+    assert "F8_NETWORK_ERROR" not in resp.text

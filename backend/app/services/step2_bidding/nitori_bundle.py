@@ -21,7 +21,14 @@ def resolve_bundle(folder: Path) -> tuple[Path, Path]:
     成本表识别依据：含名为 'FCL' 的 sheet（区别于 ① 邮件夹带的旧报价/合同 xlsx）。
     """
     folder = Path(folder)
-    quote = next(p for p in folder.glob("*GLOBAL*.xlsm"))
+    # 注意：不能用 next(...) 裸取——找不到时抛 StopIteration，在 async 端点里会被
+    # Python 转成 RuntimeError 裸 500（无 CORS 头→前端误报 Network Error）。显式判空。
+    quotes = [p for p in folder.glob("*GLOBAL*.xlsm") if not p.name.startswith("._")]
+    if not quotes:
+        raise FileNotFoundError(
+            "TO GLOBAL 报价表(*GLOBAL*.xlsm) 未在投标包中找到"
+        )
+    quote = quotes[0]
 
     # 候选成本 xlsx：顶层散落 + 所有 .msg 抽出的 xlsx 附件
     candidates: list[Path] = list(folder.glob("*.xlsx"))
