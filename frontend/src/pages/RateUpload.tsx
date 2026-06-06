@@ -5,7 +5,7 @@ import { message, Spin } from 'antd';
 import Icon from '../components/Icon';
 import type { IconName } from '../components/Icon';
 import BatchesPanel from '../components/BatchesPanel';
-import { aiParseApi, rateApi, rateBatchApi } from '../services/api';
+import { aiParseApi, rateBatchApi } from '../services/api';
 import type { ParsePreviewRow, RateBatchDetail } from '../types';
 
 interface InboxImageMeta {
@@ -428,11 +428,7 @@ export default function RateUpload() {
     if (commitTimerRef.current) clearInterval(commitTimerRef.current);
     commitTimerRef.current = setInterval(() => setCommitSeconds((s) => s + 1), 1000);
     try {
-      const isAi = ['email_text', 'wechat_image', 'inbox_email', 'inbox_attachment'].includes(
-        parseResult.source_type
-      );
-      const fn = isAi ? aiParseApi.confirmImport : rateApi.confirmImport;
-      const res = await fn(parseResult.batch_id);
+      const res = await aiParseApi.confirmImport(parseResult.batch_id);
       const envelope = res as { code?: number; message?: string; data?: ImportResult };
       if (envelope.code !== 0 && envelope.code !== undefined) {
         message.error(envelope.message || t('upload.importFailed'));

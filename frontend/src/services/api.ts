@@ -98,11 +98,6 @@ export const rateApi = {
     api.put<unknown, ApiResponse>(`/rates/batch/${batchId}/status`, null, { params: { status } }),
   delete: (id: number) =>
     api.delete<unknown, ApiResponse>(`/rates/${id}`),
-
-  confirmImport: (batchId: string) =>
-    api.post<unknown, ApiResponse>(`/rates/upload/confirm`, null, {
-      params: { batch_id: batchId },
-    }),
 };
 
 // --- AI 解析 ---
