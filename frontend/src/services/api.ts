@@ -239,15 +239,18 @@ export const rateSheetApi = {
       timeout: 180000,
     });
   },
+  // 合约类文件做表后 rows 可达上万行，preview 返回的 JSON 可达数 MB；
+  // 默认 60s 超时在真实网络下会断，单独放宽到 180s。
   preview: (sessionId: string): Promise<ApiResponse> =>
-    api.get<unknown, ApiResponse>(`/rate-sheet/${sessionId}/preview`),
+    api.get<unknown, ApiResponse>(`/rate-sheet/${sessionId}/preview`, { timeout: 180000 }),
   downloadUrl: (sessionId: string) =>
     `${api.defaults.baseURL}/rate-sheet/${sessionId}/download`,
+  // 下载会把上万行回传后端填模板（实测 12000 行约 5s），同样放宽到 180s。
   downloadFilled: (sessionId: string, rows: unknown[]): Promise<Blob> =>
     api.post<unknown, Blob>(
       `/rate-sheet/${sessionId}/download`,
       { rows },
-      { responseType: 'blob' },
+      { responseType: 'blob', timeout: 180000 },
     ),
 };
 

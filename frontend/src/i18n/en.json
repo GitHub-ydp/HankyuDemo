@@ -9,6 +9,7 @@
     "flow4": "Review · DL",
     "uploadHintSub": "Excel / WeChat image / email text",
     "editHint": "Click any cell to edit; unchecked rows are excluded from download",
+    "largeInputWarn": "Large input detected: {{file}} produced {{count}} rows (likely a service contract). The rate-sheet builder is meant for curated weekly rates — you can still select/edit/download below, but a full contract is better imported into the rate database (via Rate Import) for bidding match.",
     "step1": "① Select template",
     "step2": "② Upload sources",
     "step3": "③ Review & download",

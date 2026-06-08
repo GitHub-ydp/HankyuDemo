@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Upload, Input, InputNumber, Table, Tooltip, message, Select, Spin } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import type { UploadFile } from 'antd';
@@ -71,6 +71,63 @@ interface ApiLike {
   message?: string;
   data?: unknown;
 }
+
+// 单个文件解析超过这个行数即视为「超大输入」（典型为整本服务合约），
+// 顶部给非阻断提示：做表为精选周运价表设计，合约建议走运价导入入库。
+const LARGE_INPUT_THRESHOLD = 2000;
+
+// 可编辑单元格：本地状态承接每次按键，仅在 onBlur 提交回父级 editedRows。
+// 关键性能点——上万行时，受控 Input 每敲一键都 setState 父组件→antd 整表(12000+行)
+// 重渲染(实测 ~150ms/键)，造成「打字到处卡」。改成单元格自管本地态后，敲键只重渲染
+// 这一个格子，父组件与整表都不动，输入恒为即时；编辑值在失焦时一次性提交（下载/入库读 editedRows，行为不变）。
+const EditableText = ({
+  value,
+  onCommit,
+}: {
+  value: string;
+  onCommit: (v: string) => void;
+}) => {
+  const [local, setLocal] = useState(value);
+  useEffect(() => {
+    setLocal(value);
+  }, [value]);
+  return (
+    <Input
+      size="small"
+      variant="outlined"
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => {
+        if (local !== value) onCommit(local);
+      }}
+    />
+  );
+};
+
+const EditableNumber = ({
+  value,
+  onCommit,
+}: {
+  value: number | null | undefined;
+  onCommit: (v: number | null) => void;
+}) => {
+  const [local, setLocal] = useState<number | null | undefined>(value);
+  useEffect(() => {
+    setLocal(value);
+  }, [value]);
+  return (
+    <InputNumber
+      size="small"
+      variant="outlined"
+      style={{ width: '100%' }}
+      value={local}
+      onChange={(v) => setLocal(v as number | null)}
+      onBlur={() => {
+        if (local !== value) onCommit(local ?? null);
+      }}
+    />
+  );
+};
 
 export default function RateSheetBuilder() {
   const { t } = useTranslation();
@@ -155,14 +212,25 @@ export default function RateSheetBuilder() {
   };
 
   const keptCount = selectedRowKeys.length;
+  // 上传后 selectedRowKeys 会被全选（合约类文件可达上万条）。用 Set 做 O(1) 命中判断：
+  // 否则 keptReview / buildFinalRows / rowClassName 里的 selectedRowKeys.includes() 套在
+  // rows.filter() 上是 O(n²)，12744 行实测每次渲染 ~15ms(Chrome)。这只是次要项；
+  // 真正的「打字到处卡」是受控单元格每键触发整表重渲染，已由 EditableText/EditableNumber 的
+  // 本地态+失焦提交解决。两处一起改，渲染开销才回到可用区间。
+  const selectedSet = useMemo(() => new Set(selectedRowKeys), [selectedRowKeys]);
   const keptReview = rows.filter(
-    (r) => selectedRowKeys.includes(r._rid as number) && r.needs_review,
+    (r) => selectedSet.has(r._rid as number) && r.needs_review,
   ).length;
+
+  // 超大输入（疑似服务合约）：取行数最多且超阈值的那个文件用于提示文案。
+  const largeFile = fileResults
+    .filter((f) => f.row_count > LARGE_INPUT_THRESHOLD)
+    .sort((a, b) => b.row_count - a.row_count)[0];
 
   // 勾选保留 + 行内编辑后的最终行（下载与入库共用）
   const buildFinalRows = () =>
     rows
-      .filter((r) => selectedRowKeys.includes(r._rid as number))
+      .filter((r) => selectedSet.has(r._rid as number))
       .map((r) => {
         const merged = { ...r, ...editedRows[r._rid as number] } as PreviewRow;
         delete (merged as { _rid?: number })._rid;
@@ -238,11 +306,9 @@ export default function RateSheetBuilder() {
     key: field as string,
     width,
     render: (_: unknown, r: PreviewRow) => (
-      <Input
-        size="small"
-        variant="outlined"
+      <EditableText
         value={(valueOf(r, field) as string) ?? ''}
-        onChange={(e) => editCell(r._rid as number, field, e.target.value)}
+        onCommit={(v) => editCell(r._rid as number, field, v)}
       />
     ),
   });
@@ -252,12 +318,9 @@ export default function RateSheetBuilder() {
     key: field as string,
     width: 78,
     render: (_: unknown, r: PreviewRow) => (
-      <InputNumber
-        size="small"
-        variant="outlined"
-        style={{ width: '100%' }}
+      <EditableNumber
         value={valueOf(r, field) as number | null | undefined}
-        onChange={(v) => editCell(r._rid as number, field, v)}
+        onCommit={(v) => editCell(r._rid as number, field, v)}
       />
     ),
   });
@@ -292,12 +355,9 @@ export default function RateSheetBuilder() {
     key: `tier_${kg}`,
     width: 74,
     render: (_: unknown, r: PreviewRow) => (
-      <InputNumber
-        size="small"
-        variant="outlined"
-        style={{ width: '100%' }}
+      <EditableNumber
         value={mergedTiers(r)[String(kg)] as number | null | undefined}
-        onChange={(v) => editTier(r, kg, v as number | null)}
+        onCommit={(v) => editTier(r, kg, v)}
       />
     ),
   });
@@ -566,6 +626,30 @@ export default function RateSheetBuilder() {
         <div className="card-body">
           {summary || rows.length > 0 ? (
             <>
+              {largeFile && (
+                <div
+                  style={{
+                    marginBottom: 16,
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 10,
+                    padding: '10px 14px',
+                    background: '#fff7e6',
+                    border: '1px solid #ffd591',
+                    borderRadius: 8,
+                    color: '#ad6800',
+                    lineHeight: 1.6,
+                  }}
+                >
+                  <Icon name="review" size={16} />
+                  <span>
+                    {t('rateSheet.largeInputWarn', {
+                      file: largeFile.name,
+                      count: largeFile.row_count.toLocaleString(),
+                    })}
+                  </span>
+                </div>
+              )}
               <div
                 className="kpi-grid"
                 style={{ gridTemplateColumns: 'repeat(2, minmax(150px, 220px))', marginBottom: 18 }}
@@ -604,7 +688,7 @@ export default function RateSheetBuilder() {
                 columns={previewCols}
                 dataSource={rows}
                 rowClassName={(r: PreviewRow) =>
-                  !selectedRowKeys.includes(r._rid as number)
+                  !selectedSet.has(r._rid as number)
                     ? 'row-excluded'
                     : r.needs_review
                       ? 'row-needs-review'
