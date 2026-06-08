@@ -470,11 +470,11 @@ export default function RateUpload() {
         ? 'tag-warn'
         : 'tag-info';
 
-  // 邮件类（inbox/email）tab 已隐藏，只保留 excel + wechat；
-  // 相关 state/handler 暂时保留以避免影响 InboxRow / handleMsgUpload 等共用逻辑
+  // 邮件类（inbox/email）+ 聊天截图（wechat）tab 已隐藏：
+  // 截图现在统一在「运价表生成」处处理，导入页只保留 Excel 文件。
+  // 相关 state/handler 暂时保留以避免影响 InboxRow / handleMsgUpload / 截图渲染块等共用逻辑
   const tabs: { key: SourceTab; label: string; icon: IconName }[] = [
     { key: 'excel', label: t('upload.tabExcel'), icon: 'import' },
-    { key: 'wechat', label: t('upload.tabWechat'), icon: 'sparkles' },
   ];
 
   return (

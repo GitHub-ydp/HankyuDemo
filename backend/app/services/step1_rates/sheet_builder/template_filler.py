@@ -13,8 +13,9 @@ normalized rate dict 字段约定：
   air(周表源 Market Price):  service, day1..day7
   air(档位源 EES/唯凯):       service, tier_prices(稀疏 KG→价)
 
-档位源的列是动态的(全表档位并集)，套不进固定 air_blank.xlsx → 程序从零生成档位表
-(起运港|目的港|服务|动态 KG 列|备注)，报价日入 sheet 名。
+档位源(EES/唯凯)有多个重量档。默认「严格按模板」：只取 +100KG 一档(模板 C 列就是
+Service/+100KG)，套进 air_blank.xlsx 周表(价铺满 day1-7)。关掉 strict 才走旧的「程序从零
+生成动态档位表(起运港|目的港|服务|动态 KG 列|备注)」——见 _STRICT_AIR_TEMPLATE_DEFAULT。
 """
 from __future__ import annotations
 
@@ -55,14 +56,39 @@ _TIER_META_COLS = (
     ("Density", "density"),
 )
 
+# air 档位源默认出表方式：True=严格套 air_blank.xlsx，只取 +100KG 档(邓老师 2026-06-08
+# 要求「完全按模板」)；False=动态多档表(_build_tier_sheet，旧行为，保留备查/可切回)。
+# 客户确认后若要回到多档，改这一处常量(或调用 fill_template 时传 strict_air_template=False)即可。
+_STRICT_AIR_TEMPLATE_DEFAULT = True
 
-def fill_template(template_type: str, rows: list[dict[str, Any]]) -> tuple[bytes, str]:
-    """把 rows 填进对应空白模板，返回 (xlsx_bytes, 建议文件名)。"""
+
+def fill_template(
+    template_type: str,
+    rows: list[dict[str, Any]],
+    *,
+    strict_air_template: bool | None = None,
+) -> tuple[bytes, str]:
+    """把 rows 填进对应空白模板，返回 (xlsx_bytes, 建议文件名)。
+
+    air 档位源(行带 tier_prices)有两种出表方式，由 strict_air_template 决定
+    (None → 取模块默认 _STRICT_AIR_TEMPLATE_DEFAULT)：
+      - True(默认)：严格套 air_blank.xlsx 周表模板——每条航线只取 +100KG 一档
+        (模板 C 列 = Service/+100KG)，价铺满 day1-7；其余档位(45/300/500/1000…)按模板舍弃。
+      - False：走 _build_tier_sheet 动态多档表(列=全表档位并集)，旧行为保留备查。
+    """
     cfg = get_template_config(template_type)  # 校验类型；未知抛 ValueError
 
-    # air 档位源(行带 tier_prices)：列动态 → 程序生成档位表，不套固定 air_blank.xlsx。
+    # air 档位源(行带 tier_prices)：默认严格按模板(降档为 +100KG 周表行，下落 _fill_air)；
+    # 关掉 strict 则回到动态档位表(_build_tier_sheet，旧码保留)。
     if template_type == "air" and any(r.get("tier_prices") for r in rows):
-        return _build_tier_sheet(rows)
+        strict = (
+            _STRICT_AIR_TEMPLATE_DEFAULT
+            if strict_air_template is None
+            else strict_air_template
+        )
+        if not strict:
+            return _build_tier_sheet(rows)
+        rows = _tier_rows_as_weekly(rows)
 
     workbook = load_workbook(cfg.template_path, data_only=False)
     if template_type == "air":
@@ -129,6 +155,38 @@ def _build_tier_sheet(rows: list[dict[str, Any]]) -> tuple[bytes, str]:
     return buffer.getvalue(), "air_tier_rate_sheet_filled.xlsx"
 
 
+def _pick_p100(tiers: dict[int, float]) -> tuple[float | None, int | None]:
+    """从稀疏档位取 +100KG 代表价。精确 100 优先；无则取最接近 100 的档
+    (距离相等取较小档)。返回 (价, 实际取的档位 KG)；空档返回 (None, None)。"""
+    if not tiers:
+        return None, None
+    if 100 in tiers:
+        return tiers[100], 100
+    kg = min(tiers, key=lambda k: (abs(k - 100), k))
+    return tiers[kg], kg
+
+
+def _tier_rows_as_weekly(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """严格按模板：把档位行降为 air_blank.xlsx 周表行——只留 +100KG 一档，
+    铺满 day1-7(档位价无每日维度，整周同价)。已是周表行(无 tier_prices)原样透传，
+    兼容同批混排。非 100 档代表时在备注标注实际档位，便于审核追溯。"""
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        tiers = _row_tiers(row)
+        if not tiers:
+            out.append(row)
+            continue
+        price, used_kg = _pick_p100(tiers)
+        new = {k: v for k, v in row.items() if k != "tier_prices"}
+        for day in range(1, 8):
+            new[f"day{day}"] = price
+        if used_kg is not None and used_kg != 100:
+            note = f"(按 {used_kg}KG 档)"
+            new["remark"] = f"{(row.get('remark') or '').strip()} {note}".strip()
+        out.append(new)
+    return out
+
+
 def _unmerge_data_area(ws, data_start_row: int) -> None:
     """解除「数据起始行及以后」的合并单元格，让数据区每格可写。表头合并保留。"""
     targets = [
@@ -167,20 +225,19 @@ def _apply_week_headers(ws, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any
 
 
 def _fill_air(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) -> None:
+    # 严格按客户原件布局：目的港 | 服务 | day1-7 | 备注。无起运港/币种列——
+    # 起运港固定 PVG 不入表(回流由 AirAdapter 默认补 PVG/CNY)；row 里的 origin/currency 不写。
     ws = workbook[sheet_cfg.sheet_name]
     _unmerge_data_area(ws, sheet_cfg.data_start_row)
     _apply_week_headers(ws, sheet_cfg, rows)
     col = sheet_cfg.columns
-    ws.cell(sheet_cfg.header_row, col["currency"]).value = "Currency"
     r = sheet_cfg.data_start_row
     for row in rows:
-        safe_set(ws.cell(r, col["origin"]), row.get("origin"))
         safe_set(ws.cell(r, col["destination"]), row.get("destination"))
         safe_set(ws.cell(r, col["service"]), row.get("service"))
         for day in range(1, 8):
             safe_set(ws.cell(r, col[f"day{day}"]), row.get(f"day{day}"))
         safe_set(ws.cell(r, col["remark"]), row.get("remark"))
-        safe_set(ws.cell(r, col["currency"]), row.get("currency"))
         r += 1
 
 

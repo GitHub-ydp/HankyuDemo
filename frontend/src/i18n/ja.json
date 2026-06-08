@@ -54,6 +54,7 @@
     "colRemark": "備考",
     "needsReview": "要確認",
     "download": "作成したレート表をダウンロード",
+    "downloading": "レート表を作成中…",
     "downloadFailed": "ダウンロード失敗",
     "downloadThenImportHint": "レート表をダウンロードしました。「レート取込」画面でこの表をアップロードしてデータ化してください",
     "addRow": "＋手動で行追加",

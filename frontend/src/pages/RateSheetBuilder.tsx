@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import { Upload, Input, InputNumber, Table, Tooltip, message, Select, Spin } from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
 import type { UploadFile } from 'antd';
 import { useTranslation } from 'react-i18next';
 import Icon from '../components/Icon';
@@ -80,6 +81,7 @@ export default function RateSheetBuilder() {
   const [rows, setRows] = useState<PreviewRow[]>([]);
   const [summary, setSummary] = useState<{ total_rows: number; needs_review: number } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
   const [editedRows, setEditedRows] = useState<Record<number, Partial<PreviewRow>>>({});
   // air 做表会话级起运港 + 币种(默认 PVG/CNY；日本段选 NRT/JPY)。中国段默认不变。
@@ -181,7 +183,9 @@ export default function RateSheetBuilder() {
       });
 
   const handleDownload = async () => {
-    if (!sessionId) return;
+    // 防重复点击：演示时客户连点会并发触发多次同步生成把后端拖死，进行中直接忽略后续点击
+    if (!sessionId || downloading) return;
+    setDownloading(true);
     try {
       const blob = await rateSheetApi.downloadFilled(sessionId, buildFinalRows());
       const url = URL.createObjectURL(blob);
@@ -196,6 +200,8 @@ export default function RateSheetBuilder() {
       message.success(t('rateSheet.downloadThenImportHint'));
     } catch {
       message.error(t('rateSheet.downloadFailed'));
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -381,7 +387,7 @@ export default function RateSheetBuilder() {
     numCol(t('rateSheet.colDay', { n: i + 1 }), `day${i + 1}` as keyof PreviewRow),
   );
   const airCols = [
-    originCol,
+    // 严格按客户原件模板：不展示起运港列（起运港固定 PVG，由会话级设置写入行供入库；模板/下载也无此列）。
     textCol(t('rateSheet.colDestination'), 'destination', 96),
     // air 图片/文本多维列：该字段全表至少一行有值才显(seaHas 是泛型判定)；EES/周报行无 → 隐藏。
     ...(seaHas('carrier') ? [textCol(t('rateSheet.colCarrier'), 'carrier', 84)] : []),
@@ -545,12 +551,16 @@ export default function RateSheetBuilder() {
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            style={{ marginLeft: 'auto' }}
-            disabled={!summary || keptCount === 0}
+            style={{ marginLeft: 'auto', cursor: downloading ? 'wait' : undefined }}
+            disabled={!summary || keptCount === 0 || downloading}
             onClick={handleDownload}
           >
-            <Icon name="download" size={14} />
-            {t('rateSheet.download')}
+            {downloading ? (
+              <Spin indicator={<LoadingOutlined style={{ fontSize: 14, color: '#fff' }} spin />} />
+            ) : (
+              <Icon name="download" size={14} />
+            )}
+            {downloading ? t('rateSheet.downloading') : t('rateSheet.download')}
           </button>
         </div>
         <div className="card-body">

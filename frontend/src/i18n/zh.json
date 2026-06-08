@@ -54,6 +54,7 @@
     "colRemark": "备注",
     "needsReview": "待确认",
     "download": "下载填好的运价表",
+    "downloading": "正在生成运价表…",
     "downloadFailed": "下载失败",
     "downloadThenImportHint": "运价表已下载，请到「运价导入」页上传此表以形成数据",
     "addRow": "＋手动添加行",
