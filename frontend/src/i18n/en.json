@@ -54,6 +54,7 @@
     "colRemark": "Remark",
     "needsReview": "Review",
     "download": "Download filled rate sheet",
+    "downloading": "Generating rate sheet…",
     "downloadFailed": "Download failed",
     "downloadThenImportHint": "Rate sheet downloaded. Upload it on the Rate Import page to persist the data.",
     "addRow": "+ Add row",
