@@ -16,13 +16,15 @@ def test_air_config_basic():
     assert sheet.sheet_name == "May 25 to May 31"
     assert sheet.header_row == 1
     assert sheet.data_start_row == 2
-    # 列语义 → 1-based 列号（A 起运港插入后整体右移一列）
-    assert sheet.columns["origin"] == 1
-    assert sheet.columns["destination"] == 2
-    assert sheet.columns["service"] == 3
-    assert sheet.columns["day1"] == 4
-    assert sheet.columns["day7"] == 10
-    assert sheet.columns["remark"] == 11
+    # 列语义 → 1-based 列号。严格按客户原件布局：A 目的港 / B 服务 / C-I 每日价 / J 备注。
+    # 无起运港列、无币种列（邓老师 2026-06-08「完全按模板」）。
+    assert "origin" not in sheet.columns
+    assert "currency" not in sheet.columns
+    assert sheet.columns["destination"] == 1
+    assert sheet.columns["service"] == 2
+    assert sheet.columns["day1"] == 3
+    assert sheet.columns["day7"] == 9
+    assert sheet.columns["remark"] == 10
 
 
 def test_sea_config_basic():

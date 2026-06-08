@@ -1,7 +1,7 @@
 from app.services.step1_rates.service import build_default_registry
 from app.services.step1_rates.entities import Step1FileType
 from app.services.step1_rates.sheet_builder.template_filler import fill_template
-from app.services.step1_rates.adapters.air_weekly import AirWeeklyAdapter
+from app.services.step1_rates.adapters.air import AirAdapter
 
 
 def test_ocean_hint_routes_to_ocean_not_kmtc(tmp_path):
@@ -22,12 +22,14 @@ def test_air_tier_priority_unique_below_nvo(tmp_path):
 
 
 def test_air_weekly_sets_batch_effective(tmp_path):
+    # 严格按模板后做表周表不带起运港列 → 回流走 AirAdapter（非 AirWeeklyAdapter）；
+    # 批次生效期仍由周表 sheet 名 + 日期表头解析得出，无损。
     rows = [{"origin": "PVG", "destination": "NRT", "service": "CA",
              "currency": "JPY", "effective_week_start": "2026-05-25",
              "day1": 10, "day7": 16}]
     content, _ = fill_template("air", rows)
-    path = tmp_path / "air_weekly_filled.xlsx"
+    path = tmp_path / "air_market_price_filled.xlsx"
     path.write_bytes(content)
-    batch = AirWeeklyAdapter().parse(path, db=None)
+    batch = AirAdapter().parse(path, db=None)
     assert str(batch.effective_from) == "2026-05-25"
     assert str(batch.effective_to) == "2026-05-31"

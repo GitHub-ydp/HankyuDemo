@@ -11,7 +11,8 @@ def test_tier_sheet_has_metadata_columns():
         "effective_week_start": "2026-06-01", "effective_to": "2026-06-07",
         "remark": "周一报价", "tier_prices": {45: 17.0, 100: 14.0},
     }]
-    content, _ = fill_template("air", rows)
+    # 旧动态多档表行为现为非默认，显式关 strict 验证其仍可用（保留备查）。
+    content, _ = fill_template("air", rows, strict_air_template=False)
     ws = load_workbook(BytesIO(content)).active
     header = [c.value for c in ws[1]]
     for label in ["Origin (POL)", "Destination", "Service", "45KG", "100KG",

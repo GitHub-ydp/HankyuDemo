@@ -1,7 +1,9 @@
 """Air / Sea 空白模板的填充配置注册表。
 
 列映射与数据起始行均由实地调研空白模板（资料/2026.05.27）确定：
-- Air `May 25 to May 31`：表头 r1，数据起 r2；A 起运港 / B 目的港 / C 服务 / D-J 每日价 / K 备注
+- Air `May 25 to May 31`：表头 r1，数据起 r2；严格按客户原件布局
+  A 目的港 / B 服务(Service/+100KG) / C-I 每日价 / J 备注（**无起运港列、无币种列**——
+  起运港固定 PVG 不入表，回流由 AirAdapter 默认补 PVG/CNY；邓老师 2026-06-08「完全按模板」）。
 - Sea `JP N RATE FCL & LCL`：表头 r8，数据起 r9；A 目的港 / B 船司 / C 箱型 / D 运费 …
 """
 from __future__ import annotations
@@ -25,18 +27,16 @@ _AIR = TemplateConfig(
             header_row=1,
             data_start_row=2,
             columns={
-                "origin": 1,
-                "destination": 2,
-                "service": 3,
-                "day1": 4,
-                "day2": 5,
-                "day3": 6,
-                "day4": 7,
-                "day5": 8,
-                "day6": 9,
-                "day7": 10,
-                "remark": 11,
-                "currency": 13,
+                "destination": 1,
+                "service": 2,
+                "day1": 3,
+                "day2": 4,
+                "day3": 5,
+                "day4": 6,
+                "day5": 7,
+                "day6": 8,
+                "day7": 9,
+                "remark": 10,
             },
         ),
     ),

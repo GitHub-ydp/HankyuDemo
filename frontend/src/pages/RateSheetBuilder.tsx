@@ -381,7 +381,7 @@ export default function RateSheetBuilder() {
     numCol(t('rateSheet.colDay', { n: i + 1 }), `day${i + 1}` as keyof PreviewRow),
   );
   const airCols = [
-    originCol,
+    // 严格按客户原件模板：不展示起运港列（起运港固定 PVG，由会话级设置写入行供入库；模板/下载也无此列）。
     textCol(t('rateSheet.colDestination'), 'destination', 96),
     // air 图片/文本多维列：该字段全表至少一行有值才显(seaHas 是泛型判定)；EES/周报行无 → 隐藏。
     ...(seaHas('carrier') ? [textCol(t('rateSheet.colCarrier'), 'carrier', 84)] : []),
