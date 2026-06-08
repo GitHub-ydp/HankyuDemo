@@ -1,13 +1,9 @@
-"""Air 运价表生成：从图片/文本元料金 AI 抽取「重量档 × 泡比 × 货类/包装」多维行。
-
-与海运的 wechat_image_parser/email_text_parser 区别：那两个是海运箱型 schema；air 元料金
-（微信图/邮件）是多维空运价，输出结构化多维行 + 稀疏重量档 tier_prices，接 orchestrator._normalize_air。
-图片走 ai_client.chat_with_image，文本走 ai_client.chat，共享 SYSTEM_PROMPT 与行构建。
-识别失败不抛——返回空 parsed_rows + warning（沿用既有 parser 风格）。
-"""
+"""Air 运价表生成：从图片/文本元料金 AI 抽取「重量档 × 泡比 × 货类/包装」多维行。"""
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -57,26 +53,22 @@ SYSTEM_PROMPT = """你是空运（航空货运）运价识别专家。从图片/
 def parse_air_image(image_path: str, db: Session | None = None, extra_context: str = "") -> dict[str, Any]:
     """air 图片 → 多维行。db 预留（air 用 IATA 码不解析 Port）。"""
     source_file = os.path.basename(image_path)
-    user_text = "请从这张空运报价图片中提取所有航线的多维运价（重量档×泡比×货类/包装）。"
-    if extra_context:
-        user_text += f"\n\n补充背景：{extra_context}"
-    try:
-        rates_json = chat_json_with_retry(
-            lambda: ai_client.chat_with_image(
-                SYSTEM_PROMPT, user_text, image_path,
-                temperature=0.0, max_tokens=settings.ai_max_tokens_extract_json,
-            ),
-            retries=1,
-        )
-    except Exception as e:  # noqa: BLE001 — 识别失败不抛，交审核台
-        return _empty(source_file, "air_image", f"AI 图片识别失败: {e}")
-    return _result(rates_json, source_file, "air_image")
+    with TemporaryDirectory(prefix="hankyu_air_img_") as tmpdir:
+        segments = _split_air_table_image(image_path, tmpdir)
+        if len(segments) > 1:
+            return _parse_air_image_segments(segments, source_file, extra_context)
+
+        try:
+            rates_json = _extract_air_json(image_path, _build_user_text(extra_context), retries=1)
+        except Exception as e:  # noqa: BLE001 — 识别失败不抛，交审核台
+            return _empty(source_file, "air_image", f"AI 图片识别失败: {e}")
+        return _result(rates_json, source_file, "air_image")
 
 
 def parse_air_text(text: str, db: Session | None = None) -> dict[str, Any]:
     """air 文本/邮件正文 → 多维行。"""
     source_file = "air_text_input"
-    user_msg = f"请从以下空运报价文本中提取所有航线的多维运价：\n\n{text}"
+    user_msg = f"请从以下空运报价文本中提取所有航线的多维运价，只输出 JSON 数组：\n\n{text}"
     try:
         rates_json = chat_json_with_retry(
             lambda: ai_client.chat(
@@ -88,6 +80,137 @@ def parse_air_text(text: str, db: Session | None = None) -> dict[str, Any]:
     except Exception as e:  # noqa: BLE001
         return _empty(source_file, "air_text", f"AI 文本识别失败: {e}")
     return _result(rates_json, source_file, "air_text")
+
+
+def _build_user_text(extra_context: str = "", segment_label: str | None = None) -> str:
+    scope = "这张空运报价图片"
+    if segment_label:
+        scope = f"这张空运报价图片的{segment_label}局部区块"
+    user_text = (
+        f"请只从{scope}中提取可见航线的多维运价（重量档×泡比×货类/包装）。"
+        "如果顶部有原表日期，所有行沿用该日期。只输出 JSON 数组，不要解释，不要思考过程，不要输出 <think>。 /no_think"
+    )
+    if extra_context:
+        user_text += f"\n\n补充背景：{extra_context}"
+    return user_text
+
+
+def _extract_air_json(image_path: str, user_text: str, *, retries: int) -> list[Any]:
+    return chat_json_with_retry(
+        lambda: ai_client.chat_with_image(
+            SYSTEM_PROMPT, user_text, image_path,
+            temperature=0.0, max_tokens=settings.ai_max_tokens_extract_json,
+        ),
+        retries=retries,
+    )
+
+
+def _parse_air_image_segments(
+    segments: list[tuple[str, str]], source_file: str, extra_context: str
+) -> dict[str, Any]:
+    items_by_index: dict[int, list[Any]] = {}
+    warnings: list[str] = []
+    max_workers = min(5, len(segments))
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(
+                _extract_air_json,
+                segment_path,
+                _build_user_text(extra_context, label),
+                retries=0,
+            ): (idx, label)
+            for idx, (label, segment_path) in enumerate(segments)
+        }
+        for future in as_completed(futures):
+            idx, label = futures[future]
+            try:
+                items_by_index[idx] = future.result()
+            except Exception as e:  # noqa: BLE001
+                warnings.append(f"{label}区块识别失败: {e}")
+
+    merged: list[Any] = []
+    for idx in sorted(items_by_index):
+        merged.extend(items_by_index[idx])
+
+    rows, row_warnings = _build_rows(merged, source_file, "air_image")
+    warnings.extend(row_warnings)
+    if not rows:
+        msg = "；".join(warnings[:3]) if warnings else "没有识别出有效运价行"
+        return _empty(source_file, "air_image", f"AI 图片分块识别失败: {msg}")
+    return {
+        "parsed_rows": rows,
+        "total_rows": len(rows),
+        "warnings": warnings,
+        "source_type": "air_image",
+        "file_name": source_file,
+    }
+
+
+def _split_air_table_image(image_path: str, tmpdir: str) -> list[tuple[str, str]]:
+    try:
+        from PIL import Image
+    except Exception:
+        return []
+
+    try:
+        with Image.open(image_path) as im:
+            im.load()
+            im = im.convert("RGB")
+            w, h = im.size
+            if h < 700 or w < 600:
+                return []
+            starts = _detect_yellow_header_starts(im)
+            if len(starts) < 2:
+                return []
+
+            bounds = [0] + starts[1:] + [h]
+            segments: list[tuple[str, str]] = []
+            for idx in range(len(bounds) - 1):
+                top, bottom = bounds[idx], bounds[idx + 1]
+                if bottom - top < 35:
+                    continue
+                segment = im.crop((0, top, w, bottom))
+                out_path = os.path.join(tmpdir, f"air_segment_{idx + 1}.png")
+                segment.save(out_path, optimize=True)
+                segments.append((f"第{idx + 1}段", out_path))
+            return segments if len(segments) > 1 else []
+    except Exception:
+        return []
+
+
+def _detect_yellow_header_starts(im: Any) -> list[int]:
+    w, h = im.size
+    step = max(1, w // 260)
+    threshold = 0.30
+    yellow_rows: list[int] = []
+    for y in range(h):
+        hits = 0
+        total = 0
+        for x in range(0, w, step):
+            r, g, b = im.getpixel((x, y))
+            total += 1
+            if r >= 210 and 130 <= g <= 220 and b <= 90 and r - g >= 20:
+                hits += 1
+        if total and hits / total >= threshold:
+            yellow_rows.append(y)
+
+    groups: list[tuple[int, int]] = []
+    for y in yellow_rows:
+        if not groups or y - groups[-1][1] > 3:
+            groups.append((y, y))
+        else:
+            groups[-1] = (groups[-1][0], y)
+
+    starts: list[int] = []
+    min_gap = 35
+    min_tail = 35
+    for start, end in groups:
+        if end - start < 5 or h - start < min_tail:
+            continue
+        if not starts or start - starts[-1] >= min_gap:
+            starts.append(start)
+    return starts[:8]
 
 
 def _result(rates_json: Any, source_file: str, source_type: str) -> dict[str, Any]:
@@ -104,8 +227,6 @@ def _result(rates_json: Any, source_file: str, source_type: str) -> dict[str, An
 
 
 def _empty(source_file: str, source_type: str, msg: str) -> dict[str, Any]:
-    # 识别失败走 error 键(沿用 air_extractor/rate_parser 约定)：orchestrator 据此标 skipped 并
-    # 透传原因。早期塞进 warnings 会绕过 skipped 分支、被当 parsed 显示绿色「已抽取」成功标签。
     return {
         "parsed_rows": [], "total_rows": 0, "error": msg,
         "source_type": source_type, "file_name": source_file,

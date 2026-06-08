@@ -691,16 +691,9 @@ def get_rate_stats(db: Session) -> dict:
     )
     ocean_carriers = db.query(func.count(func.distinct(FreightRate.carrier_id))).scalar() or 0
     ocean_routes = (
-        db.query(
-            func.count(
-                func.distinct(
-                    func.concat(
-                        FreightRate.origin_port_id, "-", FreightRate.destination_port_id
-                    )
-                )
-            )
-        ).scalar()
-        or 0
+        db.query(FreightRate.origin_port_id, FreightRate.destination_port_id)
+        .distinct()
+        .count()
     )
 
     # 空运 AirFreightRate 侧 — 与 _list_air_weekly 口径一致：统计全部已导入行
@@ -710,15 +703,9 @@ def get_rate_stats(db: Session) -> dict:
         or 0
     )
     air_routes = (
-        db.query(
-            func.count(
-                func.distinct(
-                    func.concat(AirFreightRate.origin, "-", AirFreightRate.destination)
-                )
-            )
-        )
-        .scalar()
-        or 0
+        db.query(AirFreightRate.origin, AirFreightRate.destination)
+        .distinct()
+        .count()
     )
 
     # 空运附加费 / 拼箱（5 tab 合计口径，Dashboard 与 RateList 5 tab 之和对齐）
@@ -733,17 +720,11 @@ def get_rate_stats(db: Session) -> dict:
         .count()
     )
     air_tier_routes = (
-        db.query(
-            func.count(
-                func.distinct(
-                    func.concat(AirTierRate.origin, "-", AirTierRate.destination)
-                )
-            )
-        )
+        db.query(AirTierRate.origin, AirTierRate.destination)
         .join(ImportBatch, AirTierRate.batch_id == ImportBatch.batch_id)
         .filter(ImportBatch.status == ImportBatchStatus.active)
-        .scalar()
-        or 0
+        .distinct()
+        .count()
     )
 
     # 注：海/空运承运商可能重叠但跨表无法精确去重，此处为合计估算（Demo 可接受）
