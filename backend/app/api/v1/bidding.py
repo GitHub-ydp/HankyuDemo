@@ -10,6 +10,7 @@ from uuid import uuid4
 import zipfile
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -59,6 +60,15 @@ async def auto_fill(
             ),
         )
 
+    # 落盘/解压 + identify→parse→match→fill 全是同步阻塞重活（填表 10~30s），
+    # 甩到线程池执行，避免冻住 event loop 拖垮全站。
+    return await run_in_threadpool(_process_auto_fill, content, lower, db)
+
+
+def _process_auto_fill(
+    content: bytes, lower: str, db: Session
+) -> BiddingAutoFillResponse:
+    """落盘/解压投标包 → identify→parse→match→fill×2。同步阻塞，由路由用线程池调度。"""
     bid_id = _new_bid_id()
     bid_dir = temp_files.alloc_bid_dir(bid_id)
     if lower.endswith(".zip"):

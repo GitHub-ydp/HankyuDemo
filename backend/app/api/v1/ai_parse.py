@@ -3,6 +3,7 @@ import os
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -79,7 +80,10 @@ async def api_parse_wechat_image(
     with open(save_path, "wb") as f:
         f.write(content)
 
-    result = parse_wechat_image(save_path, db, extra_context=context)
+    # AI 视觉推理同步阻塞 30~300s，甩到线程池，避免冻住 event loop 拖垮全站
+    result = await run_in_threadpool(
+        parse_wechat_image, save_path, db, extra_context=context
+    )
 
     if not result["parsed_rows"]:
         return ApiResponse(
@@ -337,55 +341,19 @@ async def api_upload_msg_file(
     with open(save_path, "wb") as f:
         f.write(content)
 
+    # .msg 解析(openMsg + 附件二进制读取)是同步阻塞，甩到线程池避免冻住 event loop
     try:
-        msg = extract_msg.openMsg(save_path)
+        payload = await run_in_threadpool(_extract_msg_payload, save_path)
     except Exception as exc:  # noqa: BLE001
         return ApiResponse(code=400, message=f"解析 .msg 文件失败: {exc}")
 
-    subject = (msg.subject or "").strip()
-    sender = (msg.sender or "").strip()
-    # extract_msg 给的 sender 通常是 "Name <addr>" 形式
-    from_name = sender
-    from_addr = sender
-    if "<" in sender and ">" in sender:
-        try:
-            from_name = sender.split("<", 1)[0].strip(' "')
-            from_addr = sender.split("<", 1)[1].rstrip(">").strip()
-        except Exception:  # noqa: BLE001
-            pass
-
-    date_iso = ""
-    if msg.date:
-        try:
-            date_iso = msg.date.isoformat() if hasattr(msg.date, "isoformat") else str(msg.date)
-        except Exception:  # noqa: BLE001
-            date_iso = str(msg.date)
-
-    body = (msg.body or "").strip()
-
-    # 收集附件：分离图片附件（用于 AI 视觉识别）与普通附件名
-    image_attachments: list[dict] = []
-    attachment_names: list[str] = []
-    for att in msg.attachments:
-        att_name = att.longFilename or att.shortFilename or ""
-        if not att_name:
-            continue
-        attachment_names.append(att_name)
-        ext_lower = os.path.splitext(att_name)[1].lower()
-        if ext_lower in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"):
-            try:
-                data: bytes = att.data or b""
-            except Exception:  # noqa: BLE001
-                data = b""
-            if data:
-                image_attachments.append({
-                    "filename": att_name,
-                    "content_type": f"image/{ext_lower.lstrip('.')}",
-                    "size": len(data),
-                    "data": data,
-                })
-
-    msg.close()
+    subject = payload["subject"]
+    from_name = payload["from_name"]
+    from_addr = payload["from_addr"]
+    date_iso = payload["date_iso"]
+    body = payload["body"]
+    image_attachments = payload["image_attachments"]
+    attachment_names = payload["attachment_names"]
 
     # 构造与 fetch_emails 完全一致的 dict
     message_id = f"msg-local-{uuid.uuid4().hex}"
@@ -474,3 +442,69 @@ def _build_preview(result: dict) -> list[dict]:
             "service_code": r.get("service_code"),
         })
     return preview_rows
+
+
+def _extract_msg_payload(save_path: str) -> dict:
+    """同步解析 .msg：openMsg + 抽正文/发件人/日期/图片附件。
+
+    重活（尤其附件二进制读取），由 /upload-msg-file 路由用 run_in_threadpool 调度，
+    避免在 event loop 线程执行冻住全站。
+    """
+    import extract_msg
+
+    msg = extract_msg.openMsg(save_path)
+
+    subject = (msg.subject or "").strip()
+    sender = (msg.sender or "").strip()
+    # extract_msg 给的 sender 通常是 "Name <addr>" 形式
+    from_name = sender
+    from_addr = sender
+    if "<" in sender and ">" in sender:
+        try:
+            from_name = sender.split("<", 1)[0].strip(' "')
+            from_addr = sender.split("<", 1)[1].rstrip(">").strip()
+        except Exception:  # noqa: BLE001
+            pass
+
+    date_iso = ""
+    if msg.date:
+        try:
+            date_iso = msg.date.isoformat() if hasattr(msg.date, "isoformat") else str(msg.date)
+        except Exception:  # noqa: BLE001
+            date_iso = str(msg.date)
+
+    body = (msg.body or "").strip()
+
+    # 收集附件：分离图片附件（用于 AI 视觉识别）与普通附件名
+    image_attachments: list[dict] = []
+    attachment_names: list[str] = []
+    for att in msg.attachments:
+        att_name = att.longFilename or att.shortFilename or ""
+        if not att_name:
+            continue
+        attachment_names.append(att_name)
+        ext_lower = os.path.splitext(att_name)[1].lower()
+        if ext_lower in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"):
+            try:
+                data: bytes = att.data or b""
+            except Exception:  # noqa: BLE001
+                data = b""
+            if data:
+                image_attachments.append({
+                    "filename": att_name,
+                    "content_type": f"image/{ext_lower.lstrip('.')}",
+                    "size": len(data),
+                    "data": data,
+                })
+
+    msg.close()
+
+    return {
+        "subject": subject,
+        "from_name": from_name,
+        "from_addr": from_addr,
+        "date_iso": date_iso,
+        "body": body,
+        "image_attachments": image_attachments,
+        "attachment_names": attachment_names,
+    }

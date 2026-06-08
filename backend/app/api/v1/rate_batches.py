@@ -1,6 +1,7 @@
 """Step1 rate batch draft APIs."""
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -26,7 +27,9 @@ async def upload_rate_batch(
     """Upload a Step1 draft batch and return preview rows."""
     try:
         content = await file.read()
-        payload = rate_batch_service.create_draft_batch_from_upload(
+        # Excel/PDF 解析(可能含 AI)是同步阻塞重活，甩到线程池，避免冻住 event loop
+        payload = await run_in_threadpool(
+            rate_batch_service.create_draft_batch_from_upload,
             file_name=file.filename or "",
             content=content,
             db=db,

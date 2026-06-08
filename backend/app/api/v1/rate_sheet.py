@@ -7,6 +7,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -60,7 +61,10 @@ async def upload_rate_sheet_files(
         with open(save_path, "wb") as fh:
             fh.write(content)
 
-        file_result = orchestrator.add_file(session_id, original_name, save_path, db)
+        # 抽取(AI/Excel/PDF)是同步阻塞重活，甩到线程池，避免冻住 event loop 拖垮全站
+        file_result = await run_in_threadpool(
+            orchestrator.add_file, session_id, original_name, save_path, db
+        )
         results.append(
             {
                 "name": file_result.name,
