@@ -231,7 +231,8 @@
     "emails": "メール分析",
     "dataGroup": "基礎データ",
     "carriers": "船社管理",
-    "settings": "システム設定"
+    "settings": "システム設定",
+    "activity": "アクティビティログ"
   },
   "settings": {
     "title": "システム設定",

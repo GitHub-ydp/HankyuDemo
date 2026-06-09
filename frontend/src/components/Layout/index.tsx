@@ -25,7 +25,7 @@ const OPS_NAV: NavEntry[] = [
 
 const DATA_NAV: NavEntry[] = [{ to: '/carriers', icon: 'carriers', labelKey: 'menu.carriers' }];
 
-const ADMIN_NAV: NavEntry[] = [{ to: '/activity', icon: 'dashboard', labelKey: 'menu.activity' }];
+const ADMIN_NAV: NavEntry[] = [{ to: '/activity', icon: 'eye', labelKey: 'menu.activity' }];
 
 const BREADCRUMBS: Record<string, string[]> = {
   '/': ['breadcrumb.dashboard'],
@@ -38,6 +38,7 @@ const BREADCRUMBS: Record<string, string[]> = {
   '/emails': ['breadcrumb.emails'],
   '/carriers': ['breadcrumb.dataGroup', 'breadcrumb.carriers'],
   '/settings': ['breadcrumb.settings'],
+  '/activity': ['breadcrumb.activity'],
 };
 
 export default function AppLayout() {

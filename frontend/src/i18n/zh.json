@@ -231,7 +231,8 @@
     "emails": "邮件分析",
     "dataGroup": "基础数据",
     "carriers": "承运商管理",
-    "settings": "系统设置"
+    "settings": "系统设置",
+    "activity": "活动日志"
   },
   "settings": {
     "title": "系统设置",

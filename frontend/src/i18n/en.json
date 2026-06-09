@@ -231,7 +231,8 @@
     "emails": "Email Analysis",
     "dataGroup": "Data",
     "carriers": "Carriers",
-    "settings": "System Settings"
+    "settings": "System Settings",
+    "activity": "Activity Log"
   },
   "settings": {
     "title": "System Settings",
