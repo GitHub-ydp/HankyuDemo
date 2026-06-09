@@ -10,5 +10,6 @@ def register(client, email, password="pw123456", name="Tester"):
 
 def login_headers(client, email, password="pw123456"):
     r = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    assert r.status_code == 200, f"login failed: {r.status_code} {r.text}"
     token = r.json()["data"]["token"]
     return {"Authorization": f"Bearer {token}"}
