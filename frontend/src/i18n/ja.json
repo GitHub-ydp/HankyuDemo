@@ -85,7 +85,8 @@
     "domesticRates": "国内運賃",
     "emailSearch": "メール検索・AI分析",
     "pkg": "入札パッケージ自動入力",
-    "batches": "運賃バッチ"
+    "batches": "運賃バッチ",
+    "activity": "アクティビティログ"
   },
   "common": {
     "create": "新規作成",
@@ -211,7 +212,8 @@
   },
   "nav": {
     "operations": "業務 Operations",
-    "data": "データ Data"
+    "data": "データ Data",
+    "admin": "管理"
   },
   "topbar": {
     "searchPlaceholder": "運賃 / レーン / 船社 を検索...",
@@ -796,6 +798,23 @@
       "searching": "関連メールを検索中...",
       "analyzing": "AI 分析を実行中...",
       "generating": "レポートを生成中..."
+    }
+  },
+  "activity": {
+    "title": "アクティビティログ",
+    "totalUsers": "ユーザー総数",
+    "activeUsers": "アクティブユーザー",
+    "admin": "管理者",
+    "user": "一般ユーザー",
+    "active": "有効",
+    "disabled": "無効",
+    "loadError": "読み込みに失敗しました",
+    "tab": { "users": "ユーザー一覧", "logins": "ログイン履歴", "ops": "操作履歴" },
+    "col": {
+      "email": "メール", "name": "氏名", "role": "ロール", "status": "状態",
+      "lastLogin": "最終ログイン", "createdAt": "登録日時", "time": "日時", "ip": "IP",
+      "operator": "操作者", "source": "種別", "file": "ファイル", "fileType": "形式",
+      "opStatus": "状態", "imported": "登録件数"
     }
   }
 }

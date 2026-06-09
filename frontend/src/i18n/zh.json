@@ -85,7 +85,8 @@
     "domesticRates": "国内运价",
     "emailSearch": "邮件搜索与AI分析",
     "pkg": "投标包自动填表",
-    "batches": "运价批次"
+    "batches": "运价批次",
+    "activity": "活动日志"
   },
   "common": {
     "create": "新增",
@@ -211,7 +212,8 @@
   },
   "nav": {
     "operations": "业务 Operations",
-    "data": "数据 Data"
+    "data": "数据 Data",
+    "admin": "管理"
   },
   "topbar": {
     "searchPlaceholder": "搜索运价 / 航线 / 承运商...",
@@ -797,6 +799,23 @@
       "searching": "正在检索相关邮件...",
       "analyzing": "正在进行 AI 分析...",
       "generating": "正在生成报告..."
+    }
+  },
+  "activity": {
+    "title": "活动日志",
+    "totalUsers": "用户总数",
+    "activeUsers": "活跃用户",
+    "admin": "管理员",
+    "user": "普通用户",
+    "active": "启用",
+    "disabled": "停用",
+    "loadError": "加载失败",
+    "tab": { "users": "用户列表", "logins": "登录历史", "ops": "操作记录" },
+    "col": {
+      "email": "邮箱", "name": "姓名", "role": "角色", "status": "状态",
+      "lastLogin": "最后登录", "createdAt": "注册时间", "time": "时间", "ip": "IP",
+      "operator": "操作人", "source": "来源", "file": "文件", "fileType": "类型",
+      "opStatus": "状态", "imported": "入库数"
     }
   }
 }

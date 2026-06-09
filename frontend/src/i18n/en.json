@@ -85,7 +85,8 @@
     "domesticRates": "Domestic Rates",
     "emailSearch": "Email Search & AI Analysis",
     "pkg": "Bid Package Auto Fill",
-    "batches": "Rate Batches"
+    "batches": "Rate Batches",
+    "activity": "Activity Log"
   },
   "common": {
     "create": "Create",
@@ -211,7 +212,8 @@
   },
   "nav": {
     "operations": "Operations",
-    "data": "Data"
+    "data": "Data",
+    "admin": "Admin"
   },
   "topbar": {
     "searchPlaceholder": "Search rates / lanes / carriers...",
@@ -796,6 +798,23 @@
       "searching": "Searching related emails...",
       "analyzing": "Running AI analysis...",
       "generating": "Generating report..."
+    }
+  },
+  "activity": {
+    "title": "Activity Log",
+    "totalUsers": "Total Users",
+    "activeUsers": "Active Users",
+    "admin": "Admin",
+    "user": "User",
+    "active": "Active",
+    "disabled": "Disabled",
+    "loadError": "Failed to load",
+    "tab": { "users": "Users", "logins": "Login History", "ops": "Operations" },
+    "col": {
+      "email": "Email", "name": "Name", "role": "Role", "status": "Status",
+      "lastLogin": "Last Login", "createdAt": "Created", "time": "Time", "ip": "IP",
+      "operator": "Operator", "source": "Source", "file": "File", "fileType": "Type",
+      "opStatus": "Status", "imported": "Imported"
     }
   }
 }
