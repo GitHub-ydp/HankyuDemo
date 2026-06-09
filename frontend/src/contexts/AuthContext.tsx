@@ -42,13 +42,14 @@ function toUser(raw: { email: string; name: string; is_admin: boolean }): AuthUs
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  // 初始 loading 由是否存在 token 决定：无 token 直接非加载态，
+  // 避免在 effect 内同步调用 setState（触发 react-hooks/set-state-in-effect）
+  const [loading, setLoading] = useState(() => !!localStorage.getItem(TOKEN_KEY));
 
   // 挂载时若有 token → /auth/me 还原会话
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) {
-      setLoading(false);
       return;
     }
     authApi
