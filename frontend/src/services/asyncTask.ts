@@ -19,6 +19,7 @@ export async function pollTask(
   const interval = opts?.interval ?? 1500;
   const timeout = opts?.timeout ?? 300000;
   const start = Date.now();
+  if (!taskId) throw new Error('任务提交失败，未获得 task_id');
 
   for (;;) {
     const resp = (await api.get<unknown, ApiResponse>(`/tasks/${taskId}`)) as ApiResponse;

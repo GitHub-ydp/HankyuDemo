@@ -182,6 +182,7 @@ def api_parse_inbox_email(
         result["file_name"] = f"📧 {safe_subject}"
         for row in result["parsed_rows"]:
             row["source_file"] = result["file_name"]
+            # row["source_type"] 保持 "email_text" 不变，避免触发 SourceType 枚举校验失败
         _parse_cache[result["batch_id"]] = result
         return {
             "batch_id": result["batch_id"],

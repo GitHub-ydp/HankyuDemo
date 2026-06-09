@@ -10,7 +10,6 @@ from uuid import uuid4
 import zipfile
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
