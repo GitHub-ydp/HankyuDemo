@@ -6,15 +6,28 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 
-connect_args = {}
-if settings.database_url.startswith("sqlite"):
-    connect_args["check_same_thread"] = False
+def _build_engine(database_url: str, debug: bool):
+    """按 DB 类型构造引擎。
 
-engine = create_engine(
-    settings.database_url,
-    echo=settings.debug,
-    connect_args=connect_args,
-)
+    - SQLite：check_same_thread=False（FastAPI 多线程需要），不配 QueuePool
+      参数（SQLite 用默认）。
+    - PostgreSQL：连接池保活——pool_pre_ping 防 PG 空闲断连后拿到死连接；
+      pool_recycle=1800 主动回收；pool_size/max_overflow 给并发留余量。
+    """
+    kwargs: dict = {"echo": debug}
+    if database_url.startswith("sqlite"):
+        kwargs["connect_args"] = {"check_same_thread": False}
+    else:
+        kwargs.update(
+            pool_size=10,
+            max_overflow=20,
+            pool_pre_ping=True,
+            pool_recycle=1800,
+        )
+    return create_engine(database_url, **kwargs)
+
+
+engine = _build_engine(settings.database_url, settings.debug)
 
 
 def _apply_sqlite_pragmas(dbapi_conn: Any) -> None:
