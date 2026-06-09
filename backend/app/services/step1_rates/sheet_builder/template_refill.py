@@ -114,28 +114,34 @@ def _group_rows_by_port(rows: list[dict[str, Any]]) -> dict[str, list[dict[str, 
     return out
 
 
-def _port_candidates(name: str) -> set[str]:
-    """模板港名 → 候选 canonical 集合：去括号、按 / 与换行拆名，提升命中率。
+def _port_candidates(name: str) -> list[str]:
+    """模板港名 → 候选 canonical 有序列表：去括号、按 / 与换行拆名，提升命中率。
 
-    例：'MADRAS / CHENNAI'→{MADRAS,CHENNAI,MADRASCHENNAI}；
-        'CHICAGO (via LAX)'→{CHICAGO}；'LONG BEACH\\nLOS ANGELES'→{LONGBEACH,LOSANGELES,...}
+    保序（whole → 各 part）且去重，使下游匹配顺序确定、不受进程 hash 随机化影响。
+    例：'MADRAS / CHENNAI'→[MADRASCHENNAI,MADRAS,CHENNAI]；
+        'CHICAGO (via LAX)'→[CHICAGO]；'LONG BEACH\\nLOS ANGELES'→[LONGBEACHLOSANGELES,LONGBEACH,LOSANGELES]
     """
     base = re.sub(r"\([^)]*\)", " ", str(name or ""))
-    cands: set[str] = set()
+    cands: list[str] = []
     whole = canonicalize(base)
     if whole:
-        cands.add(whole)
+        cands.append(whole)
     for part in _SPLIT_RE.split(base):
         cp = canonicalize(part)
         if cp:
-            cands.add(cp)
-    return cands
+            cands.append(cp)
+    return list(dict.fromkeys(cands))
 
 
 def _match_rows(port_name: str, by_port: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
     matched: list[dict[str, Any]] = []
+    seen: set[int] = set()
     for cand in _port_candidates(port_name):
-        matched.extend(by_port.get(cand, []))
+        for row in by_port.get(cand, []):
+            if id(row) in seen:
+                continue
+            seen.add(id(row))
+            matched.append(row)
     return matched
 
 
@@ -150,7 +156,12 @@ def _freight(row: dict[str, Any], crow: dict[str, Any]) -> Any:
 def _surcharge_cell(row: dict[str, Any], code: str, container: int) -> Any:
     """结构化附加费 → 单元格值，还原原始样本写法（Incl./Collect/数值/备注）。"""
     amt_key = "amount_20" if container == 20 else "amount_40"
-    for item in (row.get("surcharges") or []):
+    items = row.get("surcharges")
+    if not isinstance(items, list):
+        items = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
         if str(item.get("code") or "").strip().upper() != code:
             continue
         if item.get("included"):
@@ -182,12 +193,16 @@ def _write_ports(ws, profile, ports, by_port, styles) -> None:
     col = profile["cols"]
     crows = profile["container_rows"]
     scol = profile["surcharge_cols"]
-    # 有数据的港按模板序紧凑排在前（动态行），无数据的港留名追加在后。
-    matched_ports = [(p, m) for p in ports if (m := _match_rows(p, by_port))]
-    empty_ports = [p for p in ports if not _match_rows(p, by_port)]
+    # 按模板原港序遍历：无数据港就地占 1 行、价格留空（保留她模板的阅读版式）。
     r = profile["data_start_row"]
-    for port, matched in matched_ports:
+    for port in ports:
+        matched = _match_rows(port, by_port)
         block_start = r
+        if not matched:
+            _apply_style(ws, r, styles["c20"])
+            safe_set(ws.cell(r, col["destination"]), port)
+            r += 1
+            continue
         for row in matched:
             top, bot = crows[0], crows[1]
             # 20FT 行
@@ -220,8 +235,3 @@ def _write_ports(ws, profile, ports, by_port, styles) -> None:
         if r - 1 > block_start:
             ws.merge_cells(start_row=block_start, end_row=r - 1,
                            start_column=col["destination"], end_column=col["destination"])
-    # 无数据的港：保留港名 + 1 空行（让她看到这个港没报到价）
-    for port in empty_ports:
-        _apply_style(ws, r, styles["c20"])
-        safe_set(ws.cell(r, col["destination"]), port)
-        r += 1
