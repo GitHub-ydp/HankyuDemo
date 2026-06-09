@@ -82,9 +82,26 @@ class Settings(BaseSettings):
     upload_dir: str = "uploads"
     max_upload_size: int = 50 * 1024 * 1024  # 50MB
 
+    # 认证 / JWT
+    jwt_secret: str = "dev-insecure-secret-change-in-prod"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 720           # 12 小时
+    admin_emails: str = ""                  # 逗号分隔的管理员邮箱白名单
+    registration_mode: str = "open"         # open | admin_only
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
 
 
 settings = Settings()
+
+
+def get_admin_emails() -> set[str]:
+    """实时解析 ADMIN_EMAILS（逗号分隔，小写归一）。"""
+    return {e.strip().lower() for e in settings.admin_emails.split(",") if e.strip()}
+
+
+def is_admin_email(email: str) -> bool:
+    """该邮箱是否为管理员（live 判定，改 .env 即刻生效）。"""
+    return email.strip().lower() in get_admin_emails()
