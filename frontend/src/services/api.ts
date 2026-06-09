@@ -252,6 +252,25 @@ export const rateSheetApi = {
       { rows },
       { responseType: 'blob', timeout: 180000 },
     ),
+  // 指定数据下载：上传带目的港的模板 + 当前会话最终行，后端只回填指定港。
+  downloadIntoTemplate: (
+    sessionId: string,
+    template: File,
+    rows: unknown[],
+  ): Promise<Blob> => {
+    const fd = new FormData();
+    fd.append('template', template);
+    fd.append('rows', JSON.stringify(rows));
+    return api.post<unknown, Blob>(
+      `/rate-sheet/${sessionId}/download-into-template`,
+      fd,
+      {
+        responseType: 'blob',
+        timeout: 180000,
+        headers: { 'Content-Type': 'multipart/form-data' },
+      },
+    );
+  },
 };
 
 export default api;
