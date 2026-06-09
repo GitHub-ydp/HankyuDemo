@@ -26,8 +26,8 @@ def upgrade() -> None:
         sa.Column("last_login_at", sa.DateTime(timezone=True), nullable=True, comment="最后登录时间(UTC aware)"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("email", name="uq_users_email"),
     )
+    # email 唯一性由下面的唯一索引保证（与模型 unique=True, index=True 对齐，避免双重约束）
     op.create_index("ix_users_email", "users", ["email"], unique=True)
 
     op.create_table(
