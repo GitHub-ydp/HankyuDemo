@@ -179,7 +179,7 @@ server {
     proxy_set_header   X-Real-IP $remote_addr;
     proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header   X-Forwarded-Proto $scheme;
-    # ⚠️ 过渡期(Phase1)：提到 300s 与后端 AI_TIMEOUT_SECONDS 对齐，消除
+    # ⚠️ 过渡期(Phase1)：提升到 300s 与后端 AI_TIMEOUT_SECONDS 对齐，消除
     #    「nginx 先掐断 504、后端线程仍空转到 300s 不释放」的倒挂。
     #    AI 异步化(Phase3)上线后改回 60s（届时请求都变短）。
     proxy_read_timeout 300s;

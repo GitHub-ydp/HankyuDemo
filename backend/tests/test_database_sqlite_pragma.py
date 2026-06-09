@@ -13,4 +13,5 @@ def test_apply_sqlite_pragmas_enables_wal_busy_timeout_and_fk(tmp_path):
         assert cur.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
         assert cur.execute("PRAGMA foreign_keys").fetchone()[0] == 1
     finally:
+        cur.close()
         conn.close()

@@ -1,4 +1,6 @@
 """数据库连接管理"""
+from typing import Any
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
@@ -14,7 +16,8 @@ engine = create_engine(
     connect_args=connect_args,
 )
 
-def _apply_sqlite_pragmas(dbapi_conn) -> None:
+
+def _apply_sqlite_pragmas(dbapi_conn: Any) -> None:
     """SQLite 每条连接的 PRAGMA：外键约束 + WAL（读不被写阻塞）+ 5s 锁等待。
 
     WAL 让并发读不被写者阻塞，缓解「一人大批导入→全站查询卡住」。
