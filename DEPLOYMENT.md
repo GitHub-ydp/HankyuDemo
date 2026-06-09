@@ -103,12 +103,19 @@ sudo chmod -R u+rwX /var/lib/hankyu/uploads
 
 ### 2.4 初始化数据库 + 灌字典
 
+> **注意**：核心表（carriers/ports/freight_rates/lanes 等）由 `create_all` 建，不在 alembic 迁移链里。
+> 初始化必须用 `create_all + alembic stamp head`，直接 `alembic upgrade head` 会因 FK 依赖缺失在 PG 上失败。
+
 ```bash
 cd /opt/hankyu/backend
-../.venv/bin/python -m alembic upgrade head
+# 1. create_all 建全部表（SQLAlchemy 按 FK 依赖自动排序，PG 安全）
+DATABASE_URL=<见.env> ../.venv/bin/python -c "from app.core.database import init_db; init_db()"
+# 2. alembic stamp head：标记版本为最新，避免日后 upgrade 重复建表/报错
+DATABASE_URL=<见.env> ../.venv/bin/python -m alembic stamp head
 cd /opt/hankyu
-.venv/bin/python scripts/seed_data.py
-# 期望日志：carriers seed: 34 inserted / ports seed: 140 inserted
+# 3. 灌字典
+DATABASE_URL=<见.env> .venv/bin/python scripts/seed_data.py
+# 期望日志：船司: 新增 38 条 / 港口: 新增 183 条（或含"已存在"行）
 ```
 
 ### 2.5 前端 build
@@ -222,6 +229,9 @@ git diff HEAD@{1} HEAD -- backend/requirements.txt
 
 ### 3.2 数据库迁移变了？
 
+> 此处 `alembic upgrade head` 适用于**已完成初始化的 PG**（表已存在）只需执行增量列变更的场景。
+> 全新 PG 初始化请见 §2.4 / §3.7（必须先 `create_all + stamp`，不能直接 `upgrade`）。
+
 ```bash
 git diff HEAD@{1} HEAD -- backend/alembic/versions/
 # 如果有新增迁移文件：
@@ -299,10 +309,16 @@ curl -s 'http://127.0.0.1:8000/api/v1/freight-rates/stats' \
 1. 备份现有 SQLite：`cp backend/hankyu_hanshin.db backend/hankyu_hanshin.db.bak.$(date +%Y%m%d-%H%M%S)`
 2. 起 PG 并建库（见 §6.2），或复用 docker-compose 的 postgres。
 3. 改 `backend/.env`：`DATABASE_URL=postgresql+psycopg2://hankyu:<pwd>@localhost:5432/hankyu_hanshin`
-4. 迁移 + 灌字典：
+4. 初始化 PG + 灌字典：
+   > 核心表由 `create_all` 建、alembic 仅管增量列变更，故初始化用 `create_all + stamp` 而非 `upgrade`。
    ```bash
-   cd backend && ../.venv/bin/python -m alembic upgrade head && cd ..
-   .venv/bin/python scripts/seed_data.py   # 期望 34 船司 / 140 港口
+   cd backend
+   # create_all 建全部表（SQLAlchemy 按 FK 依赖自动排序，PG 不报 FK 缺失）
+   DATABASE_URL=<见.env> ../.venv/bin/python -c "from app.core.database import init_db; init_db()"
+   # alembic stamp head：标记版本为最新，避免日后 upgrade 重复建表/报错
+   DATABASE_URL=<见.env> ../.venv/bin/python -m alembic stamp head
+   cd ..
+   DATABASE_URL=<见.env> .venv/bin/python scripts/seed_data.py   # 期望 38 船司 / 183 港口
    ```
 5. 重启后端：`sudo systemctl restart hankyu-backend`
 6. 烟雾测试（§3.6）：health / carriers≥34 / 导一份运价端到端。
