@@ -15,5 +15,5 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(100), comment="显示名")
     password_hash: Mapped[str] = mapped_column(String(255), comment="bcrypt 哈希")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="启用(软停用释放席位)")
-    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="最后登录时间")
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, comment="最后登录时间(UTC aware)")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
