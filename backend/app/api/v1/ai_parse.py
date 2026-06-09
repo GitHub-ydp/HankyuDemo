@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_db, get_optional_user
 from app.core.config import settings
+from app.models.user import User
 from app.schemas.common import ApiResponse
 from app.services.email_text_parser import parse_email_text
 from app.services.wechat_image_parser import parse_wechat_image
@@ -406,13 +407,16 @@ async def api_upload_msg_file(
 def api_confirm_import(
     batch_id: str = Query(...),
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user),
 ):
     """确认导入 AI 解析结果到数据库（共用 rates 的 confirm 逻辑）"""
     parsed_data = _parse_cache.get(batch_id)
     if not parsed_data:
         return ApiResponse(code=404, message=f"批次 {batch_id} 不存在或已过期")
 
-    result = import_parsed_rates(parsed_data, db)
+    result = import_parsed_rates(
+        parsed_data, db, operator_email=current_user.email if current_user else None
+    )
     _parse_cache.pop(batch_id, None)
 
     return ApiResponse(data=result)

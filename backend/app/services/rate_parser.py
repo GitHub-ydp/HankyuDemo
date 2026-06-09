@@ -694,6 +694,7 @@ def import_parsed_rates(
     parsed_data: dict,
     db: Session,
     confirmed_indices: list[int] | None = None,
+    operator_email: str | None = None,
 ) -> dict:
     """将解析后的费率数据写入数据库"""
     batch_id = parsed_data["batch_id"]
@@ -758,6 +759,7 @@ def import_parsed_rates(
         records_imported=imported,
         status=UploadStatus.completed if not errors else UploadStatus.failed,
         error_message="\n".join(errors) if errors else None,
+        uploaded_by=operator_email,
     )
     db.add(log)
     db.commit()

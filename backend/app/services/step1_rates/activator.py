@@ -76,6 +76,7 @@ def activate(
     *,
     dry_run: bool,
     force: bool = False,
+    operator_email: str | None = None,
 ) -> ActivationResult:
     """真激活或 dry_run 预览。
 
@@ -155,7 +156,7 @@ def activate(
                 effective_to=effective_to,
                 row_count=0,
                 status=ImportBatchStatus.active,
-                imported_by="step1_activator",
+                imported_by=operator_email or "step1_activator",
             )
             db.add(import_batch_row)
             db.flush()

@@ -316,6 +316,7 @@ def activate_rate_batch(
     dry_run: bool = True,
     force: bool = False,
     selected_row_indices: list[int] | None = None,
+    operator_email: str | None = None,
 ) -> dict[str, Any] | None:
     """真激活批次或 dry_run 预览。"""
     draft = _draft_batches.get(batch_id)
@@ -381,7 +382,7 @@ def activate_rate_batch(
             "errors": [],
         }
 
-    result = activator.activate(draft, db, dry_run=dry_run, force=force)
+    result = activator.activate(draft, db, dry_run=dry_run, force=force, operator_email=operator_email)
 
     errors_payload = [
         {

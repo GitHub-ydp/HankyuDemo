@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_db, get_optional_user
+from app.models.user import User
 from app.schemas.common import ApiResponse, PaginatedData
 from app.schemas.rate_batch import (
     RateBatchActivateRequest,
@@ -98,6 +99,7 @@ def activate_rate_batch(
     batch_id: str,
     request: RateBatchActivateRequest,
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user),
 ):
     """Activate a Step1 draft batch with a stable stub response."""
     payload = rate_batch_service.activate_rate_batch(
@@ -106,6 +108,7 @@ def activate_rate_batch(
         dry_run=request.dry_run,
         force=request.force,
         selected_row_indices=request.selected_row_indices,
+        operator_email=current_user.email if current_user else None,
     )
     if not payload:
         return ApiResponse(code=404, message=f"Rate batch {batch_id} not found")
