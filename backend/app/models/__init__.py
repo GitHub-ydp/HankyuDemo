@@ -13,6 +13,8 @@ from app.models.surcharge import Surcharge, CalculationType
 from app.models.tariff import Tariff
 from app.models.upload_log import UploadLog, UploadStatus
 from app.models.app_settings import AppSettings
+from app.models.user import User
+from app.models.login_event import LoginEvent
 
 __all__ = [
     "Base",
@@ -30,4 +32,6 @@ __all__ = [
     "Tariff",
     "UploadLog", "UploadStatus",
     "AppSettings",
+    "User",
+    "LoginEvent",
 ]

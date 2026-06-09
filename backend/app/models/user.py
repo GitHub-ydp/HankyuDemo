@@ -1,0 +1,19 @@
+"""用户模型（真实登录）"""
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, String, func
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import Base
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, comment="登录邮箱(小写归一)")
+    name: Mapped[str] = mapped_column(String(100), comment="显示名")
+    password_hash: Mapped[str] = mapped_column(String(255), comment="bcrypt 哈希")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="启用(软停用释放席位)")
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="最后登录时间")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
