@@ -85,7 +85,7 @@ python3.10 -m venv .venv
 ```bash
 cp backend/.env.example backend/.env
 # 然后编辑 backend/.env，最少要填：
-# - DATABASE_URL（SQLite 留默认即可；走 PG 改成 postgresql://...）
+# - DATABASE_URL（SQLite 留默认即可；走 PG 改成 postgresql+psycopg2://...）
 # - VLLM_BASE_URL / VLLM_API_KEY / VLLM_MODEL（AI Provider）
 # - EMAIL_ADDRESS / EMAIL_PASSWORD（邮件 Demo）
 # - UPLOAD_DIR=/var/lib/hankyu/uploads     # ★ 强烈建议写绝对路径，原因见 §5
@@ -376,8 +376,8 @@ diff <(grep -oE '^[A-Z_]+=' backend/.env.example | sort -u) \
 ### 6.2 PostgreSQL（推荐 prod）
 
 ```bash
-# .env
-DATABASE_URL=postgresql://hankyu:<password>@localhost:5432/hankyu_hanshin
+# .env（driver 必须写 postgresql+psycopg2，不能省略 +psycopg2）
+DATABASE_URL=postgresql+psycopg2://hankyu:<password>@localhost:5432/hankyu_hanshin
 ```
 
 ```bash
@@ -388,6 +388,8 @@ sudo -u postgres psql -c "GRANT ALL ON DATABASE hankyu_hanshin TO hankyu;"
 ```
 
 切换 DB 后必须重新 `seed_data.py`，不然字典是空的。
+
+生产从 SQLite 切 PG 后必须按 §3.7 的迁移 runbook 执行（备份→切 URL→alembic+seed→客户重导运价）。
 
 ---
 
