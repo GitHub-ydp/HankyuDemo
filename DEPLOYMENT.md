@@ -292,6 +292,23 @@ curl -s 'http://127.0.0.1:8000/api/v1/freight-rates/stats' \
 - [ ] 「船司/供应商」页：清空后页面空 / 导入后只显命中
 - [ ] 「投标包自动填表」端到端能跑通
 
+### 3.7 SQLite → PostgreSQL 迁移（一次性，停机窗口）
+
+> 决策：**不迁历史数据**。字典重 seed，客户把在用的运价重导一遍（已与业务确认）。
+
+1. 备份现有 SQLite：`cp backend/hankyu_hanshin.db backend/hankyu_hanshin.db.bak.$(date +%Y%m%d-%H%M%S)`
+2. 起 PG 并建库（见 §6.2），或复用 docker-compose 的 postgres。
+3. 改 `backend/.env`：`DATABASE_URL=postgresql+psycopg2://hankyu:<pwd>@localhost:5432/hankyu_hanshin`
+4. 迁移 + 灌字典：
+   ```bash
+   cd backend && ../.venv/bin/python -m alembic upgrade head && cd ..
+   .venv/bin/python scripts/seed_data.py   # 期望 34 船司 / 140 港口
+   ```
+5. 重启后端：`sudo systemctl restart hankyu-backend`
+6. 烟雾测试（§3.6）：health / carriers≥34 / 导一份运价端到端。
+7. 通知客户：历史运价不保留，请重新导入在用运价。
+8. 回滚：把 `.env` 的 `DATABASE_URL` 改回 SQLite 行并重启即可（SQLite 文件未动）。
+
 ---
 
 ## 4. 「为什么修了还是不好使」常见原因（按出现频率）
