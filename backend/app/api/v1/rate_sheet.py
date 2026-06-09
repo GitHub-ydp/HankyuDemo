@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.core.config import settings
 from app.schemas.common import ApiResponse
+from app.services import async_runner
 from app.services.step1_rates.sheet_builder import orchestrator
 from app.services.step1_rates.sheet_builder.template_filler import fill_template
 from app.services.step1_rates.sheet_builder.template_refill import (
@@ -50,14 +51,15 @@ async def upload_rate_sheet_files(
     files: list[UploadFile] = File(...),
     db: Session = Depends(get_db),
 ):
-    """上传该模板对应的一批杂料（各家 Excel / 微信图 / 邮件文本），逐个抽取并汇总。"""
+    """落盘一批杂料后提交抽取任务，立即返回 task_id（前端轮询 /tasks/{id}）。"""
     try:
-        session = orchestrator.get_session(session_id)
+        orchestrator.get_session(session_id)
     except KeyError:
         return ApiResponse(code=404, message="会话不存在或已过期，请重新创建")
 
     os.makedirs(settings.upload_dir, exist_ok=True)
-    results = []
+    # UploadFile 请求结束即失效：先把所有文件落盘，记录 (原名, 落盘路径)
+    saved: list[tuple[str, str]] = []
     for upload in files:
         original_name = upload.filename or "file"
         safe_name = original_name.replace("/", "_").replace("\\", "_")
@@ -66,32 +68,36 @@ async def upload_rate_sheet_files(
         content = await upload.read()
         with open(save_path, "wb") as fh:
             fh.write(content)
+        saved.append((original_name, save_path))
 
-        # 抽取(AI/Excel/PDF)是同步阻塞重活，甩到线程池，避免冻住 event loop 拖垮全站
-        file_result = await run_in_threadpool(
-            orchestrator.add_file, session_id, original_name, save_path, db
-        )
-        results.append(
-            {
+    task_id = async_runner.create_task(db, "rate_sheet_files")
+
+    def work(task_db: Session) -> dict:
+        session = orchestrator.get_session(session_id)
+        results = []
+        for original_name, save_path in saved:
+            file_result = orchestrator.add_file(
+                session_id, original_name, save_path, task_db
+            )
+            results.append({
                 "name": file_result.name,
                 "source_type": file_result.source_type,
                 "status": file_result.status,
                 "row_count": file_result.row_count,
                 "warnings": file_result.warnings,
                 "message": file_result.message,
-            }
-        )
-
-    needs_review = sum(1 for r in session.rows if r.get("needs_review"))
-    return ApiResponse(
-        data={
+            })
+        needs_review = sum(1 for r in session.rows if r.get("needs_review"))
+        return {
             "files": results,
             "summary": {
                 "total_rows": len(session.rows),
                 "needs_review": needs_review,
             },
         }
-    )
+
+    async_runner.submit(task_id, work)
+    return ApiResponse(data={"task_id": task_id})
 
 
 @router.get("/{session_id}/preview")

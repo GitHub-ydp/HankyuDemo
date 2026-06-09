@@ -16,6 +16,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.schemas.bidding import BiddingAutoFillResponse
+from app.schemas.common import ApiResponse
+from app.services import async_runner
 from app.services.step2_bidding import temp_files
 from app.services.step2_bidding.bidding_orchestrator import run_auto_fill
 from app.services.step2_bidding.token_store import TOKEN_STORE
@@ -32,15 +34,15 @@ _XLSX_MEDIA_TYPE = (
 )
 
 
-@router.post("/auto-fill", response_model=BiddingAutoFillResponse)
+@router.post("/auto-fill")
 async def auto_fill(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-) -> BiddingAutoFillResponse:
-    """一次性自动填入：identify → parse → match → fill×2。
+):
+    """提交投标包自动填入任务，立即返回 task_id（前端轮询 /tasks/{id}）。
 
-    响应恒为 200 + BiddingAutoFillResponse（降级由 body.ok/error 区分）。
-    仅 F6（> 10MB）走 413、F7（扩展名错）走 400。
+    扩展名/大小校验仍同步即时返回：F7→400、F6→413；
+    identify→parse→match→fill 的降级由轮询结果的 ok/error 区分。
     """
     filename = file.filename or ""
     lower = filename.lower()
@@ -60,9 +62,16 @@ async def auto_fill(
             ),
         )
 
-    # 落盘/解压 + identify→parse→match→fill 全是同步阻塞重活（填表 10~30s），
-    # 甩到线程池执行，避免冻住 event loop 拖垮全站。
-    return await run_in_threadpool(_process_auto_fill, content, lower, db)
+    task_id = async_runner.create_task(db, "bidding_auto_fill")
+
+    def work(task_db: Session) -> dict:
+        resp = _process_auto_fill(content, lower, task_db)
+        # BiddingAutoFillResponse(pydantic) → dict 落 result_json；mode="json" 保证
+        # datetime 等转成 JSON 可序列化值（JSON 列存储不报错）
+        return resp.model_dump(mode="json") if hasattr(resp, "model_dump") else dict(resp)
+
+    async_runner.submit(task_id, work)
+    return ApiResponse(data={"task_id": task_id})
 
 
 def _process_auto_fill(
