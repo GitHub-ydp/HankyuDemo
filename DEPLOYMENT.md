@@ -23,7 +23,7 @@
 | `489e65b` upload_dir 绝对化 + reset 语义 | uvicorn 不在 backend/ 启动也能写 `uploads/`；reset 提示文案如实 | 上传一份 Excel，能看到草稿批次；点右上角清空按钮，提示文案是「临时 X / 字典 Y」 |
 | `89bf7fa` reset 真清 + 自动重灌字典 | 清空后立即 reseed 34 船司 / 140 港口 | 清空后再上传 NGB / 海运 Excel，行数不应再全部 `CARRIER_NOT_FOUND` |
 | `3433c5b` 运价导入页 UI 收口 | 删 disclaimer / 重排底部按钮 / 隐邮件入口 | 进入「运价导入」页，没有 disclaimer，只剩 Excel + 聊天截图两个 tab |
-| 本次 perf 根治 | nginx proxy_read_timeout 120→300（过渡消倒挂） | 改 nginx site config 后 `sudo nginx -t && sudo systemctl reload nginx` |
+| 本次 perf 根治 | nginx proxy_read_timeout → 60s（AI 异步化后请求都短；Phase1 过渡曾设 300） | 改 nginx site config 后 `sudo nginx -t && sudo systemctl reload nginx` |
 
 **前两次踩过：本地修了，服务器上 git pull 后没重启 / 没 build，"功能不好使"就是这么来的。**
 
@@ -186,10 +186,9 @@ server {
     proxy_set_header   X-Real-IP $remote_addr;
     proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header   X-Forwarded-Proto $scheme;
-    # ⚠️ 过渡期(Phase1)：提升到 300s 与后端 AI_TIMEOUT_SECONDS 对齐，消除
-    #    「nginx 先掐断 504、后端线程仍空转到 300s 不释放」的倒挂。
-    #    AI 异步化(Phase3)上线后改回 60s（届时请求都变短）。
-    proxy_read_timeout 300s;
+    # 异步化(Phase3)后所有请求都短（提交+轮询），回到常规 60s。
+    # 例外：rate-sheet 大 JSON preview/download 仍可能久，如需可单独 location 放宽。
+    proxy_read_timeout 60s;
   }
 }
 
