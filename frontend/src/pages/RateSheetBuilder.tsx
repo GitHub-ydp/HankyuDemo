@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Upload, Input, InputNumber, Table, Tooltip, message, Select, Spin } from 'antd';
+import { Upload, Input, InputNumber, Table, Tooltip, message, Select, Spin, Modal } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import type { UploadFile } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -139,6 +139,9 @@ export default function RateSheetBuilder() {
   const [summary, setSummary] = useState<{ total_rows: number; needs_review: number } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [specOpen, setSpecOpen] = useState(false);
+  const [specFile, setSpecFile] = useState<File | null>(null);
+  const [specDownloading, setSpecDownloading] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
   const [editedRows, setEditedRows] = useState<Record<number, Partial<PreviewRow>>>({});
   // air 做表会话级起运港 + 币种(默认 PVG/CNY；日本段选 NRT/JPY)。中国段默认不变。
@@ -270,6 +273,31 @@ export default function RateSheetBuilder() {
       message.error(t('rateSheet.downloadFailed'));
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleSpecifiedDownload = async () => {
+    if (!sessionId || !specFile || specDownloading) return;
+    setSpecDownloading(true);
+    try {
+      const blob = await rateSheetApi.downloadIntoTemplate(
+        sessionId,
+        specFile,
+        buildFinalRows(),
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${specFile.name.replace(/\.[^.]+$/, '')}_filled.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      message.success(t('rateSheet.specifiedDownloadDone'));
+      setSpecOpen(false);
+      setSpecFile(null);
+    } catch {
+      message.error(t('rateSheet.downloadFailed'));
+    } finally {
+      setSpecDownloading(false);
     }
   };
 
@@ -622,6 +650,18 @@ export default function RateSheetBuilder() {
             )}
             {downloading ? t('rateSheet.downloading') : t('rateSheet.download')}
           </button>
+          {templateType === 'sea' && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              style={{ marginLeft: 8 }}
+              disabled={!summary || keptCount === 0}
+              onClick={() => setSpecOpen(true)}
+            >
+              <Icon name="download" size={14} />
+              {t('rateSheet.specifiedDownload')}
+            </button>
+          )}
         </div>
         <div className="card-body">
           {summary || rows.length > 0 ? (
@@ -702,6 +742,39 @@ export default function RateSheetBuilder() {
           )}
         </div>
       </div>
+
+      <Modal
+        open={specOpen}
+        title={t('rateSheet.specifiedDownload')}
+        onCancel={() => {
+          setSpecOpen(false);
+          setSpecFile(null);
+        }}
+        onOk={handleSpecifiedDownload}
+        okText={t('rateSheet.specifiedDownloadConfirm')}
+        okButtonProps={{ disabled: !specFile, loading: specDownloading }}
+        confirmLoading={specDownloading}
+      >
+        <p style={{ marginBottom: 12 }}>{t('rateSheet.specifiedDownloadHint')}</p>
+        <Upload
+          accept=".xlsx"
+          maxCount={1}
+          beforeUpload={(file) => {
+            setSpecFile(file as unknown as File);
+            return false;
+          }}
+          onRemove={() => setSpecFile(null)}
+          fileList={
+            specFile
+              ? ([{ uid: '-1', name: specFile.name } as UploadFile])
+              : []
+          }
+        >
+          <button type="button" className="btn btn-sm">
+            {t('rateSheet.specifiedDownloadPick')}
+          </button>
+        </Upload>
+      </Modal>
     </div>
   );
 }
