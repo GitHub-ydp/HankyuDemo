@@ -1,6 +1,7 @@
 """v1 API 总路由"""
 from fastapi import APIRouter
 
+from app.api.v1.auth import router as auth_router
 from app.api.v1.carriers import router as carriers_router
 from app.api.v1.ports import router as ports_router
 from app.api.v1.rates import router as rates_router
@@ -14,6 +15,7 @@ from app.api.v1.admin import router as admin_router
 from app.api.v1.admin_settings import router as admin_settings_router
 
 router = APIRouter(prefix="/api/v1")
+router.include_router(auth_router)
 router.include_router(carriers_router)
 router.include_router(ports_router)
 router.include_router(rates_router)
