@@ -187,7 +187,9 @@ server {
     proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header   X-Forwarded-Proto $scheme;
     # 异步化(Phase3)后所有请求都短（提交+轮询），回到常规 60s。
-    # 例外：rate-sheet 大 JSON preview/download 仍可能久，如需可单独 location 放宽。
+    # 例外：① rate-sheet 大 JSON preview/download 仍可能久；
+    #       ② rate-batches/upload 罕见 AI fallback（Excel 不被识别时）可能 >60s。
+    # 这两个路径如遇 504，可对其单独 location 放宽 proxy_read_timeout（如 300s）。
     proxy_read_timeout 60s;
   }
 }
