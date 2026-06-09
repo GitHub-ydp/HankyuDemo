@@ -1,6 +1,7 @@
 import axios from 'axios';
 import type { ApiResponse } from '../types';
 import type { BiddingAutoFillResponse } from '../types/bidding';
+import { pollTask } from './asyncTask';
 
 const resolveApiBaseUrl = () => {
   const envBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
@@ -102,22 +103,26 @@ export const rateApi = {
 
 // --- AI 解析 ---
 export const aiParseApi = {
-  parseEmailText: (text: string) => {
+  parseEmailText: async (text: string): Promise<ApiResponse> => {
     const formData = new FormData();
     formData.append('text', text);
-    return api.post<unknown, ApiResponse>('/ai/parse-email-text', formData, {
+    const submit = (await api.post<unknown, ApiResponse>('/ai/parse-email-text', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 120000,
-    });
+    })) as ApiResponse;
+    const taskId = (submit.data as { task_id: string }).task_id;
+    const result = await pollTask(taskId);
+    return { code: 0, data: result, message: 'ok' } as ApiResponse;
   },
-  parseWechatImage: (file: File, context?: string) => {
+  parseWechatImage: async (file: File, context?: string): Promise<ApiResponse> => {
     const formData = new FormData();
     formData.append('file', file);
     if (context) formData.append('context', context);
-    return api.post<unknown, ApiResponse>('/ai/parse-wechat-image', formData, {
+    const submit = (await api.post<unknown, ApiResponse>('/ai/parse-wechat-image', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 120000,
-    });
+    })) as ApiResponse;
+    const taskId = (submit.data as { task_id: string }).task_id;
+    const result = await pollTask(taskId);
+    return { code: 0, data: result, message: 'ok' } as ApiResponse;
   },
   // 拉取邮箱最近邮件列表（IMAP 直连）
   listInboxEmails: (params?: { limit?: number; since_date?: string }) =>
@@ -126,23 +131,27 @@ export const aiParseApi = {
       timeout: 120000,
     }),
   // 对邮箱列表中选定的某封邮件进行 AI 费率识别
-  parseInboxEmail: (cacheKey: string) => {
+  parseInboxEmail: async (cacheKey: string): Promise<ApiResponse> => {
     const formData = new FormData();
     formData.append('cache_key', cacheKey);
-    return api.post<unknown, ApiResponse>('/ai/parse-inbox-email', formData, {
+    const submit = (await api.post<unknown, ApiResponse>('/ai/parse-inbox-email', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 180000,
-    });
+    })) as ApiResponse;
+    const taskId = (submit.data as { task_id: string }).task_id;
+    const result = await pollTask(taskId);
+    return { code: 0, data: result, message: 'ok' } as ApiResponse;
   },
   // 对邮件中的某张图片附件进行 AI 视觉识别
-  parseInboxAttachment: (cacheKey: string, attachmentIndex: number) => {
+  parseInboxAttachment: async (cacheKey: string, attachmentIndex: number): Promise<ApiResponse> => {
     const formData = new FormData();
     formData.append('cache_key', cacheKey);
     formData.append('attachment_index', String(attachmentIndex));
-    return api.post<unknown, ApiResponse>('/ai/parse-inbox-attachment', formData, {
+    const submit = (await api.post<unknown, ApiResponse>('/ai/parse-inbox-attachment', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 180000,
-    });
+    })) as ApiResponse;
+    const taskId = (submit.data as { task_id: string }).task_id;
+    const result = await pollTask(taskId);
+    return { code: 0, data: result, message: 'ok' } as ApiResponse;
   },
   // 上传本地 Outlook .msg 文件，落到 inbox 缓存（后续复用 parseInboxEmail / parseInboxAttachment）
   uploadMsgFile: (file: File) => {
@@ -201,22 +210,24 @@ export const rateBatchApi = {
 
 // --- Bidding (T-B10 v0.1 入札对应 / PkgAutoFill) ---
 export const biddingApi = {
-  autoFill: (
+  autoFill: async (
     file: File,
     onUploadProgress?: (percent: number) => void
   ): Promise<BiddingAutoFillResponse> => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post<unknown, BiddingAutoFillResponse>('/bidding/auto-fill', formData, {
+    const submit = (await api.post<unknown, ApiResponse>('/bidding/auto-fill', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 120000,
       onUploadProgress: (evt) => {
         if (!onUploadProgress) return;
         const total = evt.total || file.size || 1;
         const pct = Math.min(100, Math.round(((evt.loaded || 0) / total) * 100));
         onUploadProgress(pct);
       },
-    });
+    })) as ApiResponse;
+    const taskId = (submit.data as { task_id: string }).task_id;
+    const result = await pollTask(taskId);
+    return result as BiddingAutoFillResponse;
   },
   downloadUrl: (token: string) =>
     `${api.defaults.baseURL}/bidding/download/${token}`,
@@ -231,13 +242,15 @@ export const rateSheetApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
-  uploadFiles: (sessionId: string, files: File[]): Promise<ApiResponse> => {
+  uploadFiles: async (sessionId: string, files: File[]): Promise<ApiResponse> => {
     const fd = new FormData();
     files.forEach((f) => fd.append('files', f));
-    return api.post<unknown, ApiResponse>(`/rate-sheet/${sessionId}/files`, fd, {
+    const submit = (await api.post<unknown, ApiResponse>(`/rate-sheet/${sessionId}/files`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 180000,
-    });
+    })) as ApiResponse;
+    const taskId = (submit.data as { task_id: string }).task_id;
+    const result = await pollTask(taskId);
+    return { code: 0, data: result, message: 'ok' } as ApiResponse;
   },
   // 合约类文件做表后 rows 可达上万行，preview 返回的 JSON 可达数 MB；
   // 默认 60s 超时在真实网络下会断，单独放宽到 180s。
