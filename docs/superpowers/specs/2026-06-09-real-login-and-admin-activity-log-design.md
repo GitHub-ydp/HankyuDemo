@@ -26,7 +26,7 @@
 | D3 | 活动日志范围 | **登录历史 + 操作记录**（操作记录复用 `upload_logs`） |
 | D4 | 管理员指定 | `.env` 的 `ADMIN_EMAILS` 名单，**实时判定**（不在 DB 存 role，改名单即刻生效） |
 | D5 | 会话机制 | **JWT（HS256）**，无状态，前端存 token、axios 带 `Authorization` 头 |
-| D6 | 操作记录存储 | **方案 A**：新建 `login_events` 表专记登录历史；操作记录复用现有 `upload_logs`（补填 `uploaded_by`）。不建通用 activity_log（YAGNI） |
+| D6 | 操作记录存储 | **方案 A**：新建 `login_events` 表专记登录历史；操作记录**复用现有两张批次表合并**——`import_batches`（文件导入 activate / 做表入库，已带 `imported_by`+`imported_at`）+ `upload_logs`（`/ai/confirm` 路径，已带 `uploaded_by`+`created_at`）。不建通用 activity_log（YAGNI） |
 
 ### D7 关键约束：为「按人头收费 → 管理员指定注册」预留缝（用户重点强调）
 
@@ -52,7 +52,7 @@ Login/Register ──POST /auth/* ───▶ auth router ──┐
 axios 拦截器 ──Bearer token────────▶ get_current_user (deps)
                                                  ├─▶ users 表（密码哈希 / last_login_at / is_active）
 ActivityLog 页 ─GET /admin/*──────▶ get_current_admin ─▶ login_events 表（登录历史）
-（仅管理员菜单）                                  └─▶ upload_logs 表（操作记录，复用）
+（仅管理员菜单）                                  └─▶ import_batches + upload_logs（操作记录，合并）
 ```
 
 - 管理员身份 = 登录用户邮箱 ∈ `ADMIN_EMAILS`（每请求实时判定，非 DB 存储）。
@@ -85,12 +85,21 @@ ActivityLog 页 ─GET /admin/*──────▶ get_current_admin ─▶ lo
 > **不在 `users` 存 role 字段**（见 D4）：管理员身份由 `ADMIN_EMAILS` 实时判定。
 > 两张表都登记到 `app/models/__init__.py`，使 `Base.metadata` / `init_db` 能自动建表（dev）。
 
-### 4.2 操作记录（复用 upload_logs）
+### 4.2 操作记录（复用两张批次表，合并读出）
 
-- 不新建表。`upload_logs.uploaded_by`（已存在）在**上传/导入创建 UploadLog 时**填入当前登录用户邮箱。
-- 这要求相关上传端点挂上 `get_current_user` 依赖，把 `current_user.email` 传入写库处。
-- `GET /admin/operations` 直接读 `upload_logs`（时间倒序、分页、可按用户筛）。
-- 本期操作记录 = `upload_logs`（运价文件导入流水）。`import_batch`（做表批次）**本期不纳入**，留作后续增量。
+实际有**两张**已存在的操作表，活路分布如下（实测确认）：
+
+| 表 | 写入路径 | 操作人字段 | 时间字段 |
+| ---- | ---- | ---- | ---- |
+| `import_batches` | 文件导入 activate（`rate_batches.py` → `activator.activate`）、做表入库（`sheet_builder/db_writer.commit_*_rows`） | `imported_by`（str，可空） | `imported_at` |
+| `upload_logs` | `/ai/confirm`（`ai_parse.py` → `import_parsed_rates`） | `uploaded_by`（str，可空） | `created_at` |
+
+- **不新建操作表**。`GET /admin/operations` **合并读** `import_batches` + `upload_logs`，归一为统一行：
+  `{operator, time, source(import|ai_confirm), file, file_type, status, row_count, parsed/imported}`，时间倒序、分页、可按 operator 筛。
+- **盖章（写真实操作人），本期只接两条最浅且高价值的活路，且用 `get_optional_user`（非破坏）**：
+  1. `/ai/confirm`：端点挂 `get_optional_user`，`import_parsed_rates(..., operator_email=user.email if user else None)` → 填 `uploaded_by`。
+  2. 文件 activate：`activate_rate_batch` 端点挂 `get_optional_user`，把 `user.email`（或 None）传入 `activator.activate(...)`，替换现在硬编码的 `imported_by="step1_activator"`（无 token 时回落该默认值）。
+- **做表入库（`db_writer.commit_*_rows`）盖章留作后续**：其 `imported_by` 参数已存在但调用链更深；本期**不**改这条线。它的批次**仍会出现在操作记录里**，只是 `operator` 可能不是真人（保持现状值）。这是有意的范围边界，避免深层穿线。
 
 ### 4.3 认证基建
 
@@ -107,8 +116,9 @@ ActivityLog 页 ─GET /admin/*──────▶ get_current_admin ─▶ lo
 - `REGISTRATION_MODE: str = "open"`（`open` | `admin_only`，见 D7）
 
 `app/api/deps.py`（扩展）
-- `get_current_user(token, db)`：解 JWT → 查 `users` → 不存在/`is_active=False`/token 失效 → 401。
+- `get_current_user(token, db)`：解 JWT → 查 `users` → 不存在/`is_active=False`/token 失效 → 401。**硬鉴权**，用于 `/auth/me` 与 `/admin/*`。
 - `get_current_admin(user=Depends(get_current_user))`：`is_admin_email(user.email)` 为假 → 403。
+- `get_optional_user(token, db) -> User | None`：**不抛 401**——有合法 token 返回用户，无/失效 token 返回 `None`。用于给现有业务端点盖章而**不破坏**其既有（无 token）调用与测试。
 
 `app/services/user_service.py`（新建，建号/认证单点收口，见 D7-2）
 - `create_user(db, email, password, name) -> User`：归一邮箱、去重（已存在→409/ValueError）、哈希、落库。
@@ -131,7 +141,7 @@ ActivityLog 页 ─GET /admin/*──────▶ get_current_admin ─▶ lo
 | ---- | ---- | ---- |
 | GET | `/admin/users` | 用户列表：email/name/is_admin/last_login_at/created_at/is_active + 汇总（活跃数/总数，见 D7-3） |
 | GET | `/admin/login-events` | 登录历史，分页（limit/offset），可选 `user_id` 筛选，时间倒序 |
-| GET | `/admin/operations` | 操作记录（读 upload_logs），分页，可选用户筛选，时间倒序 |
+| GET | `/admin/operations` | 操作记录（合并 `import_batches`+`upload_logs`），分页，可选 operator 筛选，时间倒序 |
 
 > 现有 `admin.py`（清空数据）与 `admin_settings.py` 保持不动；活动日志独立成 `admin_activity.py`，职责单一。
 > 统一走现有 `ApiResponse[...]` 包装与 RESTful 错误响应。
@@ -182,8 +192,8 @@ ActivityLog 页 ─GET /admin/*──────▶ get_current_admin ─▶ lo
 - `REGISTRATION_MODE=admin_only` 时 `/auth/register` 返回 403。
 - 登录：错密码 401；正确 → 返回 token + `last_login_at` 被更新 + 新增一条 `login_event`；停用账号 403。
 - `get_current_user`：有效 / 无效 / 过期 token 三种。
-- 管理员端点：非管理员 403、管理员（邮箱 ∈ `ADMIN_EMAILS`）200；`/admin/operations` 能读到 `upload_logs`。
-- 上传链路：带登录用户上传后 `upload_logs.uploaded_by` 被填。
+- 管理员端点：非管理员 403、管理员（邮箱 ∈ `ADMIN_EMAILS`）200；`/admin/operations` 能合并读到 `import_batches` + `upload_logs` 两表数据。
+- 盖章：`/ai/confirm` 带登录用户后 `upload_logs.uploaded_by` 被填；文件 activate 带登录用户后 `import_batches.imported_by` = 该用户邮箱（非 `step1_activator`）。
 
 前端：无测试框架，靠 `npm run build` + `npm run lint` 通过。
 
@@ -194,6 +204,7 @@ ActivityLog 页 ─GET /admin/*──────▶ get_current_admin ─▶ lo
 2. 新增 `POST /admin/users`（管理员建号）+ `PATCH /admin/users/{id}`（停用/启用），**复用** `user_service.create_user()`。
 3. 活动日志「用户列表」加「新建用户 / 停用」操作按钮（复用现有页面）。
 4. 可选：席位上限校验（建号时比对 `count(is_active=True)` 与计费档位）、邀请码 / 邮箱域名白名单。
+5. 做表入库（`db_writer.commit_*_rows`）盖章真实操作人（穿线 `imported_by`），让做表批次的 operator 也是真人。
 
 均为增量，不触及本期认证内核与数据模型。
 
@@ -203,6 +214,7 @@ ActivityLog 页 ─GET /admin/*──────▶ get_current_admin ─▶ lo
 2. **`JWT_SECRET` 生产必填**，不入 git；dev 占位默认须在 `.env.example` / 文档标注。
 3. **现有浏览器 localStorage 演示账号作废**：上线后所有人需对后端重新注册一次（首次访问 `/auth/me` 失败 → 强制登录）。
 4. 新增依赖 `passlib[bcrypt]` + `PyJWT` 需进 `requirements.txt` 并在各环境 `pip install`。
+5. **后端鉴权范围边界（重要）**：本期后端**只硬性鉴权 `/auth/me` 与 `/admin/*`**；其余业务端点（rates / upload / pkg 等）**暂不在后端强制 token**，由前端 `ProtectedRoute` 把关。这与现状（全开放）相比不降级、只增强（多了真实登录与管理员可见性），但「全后端端点强制鉴权」是后续 sweep（会触及大量现有测试），不在本期。盖章用 `get_optional_user` 正是为此——不破坏现有无 token 调用。
 
 ## 11. 工时估算
 
