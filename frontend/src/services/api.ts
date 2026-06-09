@@ -23,11 +23,29 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+export const TOKEN_KEY = 'hhrh_token';
+
+// 请求拦截器：附带 Bearer token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 // 响应拦截器
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
     const raw = error.response?.data ?? {};
+    if (error.response?.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        window.location.assign('/login');
+      }
+    }
     const detail = raw.detail;
     let detailMsg: string | undefined;
     if (Array.isArray(detail)) {
@@ -271,6 +289,24 @@ export const rateSheetApi = {
       },
     );
   },
+};
+
+// --- 认证 ---
+export const authApi = {
+  register: (email: string, password: string, name: string) =>
+    api.post<unknown, ApiResponse>('/auth/register', { email, password, name }),
+  login: (email: string, password: string) =>
+    api.post<unknown, ApiResponse>('/auth/login', { email, password }),
+  me: () => api.get<unknown, ApiResponse>('/auth/me'),
+};
+
+// --- 管理员活动日志 ---
+export const adminActivityApi = {
+  users: () => api.get<unknown, ApiResponse>('/admin/users'),
+  loginEvents: (params?: Record<string, unknown>) =>
+    api.get<unknown, ApiResponse>('/admin/login-events', { params }),
+  operations: (params?: Record<string, unknown>) =>
+    api.get<unknown, ApiResponse>('/admin/operations', { params }),
 };
 
 export default api;
