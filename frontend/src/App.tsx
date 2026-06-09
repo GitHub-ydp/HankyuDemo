@@ -6,6 +6,7 @@ import enUS from 'antd/locale/en_US';
 import { useTranslation } from 'react-i18next';
 import AppLayout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import Dashboard from './pages/Dashboard';
 import RateList from './pages/RateList';
@@ -16,6 +17,7 @@ import EmailSearch from './pages/EmailSearch';
 import PkgAutoFill from './pages/PkgAutoFill';
 import RateSheetBuilder from './pages/RateSheetBuilder';
 import Settings from './pages/Settings';
+import ActivityLog from './pages/ActivityLog';
 import LoginPage from './pages/Login';
 import RegisterPage from './pages/Register';
 import './i18n';
@@ -48,6 +50,10 @@ const router = createBrowserRouter(
             { path: '/carriers', element: <CarrierList /> },
             { path: '/emails', element: <EmailSearch /> },
             { path: '/settings', element: <Settings /> },
+            {
+              element: <AdminRoute />,
+              children: [{ path: '/activity', element: <ActivityLog /> }],
+            },
           ],
         },
       ],

@@ -25,6 +25,8 @@ const OPS_NAV: NavEntry[] = [
 
 const DATA_NAV: NavEntry[] = [{ to: '/carriers', icon: 'carriers', labelKey: 'menu.carriers' }];
 
+const ADMIN_NAV: NavEntry[] = [{ to: '/activity', icon: 'dashboard', labelKey: 'menu.activity' }];
+
 const BREADCRUMBS: Record<string, string[]> = {
   '/': ['breadcrumb.dashboard'],
   '/rates': ['breadcrumb.rateGroup', 'breadcrumb.rates'],
@@ -124,6 +126,13 @@ export default function AppLayout() {
 
         <div className="nav-section">{t('nav.data')}</div>
         {DATA_NAV.map(renderNav)}
+
+        {user?.isAdmin && (
+          <>
+            <div className="nav-section">{t('nav.admin')}</div>
+            {ADMIN_NAV.map(renderNav)}
+          </>
+        )}
 
         <div className="sidebar-foot">
           <div className="avatar">{user?.initial || 'HH'}</div>
