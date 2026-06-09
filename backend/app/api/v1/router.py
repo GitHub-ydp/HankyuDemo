@@ -13,6 +13,7 @@ from app.api.v1.rate_sheet import router as rate_sheet_router
 from app.api.v1.bidding import router as bidding_router
 from app.api.v1.admin import router as admin_router
 from app.api.v1.admin_settings import router as admin_settings_router
+from app.api.v1.admin_activity import router as admin_activity_router
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(auth_router)
@@ -27,3 +28,4 @@ router.include_router(rate_sheet_router)
 router.include_router(bidding_router)
 router.include_router(admin_router)
 router.include_router(admin_settings_router)
+router.include_router(admin_activity_router)
