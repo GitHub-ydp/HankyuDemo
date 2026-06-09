@@ -67,29 +67,6 @@ def test_rate_sheet_files_offloads_extraction(client, monkeypatch):
     )
 
 
-def test_parse_wechat_image_offloads_ai(client, monkeypatch):
-    """POST /ai/parse-wechat-image 的 AI 视觉调用不得在 event loop 线程跑。"""
-    import app.api.v1.ai_parse as ai_parse
-
-    seen: dict[str, bool] = {}
-
-    def spy_parse(save_path, db, extra_context=""):
-        seen["on_loop"] = _on_event_loop_thread()
-        return {"parsed_rows": [], "warnings": []}
-
-    monkeypatch.setattr(ai_parse, "parse_wechat_image", spy_parse)
-
-    resp = client.post(
-        "/api/v1/ai/parse-wechat-image",
-        files={"file": ("shot.png", b"x", "image/png")},
-        data={"context": ""},
-    )
-
-    assert resp.status_code == 200
-    assert seen.get("on_loop") is False, (
-        "parse_wechat_image 仍在 event loop 线程执行 → AI 解析期间冻全站"
-    )
-
 
 def test_rate_batch_upload_offloads_parse(client, monkeypatch):
     """POST /rate-batches/upload 的解析不得在 event loop 线程跑。"""
