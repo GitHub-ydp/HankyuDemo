@@ -285,6 +285,21 @@ export default function RateSheetBuilder() {
         specFile,
         buildFinalRows(),
       );
+      // 该端点的业务错误(会话过期/非海运/格式错/模板无法解析)以 ApiResponse(JSON, HTTP 200)
+      // 形式返回，axios 成功拦截器不会进 catch。xlsx 实为 zip，前两字节为 'PK'(0x50 0x4B)；
+      // 非此魔数即判定为错误 JSON，解析出 message 提示并中止下载。
+      const head = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
+      if (!(head[0] === 0x50 && head[1] === 0x4b)) {
+        let msg = t('rateSheet.downloadFailed');
+        try {
+          const parsed = JSON.parse(await blob.text());
+          if (parsed?.message) msg = parsed.message;
+        } catch {
+          /* 非 JSON：保持默认下载失败提示 */
+        }
+        message.error(msg);
+        return;
+      }
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
