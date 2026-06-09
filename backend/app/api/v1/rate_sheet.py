@@ -2,9 +2,11 @@
 
 编排逻辑在 services/step1_rates/sheet_builder/orchestrator.py，本层只做 HTTP 适配。
 """
+import json
 import os
 import uuid
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -17,6 +19,10 @@ from app.core.config import settings
 from app.schemas.common import ApiResponse
 from app.services.step1_rates.sheet_builder import orchestrator
 from app.services.step1_rates.sheet_builder.template_filler import fill_template
+from app.services.step1_rates.sheet_builder.template_refill import (
+    RefillError,
+    refill_into_template,
+)
 from app.services.step1_rates.sheet_builder.template_registry import (
     supported_template_types,
 )
@@ -149,4 +155,48 @@ def download_rate_sheet_post(session_id: str, body: DownloadRequest):
         iter([content]),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.post("/{session_id}/download-into-template")
+async def download_into_template(
+    session_id: str,
+    template: UploadFile = File(...),
+    rows: str = Form(...),
+):
+    """指定数据下载：把当前会话 rows 按目的港回填进用户上传的模板（仅 OTHER PORTS 页）。"""
+    try:
+        session = orchestrator.get_session(session_id)
+    except KeyError:
+        return ApiResponse(code=404, message="会话不存在或已过期，请重新创建")
+    if session.template_type != "sea":
+        return ApiResponse(code=400, message="指定数据下载仅支持海运模板")
+
+    try:
+        parsed_rows = json.loads(rows)
+        if not isinstance(parsed_rows, list):
+            raise ValueError
+    except (json.JSONDecodeError, ValueError):
+        return ApiResponse(code=400, message="提交的运价数据格式有误")
+
+    template_bytes = await template.read()
+    try:
+        content = await run_in_threadpool(
+            refill_into_template, template_bytes, parsed_rows
+        )
+    except RefillError as exc:
+        return ApiResponse(code=400, message=str(exc))
+    except Exception:
+        return ApiResponse(code=400, message="模板文件无法解析，请上传 .xlsx 模板")
+
+    stem = (template.filename or "rate").rsplit(".", 1)[0] or "rate"
+    download_name = f"{stem}_filled.xlsx"
+    disposition = (
+        "attachment; filename=rate_filled.xlsx; "
+        f"filename*=UTF-8''{quote(download_name)}"
+    )
+    return StreamingResponse(
+        iter([content]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": disposition},
     )
