@@ -4,8 +4,6 @@
 - 登录/注册成功写 last_login_at + login_event（带 IP）
 - 管理员标记由 ADMIN_EMAILS 实时判定，不入 DB
 """
-import re
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
@@ -19,10 +17,10 @@ from app.services import user_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-
 
 def _client_ip(request: Request) -> str | None:
+    # X-Forwarded-For 可被客户端伪造，生产须由可信反向代理（nginx）注入
+    # 并配合 ProxyHeaders / 可信代理白名单；此处取首项是「部署在可信代理之后」的简化处理。
     fwd = request.headers.get("x-forwarded-for")
     if fwd:
         return fwd.split(",")[0].strip()
@@ -39,15 +37,10 @@ def _auth_data(user: User) -> AuthData:
 def register(body: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     if settings.registration_mode != "open":
         raise HTTPException(status_code=403, detail="注册已关闭，请联系管理员开通账号")
-    email = body.email.strip().lower()
-    if not _EMAIL_RE.match(email):
-        raise HTTPException(status_code=400, detail="邮箱格式不正确")
-    if len(body.password) < 6:
-        raise HTTPException(status_code=400, detail="密码至少需要 6 位")
-    if not body.name.strip():
-        raise HTTPException(status_code=400, detail="请填写姓名")
     try:
-        user = user_service.create_user(db, email, body.password, body.name)
+        user = user_service.create_user(db, body.email, body.password, body.name)
+    except user_service.InvalidUserInputError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except user_service.EmailExistsError:
         raise HTTPException(status_code=409, detail="该邮箱已注册")
     user_service.record_login(db, user, _client_ip(request))
