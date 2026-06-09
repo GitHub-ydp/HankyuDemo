@@ -1,4 +1,6 @@
 """应用配置管理"""
+from typing import Literal
+
 from pydantic_settings import BaseSettings
 
 
@@ -87,7 +89,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 720           # 12 小时
     admin_emails: str = ""                  # 逗号分隔的管理员邮箱白名单
-    registration_mode: str = "open"         # open | admin_only
+    registration_mode: Literal["open", "admin_only"] = "open"  # 启动即校验非法值
 
     class Config:
         env_file = ".env"
