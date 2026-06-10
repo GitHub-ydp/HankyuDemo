@@ -1,5 +1,6 @@
 from __future__ import annotations
 import shutil
+from datetime import date as _date
 from decimal import Decimal
 from pathlib import Path
 from openpyxl import load_workbook
@@ -19,6 +20,26 @@ _CHINA_POLS = {"SHANGHAI", "TAICANG"}
 _SIZE_TO_COST = {"20F": "20gp", "40HC": "40hc", "40F": "40hc"}   # 40F←40HC（assumption）
 _SIZE_TO_CONTAINER = {"20F": "container_20gp", "40HC": "container_40hq", "40F": "container_40hq"}  # 40HC=40HQ
 _MARKUP = Decimal("1.15")
+
+
+def _select_ocean_candidate(cands, col):
+    """选价策略(邓老师口径 2026-06-10)：最新期间优先，同期内取最低价。
+
+    返回 (chosen, pool)：chosen=选中行(无可用行时 None)；pool=同最新期间的全部
+    可用候选(供标注复核提示)。期间以 valid_to 为准(缺失回退 valid_from，再缺
+    视为最旧)，仅在该箱型有价的行中比较。
+    """
+    viable = [c for c in cands if getattr(c, col, None) is not None]
+    if not viable:
+        return None, []
+
+    def _period(c):
+        return c.valid_to or c.valid_from or _date.min
+
+    latest = max(_period(c) for c in viable)
+    pool = [c for c in viable if _period(c) == latest]
+    chosen = min(pool, key=lambda c: getattr(c, col))
+    return chosen, pool
 
 
 class NitoriProfile:
@@ -80,51 +101,73 @@ class NitoriProfile:
             if not row.extras.get("is_china"):
                 continue
             size = row.extras.get("size", "")
-            cost_price, carrier_text, lead = self._match_from_db(row, size)
-            if cost_price is None and self._cost is not None:
-                cost_price, carrier_text, lead = self._match_from_cost_book(row, size)
-            if cost_price is None:
+            hit = self._match_from_db(row, size)
+            if hit is None and self._cost is not None:
+                hit = self._match_from_cost_book(row, size)
+            if hit is None:
                 reports.append(PerRowReport(
                     row_idx=row.row_idx, section_code="GLOBAL",
                     destination_code=row.destination_code, status=RowStatus.NO_RATE,
                     cost_price=None, sell_price=None, markup_ratio=None,
-                    lead_time_text=None, carrier_text=None, remark_text=None,
+                    lead_time_text=None, carrier_text=None,
+                    remark_text="库内无该航线运价，待询价",
                     selected_candidate=None))
                 continue
-            sell = (cost_price * self._markup).quantize(Decimal("1"))
+            sell = (hit["price"] * self._markup).quantize(Decimal("1"))
             reports.append(PerRowReport(
                 row_idx=row.row_idx, section_code="GLOBAL",
                 destination_code=row.destination_code, status=RowStatus.FILLED,
-                cost_price=cost_price, sell_price=sell, markup_ratio=self._markup,
-                lead_time_text=lead, carrier_text=carrier_text,
-                remark_text=None, selected_candidate=None))
+                cost_price=hit["price"], sell_price=sell, markup_ratio=self._markup,
+                lead_time_text=hit["lead"], carrier_text=hit["carrier"],
+                remark_text=hit["note"], selected_candidate=None,
+                thc_amount=hit["thc"], doc_amount=hit["doc"], lss_amount=hit["lss"]))
         return reports
 
     def _match_from_db(self, row, size):
-        """优先：查 DB 运价(福山确认口径)。返回 (cost_price, carrier, lead) 或 (None,None,None)。"""
+        """优先：查 DB 运价(福山确认口径)。命中返回 dict，否则 None。
+
+        选价规则(邓老师口径 2026-06-10)：先取最新期间(valid_to 最大)，
+        同一期间内多个报价取最低价，并在 note 标注候选明细提醒复核。
+        """
         if self._repo is None:
-            return None, None, None
-        cands = self._repo.query_ocean_fcl(origin=row.origin_code, destination=row.destination_code)
-        if not cands:
-            return None, None, None
-        cand = cands[0]  # MVP：取第一条
+            return None
         col = _SIZE_TO_CONTAINER.get(size)
-        price = getattr(cand, col) if col else None
-        if price is None:
-            return None, None, None
-        lead = cand.transit_time_text or (str(cand.transit_days) if cand.transit_days is not None else None)
-        return price, cand.carrier_name, lead
+        if not col:
+            return None
+        cands = self._repo.query_ocean_fcl(origin=row.origin_code, destination=row.destination_code)
+        chosen, pool = _select_ocean_candidate(cands, col)
+        if chosen is None:
+            return None
+        price = getattr(chosen, col)
+        lead = chosen.transit_time_text or (str(chosen.transit_days) if chosen.transit_days is not None else None)
+        note = None
+        if len(pool) > 1:
+            others = "、".join(
+                f"{c.carrier_name or '?'} {getattr(c, col)}" for c in pool if c is not chosen
+            )
+            note = (
+                f"同航线同期 {len(pool)} 个报价，已取最低价 {chosen.carrier_name or '?'} {price}"
+                f"（其余：{others}），请复核"
+            )
+        is_20 = size == "20F"
+        lss = (chosen.lss_20 if is_20 else chosen.lss_40) or chosen.lss_cic
+        return {
+            "price": price, "carrier": chosen.carrier_name, "lead": lead,
+            "thc": None if is_20 else chosen.thc,   # 库中 thc 经 20/40 行合并≈40 箱档值，20F 宁缺勿错
+            "doc": chosen.doc, "lss": lss, "note": note,
+        }
 
     def _match_from_cost_book(self, row, size):
-        """回退：zip 内成本文件(MVP 兜底；福山验收后或移除)。"""
+        """回退：zip 内成本文件(MVP 兜底；福山验收后或移除)。命中返回 dict，否则 None。"""
         lane = self._cost.lookup(pol=row.origin_code, pod=row.destination_code)
         cost_field = _SIZE_TO_COST.get(size)
         if not lane or lane.no_service or not cost_field:
-            return None, None, None
+            return None
         price = getattr(lane, f"rate_{cost_field}")
         if price is None:
-            return None, None, None
-        return price, lane.carrier, lane.transit_time
+            return None
+        return {"price": price, "carrier": lane.carrier, "lead": lane.transit_time,
+                "thc": None, "doc": None, "lss": None, "note": None}
 
     def fill(self, source_path: Path, parsed: ParsedPkg,
              row_reports: list[PerRowReport], variant: str, output_path: Path):
@@ -138,10 +181,18 @@ class NitoriProfile:
                 if rep.status != RowStatus.FILLED:
                     continue
                 price = rep.cost_price if variant == "cost" else rep.sell_price
+                self._set(ws, rep.row_idx, "carrier", rep.carrier_text)
                 self._set(ws, rep.row_idx, "of_cur", "USD")
                 self._set(ws, rep.row_idx, "of_amt", float(price))
-                self._set(ws, rep.row_idx, "lss_cur", "USD")
-                self._set(ws, rep.row_idx, "lss_amt", 0)          # Included→0（assumption）
+                if rep.lss_amount is not None:                    # 未知不写，不再硬编 0
+                    self._set(ws, rep.row_idx, "lss_cur", "USD")
+                    self._set(ws, rep.row_idx, "lss_amt", float(rep.lss_amount))
+                if rep.thc_amount is not None:
+                    self._set(ws, rep.row_idx, "thc_cur", "CNY")
+                    self._set(ws, rep.row_idx, "thc_amt", float(rep.thc_amount))
+                if rep.doc_amount is not None:
+                    self._set(ws, rep.row_idx, "doc_cur", "CNY")
+                    self._set(ws, rep.row_idx, "doc_amt", float(rep.doc_amount))
                 if rep.lead_time_text:
                     self._set(ws, rep.row_idx, "tt", rep.lead_time_text)
                 ft = self._cost.free_time_for(rep.destination_code) if self._cost else None

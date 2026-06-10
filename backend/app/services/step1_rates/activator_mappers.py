@@ -21,6 +21,7 @@ from app.models import (
     RateStatus,
     SourceType,
 )
+from app.services.rate_parser import PORT_ALIAS_MAP
 from app.services.rate_parser import _resolve_port as _rp_resolve_port
 from app.services.step1_rates.entities import ParsedRateRecord
 from app.services.step1_rates.port_normalizer import canonicalize
@@ -334,6 +335,12 @@ def _resolve_port(db: Session, name_raw: str | None) -> Port | None:
     name = str(name_raw).strip()
     if len(name) == 5 and name.isalpha() and name.isupper():
         port = db.query(Port).filter(Port.un_locode == name).first()
+        if port is not None:
+            return port
+    # 别名直查：TANJUNG PRIOK→IDJKT(Jakarta)、INCHEON→KRINC 等拼写/港区名变体
+    alias_key = re.sub(r"[（(].*?[）)]", "", name).strip().lower()
+    if alias_key in PORT_ALIAS_MAP:
+        port = db.query(Port).filter(Port.un_locode == PORT_ALIAS_MAP[alias_key]).first()
         if port is not None:
             return port
     port = (

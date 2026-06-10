@@ -83,3 +83,42 @@ def test_nitori_fill_rejects_bad_variant(tmp_path):
     parsed = prof.parse(QUOTE_GLOBAL, bid_id="b1", period="2026Q2")
     with pytest.raises(ValueError):
         prof.fill(QUOTE_GLOBAL, parsed, [], "bad", tmp_path / "x.xlsm")
+
+
+def test_nitori_fill_writes_carrier_thc_doc_lss(tmp_path):
+    """fill 回写 CARRIER/THC/DOC/LSS 列；LSS 未知不再硬编 USD 0。"""
+    from app.services.step2_bidding.entities import PerRowReport
+
+    prof = NitoriProfile()
+    parsed = prof.parse(QUOTE_GLOBAL, bid_id="b1", period="2026Q2")
+
+    def _rep(row_idx, **kw):
+        base = dict(
+            row_idx=row_idx, section_code="GLOBAL", destination_code="X",
+            status=RowStatus.FILLED, cost_price=Decimal("300"),
+            sell_price=Decimal("345"), markup_ratio=Decimal("1.15"),
+            lead_time_text="2 DAYS", carrier_text="COSCO", remark_text=None,
+            selected_candidate=None,
+        )
+        base.update(kw)
+        return PerRowReport(**base)
+
+    reports = [
+        _rep(114, thc_amount=Decimal("982"), doc_amount=Decimal("450"),
+             lss_amount=Decimal("200")),
+        _rep(115, carrier_text="EMC"),     # 附加费全未知
+    ]
+    out = tmp_path / "o.xlsm"
+    prof.fill(QUOTE_GLOBAL, parsed, reports, "cost", out)
+    ws = load_workbook(out, keep_vba=True)["Quotation (Global) Jul-Sep"]
+    assert ws.cell(114, 4).value == "COSCO"            # CARRIER
+    assert ws.cell(114, 26).value == "CNY"             # THC cur
+    assert ws.cell(114, 27).value == 982               # THC amount
+    assert ws.cell(114, 28).value == "CNY"             # DOC cur
+    assert ws.cell(114, 29).value == 450               # DOC amount
+    assert ws.cell(114, 20).value == "USD"             # LSS cur
+    assert ws.cell(114, 21).value == 200               # LSS amount
+    assert ws.cell(115, 4).value == "EMC"
+    assert ws.cell(115, 21).value is None              # LSS 未知 → 不写 0
+    assert ws.cell(115, 20).value is None
+    assert ws.cell(115, 27).value is None              # THC 未知 → 不写

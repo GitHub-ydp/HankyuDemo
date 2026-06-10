@@ -54,6 +54,7 @@ PORT_ALIAS_MAP: dict[str, str] = {
     "bintulu": "MYBTU", "名都鲁": "MYBTU",
     # 印度尼西亚
     "jakarta": "IDJKT", "雅加达": "IDJKT",
+    "tanjung priok": "IDJKT", "tg priok": "IDJKT", "丹戎不碌": "IDJKT",  # 雅加达港区名
     "semarang": "IDSMG", "三宝垄": "IDSMG",
     "surabaya": "IDSUB", "泗水": "IDSUB",
     "belawan": "IDBLW", "勿拉湾": "IDBLW",

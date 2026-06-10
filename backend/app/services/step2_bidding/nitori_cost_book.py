@@ -6,11 +6,18 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 
+# 整名别名：招标书写法 → 价源/字典规范名（词级别名走 rate_parser.PORT_ALIAS_MAP）
+_POD_ALIASES = {
+    "TANJUNG PRIOK": "JAKARTA",   # 雅加达港区名，价源按 JAKARTA 报价
+}
+
+
 def normalize_pod(raw: str) -> str:
     s = (raw or "").strip().upper()
+    s = s.replace("（", "(").replace("）", ")")  # 全角括号 → 半角（招标书混用）
     s = s.replace("KELANG", "KLANG")          # 拼写统一 KELANG->KLANG
     s = s.split("(")[0].strip()               # 去括号注解，留主名
-    return s
+    return _POD_ALIASES.get(s, s)
 
 
 @dataclass(slots=True)

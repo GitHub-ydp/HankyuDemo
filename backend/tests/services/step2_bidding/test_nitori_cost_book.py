@@ -33,3 +33,13 @@ def test_cost_book_marks_taicang_klang_no_service(tmp_path):
 def test_cost_book_free_time(tmp_path):
     book = NitoriCostBook.from_xlsx(_extract_cost(tmp_path))
     assert book.free_time_for("PORT KLANG") == {"dem": 28, "det": 7}
+
+# ---- normalize_pod 归一缺口（Nitori GLOBAL 对比 work buddy 败因之一）----
+
+def test_normalize_pod_strips_fullwidth_paren():
+    from app.services.step2_bidding.nitori_cost_book import normalize_pod
+    assert normalize_pod("MANILA（NORTH）") == "MANILA"
+
+def test_normalize_pod_tanjung_priok_maps_to_jakarta():
+    from app.services.step2_bidding.nitori_cost_book import normalize_pod
+    assert normalize_pod("TANJUNG PRIOK") == "JAKARTA"

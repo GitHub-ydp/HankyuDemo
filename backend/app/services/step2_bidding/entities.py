@@ -120,6 +120,9 @@ class PerRowReport:
     carrier_text: str | None
     remark_text: str | None
     selected_candidate: QuoteCandidate | None
+    thc_amount: Decimal | None = None     # 回写 THC（CNY；库值≈40 箱档，20F 行不带）
+    doc_amount: Decimal | None = None     # 回写 DOC（CNY，per BL 不分箱型）
+    lss_amount: Decimal | None = None     # 回写 LSS（USD，按箱型取 lss_20/lss_40）
     constraint_hits: list[str] = field(default_factory=list)
     validator_warnings: list[str] = field(default_factory=list)
     confidence: float = 0.0
