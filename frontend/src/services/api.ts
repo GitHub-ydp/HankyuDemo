@@ -39,8 +39,17 @@ api.interceptors.request.use((config) => {
 // 响应拦截器
 api.interceptors.response.use(
   (response) => response.data,
-  (error) => {
-    const raw = error.response?.data ?? {};
+  async (error) => {
+    let raw = error.response?.data ?? {};
+    // 下载类端点用 responseType:'blob'，出错时 data 是 Blob（内含错误 JSON）。
+    // 需先读出文本再解析，否则 message/detail 都取不到，只会回落成通用错误。
+    if (raw instanceof Blob) {
+      try {
+        raw = JSON.parse(await raw.text());
+      } catch {
+        raw = {};
+      }
+    }
     if (error.response?.status === 401) {
       localStorage.removeItem(TOKEN_KEY);
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {

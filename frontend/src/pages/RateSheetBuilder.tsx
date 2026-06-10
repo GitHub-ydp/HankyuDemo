@@ -309,8 +309,11 @@ export default function RateSheetBuilder() {
       message.success(t('rateSheet.specifiedDownloadDone'));
       setSpecOpen(false);
       setSpecFile(null);
-    } catch {
-      message.error(t('rateSheet.downloadFailed'));
+    } catch (err) {
+      // 拦截器已把后端真实原因(含框架级 detail，如字段超限)放进 Error.message
+      message.error(
+        err instanceof Error && err.message ? err.message : t('rateSheet.downloadFailed'),
+      );
     } finally {
       setSpecDownloading(false);
     }
