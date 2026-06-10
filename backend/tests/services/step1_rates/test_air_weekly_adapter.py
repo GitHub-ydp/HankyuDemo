@@ -61,7 +61,8 @@ def test_make_sheet_roundtrips_via_air_adapter(tmp_path):
     r = recs[0]
     assert r.origin_port_name == "PVG"   # AirAdapter 默认补
     assert r.destination_port_name == "NRT"
-    assert r.service_desc == "CA"
+    # 模板表头 Service/+100KG 的档位标记前置进服务描述(2026-06-10 邓老师要求可见)
+    assert r.service_desc == "+100KG · CA"
     assert r.currency == "CNY"           # 模板无币种列 → 默认 CNY
     rate = to_air_freight_rate(r, uuid.uuid4())
     assert rate.destination == "NRT"

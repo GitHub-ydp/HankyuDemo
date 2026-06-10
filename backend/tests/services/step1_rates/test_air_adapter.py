@@ -427,3 +427,59 @@ def test_v_a_curr_02_weekly_falls_back_when_no_surcharges(tmp_path: Path) -> Non
         f"应含 1 条 fallback 警告，实际 {fallback_warnings}"
     )
     assert "Surcharges sheet missing" in fallback_warnings[0]
+
+
+def test_weekly_service_tier_from_header(tmp_path: Path) -> None:
+    """表头 B1='Service/+100KG' 的档位标记落进服务描述(邓老师:导入后要看得到重量档)。"""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    weekly = wb.active
+    weekly.title = "Apr 20 to Apr 26"
+    weekly.cell(1, 1, "Destinations")
+    weekly.cell(1, 2, "Service/+100KG")
+    weekly.cell(1, 3, "2026/04/20")
+    weekly.cell(2, 1, "BKK")
+    weekly.cell(2, 2, "CK direct")
+    for col in range(3, 10):
+        weekly.cell(2, col, 15.5)
+    path = tmp_path / "air_tier_header.xlsx"
+    wb.save(path)
+
+    batch = AirAdapter().parse(path)
+    weekly_rows = [r for r in batch.records if r.record_kind == "air_weekly"]
+    assert len(weekly_rows) == 1
+    row = weekly_rows[0]
+    assert row.service_desc == "+100KG · CK direct"
+    assert row.airline_code == "CK"  # 航司码仍取自原始服务文本，不被 KG 污染
+    assert row.extras.get("service_tier") == "+100KG"
+
+
+def test_weekly_service_without_tier_header_unchanged(tmp_path: Path) -> None:
+    """表头无档位标记(B1='Service')时服务描述保持原样。"""
+    path = _build_air_xlsx(tmp_path, surcharges_f2=None)
+    batch = AirAdapter().parse(path)
+    row = [r for r in batch.records if r.record_kind == "air_weekly"][0]
+    assert row.service_desc == "CK direct"
+    assert row.extras.get("service_tier") is None
+
+
+def test_weekly_service_tier_no_double_prefix(tmp_path: Path) -> None:
+    """做表导出件回流：行内服务已带 +100KG 时不再重复前置。"""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    weekly = wb.active
+    weekly.title = "Apr 20 to Apr 26"
+    weekly.cell(1, 1, "Destinations")
+    weekly.cell(1, 2, "Service/+100KG")
+    weekly.cell(1, 3, "2026/04/20")
+    weekly.cell(2, 1, "BKK")
+    weekly.cell(2, 2, "+100KG · CK direct")  # 已含档位标记
+    for col in range(3, 10):
+        weekly.cell(2, col, 15.5)
+    path = tmp_path / "air_tier_header_rt.xlsx"
+    wb.save(path)
+
+    row = [r for r in AirAdapter().parse(path).records if r.record_kind == "air_weekly"][0]
+    assert row.service_desc == "+100KG · CK direct"  # 不是 '+100KG · +100KG · …'

@@ -144,6 +144,7 @@ function AirWeeklyHead({ t }: { t: TFn }) {
         <th className="c-right">{t('rates.cols.air_weekly.day5')}</th>
         <th className="c-right">{t('rates.cols.air_weekly.day6')}</th>
         <th className="c-right">{t('rates.cols.air_weekly.day7')}</th>
+        <th>{t('rates.currency')}</th>
       </tr>
     </thead>
   );
@@ -166,6 +167,7 @@ function AirWeeklyRow({ row }: { row: RateBatchPreviewRow }) {
       <td className="c-right num">{row.price_day5 || '—'}</td>
       <td className="c-right num">{row.price_day6 || '—'}</td>
       <td className="c-right num">{row.price_day7 || '—'}</td>
+      <td style={{ color: 'var(--ink-500)', fontSize: 11 }}>{row.currency || '—'}</td>
     </tr>
   );
 }
@@ -248,7 +250,7 @@ function AirTierRow({ row, tierKgs }: { row: RateBatchPreviewRow; tierKgs: numbe
 
 function MismatchRow({ row, layout, cols }: { row: RateBatchPreviewRow; layout: Layout; cols?: number }) {
   const span =
-    cols ?? (layout === 'air_weekly' ? 14 : layout === 'air_surcharge' ? 10 : 9);
+    cols ?? (layout === 'air_weekly' ? 15 : layout === 'air_surcharge' ? 10 : 9);
   return (
     <tr>
       <td className="num" style={{ color: 'var(--ink-500)' }}>{row.row_index}</td>

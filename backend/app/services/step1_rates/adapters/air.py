@@ -35,6 +35,9 @@ class AirAdapter:
     _YEAR_FROM_HEADER_RE = re.compile(r"(\d{4})\s*[/\-\.]\s*\d{1,2}\s*[/\-\.]\s*\d{1,2}")
     _MUST_GO_RE = re.compile(r"must\s*go\s*([0-9]+(?:\.[0-9]+)?)", re.IGNORECASE)
     _AIRLINE_CODE_RE = re.compile(r"(?<![A-Za-z])[A-Z]{2}(?![A-Za-z])")
+    # 服务列表头里的重量档标记(如 'Service/+100KG' → '+100KG')：
+    # 周报价默认只报一个档，档位写在表头而非行内，抓出来拼进服务描述展示
+    _SERVICE_TIER_RE = re.compile(r"\+?\d+\s*KG", re.IGNORECASE)
     _INLINE_WHITESPACE_RE = re.compile(r"[ \t]+")
     _DEFAULT_ORIGIN = "PVG"
     _DEFAULT_CURRENCY = "CNY"
@@ -185,6 +188,11 @@ class AirAdapter:
                 f"{sheet_name} header mismatch at A1; expected 'Destinations', got '{header_a1}'"
             )
 
+        # 服务列表头(B1)如 'Service/+100KG'：档位标记拼进每行服务描述（数据行里没有档位信息）
+        service_header = self._normalize_text(worksheet.cell(1, 2).value) or ""
+        tier_match = self._SERVICE_TIER_RE.search(service_header)
+        service_tier = tier_match.group(0).replace(" ", "").upper() if tier_match else None
+
         consecutive_empty = 0
         max_row = min(worksheet.max_row or 0, 100)
 
@@ -252,8 +260,20 @@ class AirAdapter:
                 "price_day_missing": price_day_missing,
                 "currency_source": currency_source,
                 "origin_source": "default_air_PVG",
+                "service_tier": service_tier,
             }
             extras.update(price_raw_extras)
+
+            # 档位标记前置到服务描述（航司码已从原始 service_text 提取，不受 KG 影响）。
+            # 行内已含同档标记时不再前置——做表导出件回流(服务列已带 +100KG)防止重复叠加。
+            if (
+                service_tier
+                and service_text
+                and service_tier.lower() not in service_text.replace(" ", "").lower()
+            ):
+                display_service = f"{service_tier} · {service_text}"
+            else:
+                display_service = service_text or service_tier
 
             records.append(
                 ParsedRateRecord(
@@ -261,7 +281,7 @@ class AirAdapter:
                     carrier_name=None,
                     carrier_id=None,
                     airline_code="/".join(airline_codes) if airline_codes else None,
-                    service_desc=service_text,
+                    service_desc=display_service,
                     origin_port_id=None,
                     origin_port_name=self._DEFAULT_ORIGIN,
                     destination_port_id=None,
