@@ -125,6 +125,14 @@ const EditableNumber = ({
   );
 };
 
+// 做表上传限制(2026-06-10)：空运/海运一体生效，最多 4 个文件、合计 ≤ 3MB(后端同样校验)
+const MAX_UPLOAD_FILES = 4;
+const MAX_UPLOAD_TOTAL_MB = 3;
+const MAX_UPLOAD_TOTAL_BYTES = MAX_UPLOAD_TOTAL_MB * 1024 * 1024;
+
+const totalSizeBytes = (list: UploadFile[]): number =>
+  list.reduce((sum, f) => sum + (f.originFileObj?.size ?? f.size ?? 0), 0);
+
 export default function RateSheetBuilder() {
   const { t } = useTranslation();
   const [templateType, setTemplateType] = useState<string | null>('air');
@@ -181,6 +189,14 @@ export default function RateSheetBuilder() {
     }
     if (fileList.length === 0) {
       message.warning(t('rateSheet.noFiles'));
+      return;
+    }
+    if (fileList.length > MAX_UPLOAD_FILES) {
+      message.error(t('rateSheet.uploadLimitFiles', { max: MAX_UPLOAD_FILES }));
+      return;
+    }
+    if (totalSizeBytes(fileList) > MAX_UPLOAD_TOTAL_BYTES) {
+      message.error(t('rateSheet.uploadLimitSize', { max: MAX_UPLOAD_TOTAL_MB }));
       return;
     }
     setUploading(true);
@@ -586,7 +602,27 @@ export default function RateSheetBuilder() {
               multiple
               beforeUpload={() => false}
               fileList={fileList}
-              onChange={({ fileList: fl }) => setFileList(fl)}
+              onChange={({ fileList: fl }) => {
+                // 超限即拒收新加入的文件(保留已合规部分)，并提示用户
+                let next = fl;
+                if (next.length > MAX_UPLOAD_FILES) {
+                  message.error({
+                    content: t('rateSheet.uploadLimitFiles', { max: MAX_UPLOAD_FILES }),
+                    key: 'rs-upload-limit',
+                  });
+                  next = next.slice(0, MAX_UPLOAD_FILES);
+                }
+                if (totalSizeBytes(next) > MAX_UPLOAD_TOTAL_BYTES) {
+                  message.error({
+                    content: t('rateSheet.uploadLimitSize', { max: MAX_UPLOAD_TOTAL_MB }),
+                    key: 'rs-upload-limit',
+                  });
+                  while (next.length && totalSizeBytes(next) > MAX_UPLOAD_TOTAL_BYTES) {
+                    next = next.slice(0, -1);
+                  }
+                }
+                setFileList(next);
+              }}
               disabled={!sessionId}
             >
               <div className={`dropzone${!sessionId ? ' disabled' : ''}`}>
