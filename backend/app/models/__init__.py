@@ -15,6 +15,7 @@ from app.models.upload_log import UploadLog, UploadStatus
 from app.models.app_settings import AppSettings
 from app.models.user import User
 from app.models.login_event import LoginEvent
+from app.models.async_task import AsyncTask, AsyncTaskStatus
 
 __all__ = [
     "Base",
@@ -34,4 +35,5 @@ __all__ = [
     "AppSettings",
     "User",
     "LoginEvent",
+    "AsyncTask", "AsyncTaskStatus",
 ]

@@ -13,6 +13,7 @@ from app.schemas.common import ApiResponse
 from app.services.email_text_parser import parse_email_text
 from app.services.wechat_image_parser import parse_wechat_image
 from app.services.rate_parser import import_parsed_rates
+from app.services import async_runner
 
 router = APIRouter(prefix="/ai", tags=["ai-parse"])
 
@@ -29,35 +30,18 @@ def api_parse_email_text(
     text: str = Form(..., description="邮件文本内容"),
     db: Session = Depends(get_db),
 ):
-    """AI 解析邮件文本中的运价信息"""
+    """提交 AI 文本解析任务，立即返回 task_id（前端轮询 /tasks/{id}）。"""
     if not text.strip():
         return ApiResponse(code=400, message="文本内容不能为空")
 
-    result = parse_email_text(text, db)
+    task_id = async_runner.create_task(db, "parse_email_text")
 
-    if not result["parsed_rows"]:
-        return ApiResponse(
-            code=200,
-            data=result,
-            message=f"未能提取到费率数据。{'; '.join(result.get('warnings', []))}",
-        )
+    def work(task_db: Session) -> dict:
+        result = parse_email_text(text, task_db)
+        return _email_text_response(result)
 
-    # 缓存解析结果（供后续确认导入）
-    _parse_cache[result["batch_id"]] = result
-
-    # 构建预览
-    preview_rows = _build_preview(result)
-
-    return ApiResponse(data={
-        "batch_id": result["batch_id"],
-        "file_name": "email_text_input",
-        "source_type": "email_text",
-        "carrier_code": result.get("carrier_code", ""),
-        "total_rows": result["total_rows"],
-        "preview_rows": preview_rows,
-        "warnings": result.get("warnings", []),
-        "sheets": [],
-    })
+    async_runner.submit(task_id, work)
+    return ApiResponse(data={"task_id": task_id})
 
 
 @router.post("/parse-wechat-image")
@@ -66,47 +50,40 @@ async def api_parse_wechat_image(
     context: str = Form("", description="补充上下文（可选）"),
     db: Session = Depends(get_db),
 ):
-    """AI 解析微信/QQ 截图中的运价信息"""
-    # 验证文件类型
+    """落盘截图后提交 AI 视觉任务，立即返回 task_id。"""
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"):
         return ApiResponse(code=400, message="仅支持图片文件 (PNG/JPG/GIF/WebP)")
 
-    # 保存图片
     os.makedirs(settings.upload_dir, exist_ok=True)
     save_name = f"{uuid.uuid4().hex[:8]}_{file.filename}"
     save_path = os.path.join(settings.upload_dir, save_name)
-
     content = await file.read()
     with open(save_path, "wb") as f:
         f.write(content)
 
-    # AI 视觉推理同步阻塞 30~300s，甩到线程池，避免冻住 event loop 拖垮全站
-    result = await run_in_threadpool(
-        parse_wechat_image, save_path, db, extra_context=context
-    )
+    fallback_name = file.filename
+    task_id = async_runner.create_task(db, "parse_wechat_image")
 
-    if not result["parsed_rows"]:
-        return ApiResponse(
-            code=200,
-            data=result,
-            message=f"未能从截图中提取费率。{'; '.join(result.get('warnings', []))}",
-        )
+    def work(task_db: Session) -> dict:
+        result = parse_wechat_image(save_path, task_db, extra_context=context)
+        if not result["parsed_rows"]:
+            return {"batch_id": None, "no_rows": True,
+                    "message": f"未能从截图中提取费率。{'; '.join(result.get('warnings', []))}"}
+        _parse_cache[result["batch_id"]] = result
+        return {
+            "batch_id": result["batch_id"],
+            "file_name": result.get("file_name", fallback_name),
+            "source_type": "wechat_image",
+            "carrier_code": result.get("carrier_code", ""),
+            "total_rows": result["total_rows"],
+            "preview_rows": _build_preview(result),
+            "warnings": result.get("warnings", []),
+            "sheets": [],
+        }
 
-    _parse_cache[result["batch_id"]] = result
-
-    preview_rows = _build_preview(result)
-
-    return ApiResponse(data={
-        "batch_id": result["batch_id"],
-        "file_name": result.get("file_name", file.filename),
-        "source_type": "wechat_image",
-        "carrier_code": result.get("carrier_code", ""),
-        "total_rows": result["total_rows"],
-        "preview_rows": preview_rows,
-        "warnings": result.get("warnings", []),
-        "sheets": [],
-    })
+    async_runner.submit(task_id, work)
+    return ApiResponse(data={"task_id": task_id})
 
 
 @router.get("/inbox-emails")
@@ -180,65 +157,48 @@ def api_parse_inbox_email(
     cache_key: str = Form(..., description="邮件缓存 key（来自 /inbox-emails 列表）"),
     db: Session = Depends(get_db),
 ):
-    """对邮箱中选定的某封邮件进行 AI 费率提取。
-
-    复用 email_text_parser 的同一条链路，结果落到 _parse_cache 后由
-    /ai/confirm 完成入库。
-    """
+    """提交邮件正文 AI 解析任务，立即返回 task_id。"""
     cached = _inbox_email_cache.get(cache_key)
     if not cached:
         return ApiResponse(code=404, message="邮件缓存已过期，请先重新拉取邮件列表")
-
     body = cached.get("body") or ""
     if not body.strip():
         return ApiResponse(code=400, message="该邮件正文为空，无法识别")
 
-    # 把发件人/主题/日期一起塞进 AI 上下文，便于推断船司与时效
     subject = cached.get("subject", "")
     from_name = cached.get("from_name") or cached.get("from", "")
     date_str = (cached.get("date") or "")[:10]
     enriched_text = (
-        f"【邮件主题】{subject}\n"
-        f"【发件人】{from_name}\n"
-        f"【日期】{date_str}\n\n"
-        f"{body}"
+        f"【邮件主题】{subject}\n【发件人】{from_name}\n【日期】{date_str}\n\n{body}"
     )
 
-    result = parse_email_text(enriched_text, db)
+    task_id = async_runner.create_task(db, "parse_inbox_email")
 
-    if not result["parsed_rows"]:
-        return ApiResponse(
-            code=200,
-            data=result,
-            message=f"未能从邮件中提取到费率。{'; '.join(result.get('warnings', []))}",
-        )
+    def work(task_db: Session) -> dict:
+        result = parse_email_text(enriched_text, task_db)
+        if not result["parsed_rows"]:
+            return {"batch_id": None, "no_rows": True,
+                    "message": f"未能从邮件中提取到费率。{'; '.join(result.get('warnings', []))}"}
+        safe_subject = (subject[:40] or "inbox_email").replace("/", "_").replace("\\", "_")
+        result["file_name"] = f"📧 {safe_subject}"
+        for row in result["parsed_rows"]:
+            row["source_file"] = result["file_name"]
+            # row["source_type"] 保持 "email_text" 不变，避免触发 SourceType 枚举校验失败
+        _parse_cache[result["batch_id"]] = result
+        return {
+            "batch_id": result["batch_id"],
+            "file_name": result["file_name"],
+            "source_type": "inbox_email",
+            "carrier_code": result.get("carrier_code", ""),
+            "total_rows": result["total_rows"],
+            "preview_rows": _build_preview(result),
+            "warnings": result.get("warnings", []),
+            "sheets": [],
+            "email_meta": {"subject": subject, "from": from_name, "date": date_str},
+        }
 
-    # 用「邮箱直连」标签区分前端展示，但底层 row source_type 仍走 email_text 以匹配 DB 枚举
-    safe_subject = (subject[:40] or "inbox_email").replace("/", "_").replace("\\", "_")
-    result["file_name"] = f"📧 {safe_subject}"
-    for row in result["parsed_rows"]:
-        row["source_file"] = result["file_name"]
-        # row["source_type"] 保持 "email_text" 不变，避免触发 SourceType 枚举校验失败
-
-    _parse_cache[result["batch_id"]] = result
-
-    preview_rows = _build_preview(result)
-
-    return ApiResponse(data={
-        "batch_id": result["batch_id"],
-        "file_name": result["file_name"],
-        "source_type": "inbox_email",  # 仅前端展示用，DB 实际写入仍是 email_text
-        "carrier_code": result.get("carrier_code", ""),
-        "total_rows": result["total_rows"],
-        "preview_rows": preview_rows,
-        "warnings": result.get("warnings", []),
-        "sheets": [],
-        "email_meta": {
-            "subject": subject,
-            "from": from_name,
-            "date": date_str,
-        },
-    })
+    async_runner.submit(task_id, work)
+    return ApiResponse(data={"task_id": task_id})
 
 
 @router.post("/parse-inbox-attachment")
@@ -247,25 +207,18 @@ def api_parse_inbox_attachment(
     attachment_index: int = Form(..., description="image_attachments 数组下标"),
     db: Session = Depends(get_db),
 ):
-    """对邮件中的某张图片附件运行 AI 视觉识别。
-
-    复用 wechat_image_parser 的链路：把附件二进制写入 upload_dir，
-    交给 parse_wechat_image，然后落到 _parse_cache 等待用户确认导入。
-    """
+    """落盘邮件图片附件后提交 AI 视觉任务，立即返回 task_id。"""
     cached = _inbox_email_cache.get(cache_key)
     if not cached:
         return ApiResponse(code=404, message="邮件缓存已过期，请先重新拉取邮件列表")
-
     image_list = cached.get("image_attachments") or []
     if attachment_index < 0 or attachment_index >= len(image_list):
         return ApiResponse(code=400, message="附件下标越界")
-
     image = image_list[attachment_index]
     data: bytes = image.get("data") or b""
     if not data:
         return ApiResponse(code=400, message="附件内容为空")
 
-    # 写入临时文件以便复用 parse_wechat_image(image_path)
     os.makedirs(settings.upload_dir, exist_ok=True)
     safe_name = image.get("filename", f"attachment_{attachment_index}.png")
     safe_name = safe_name.replace("/", "_").replace("\\", "_")
@@ -277,41 +230,34 @@ def api_parse_inbox_attachment(
     subject = cached.get("subject", "")
     from_name = cached.get("from_name") or cached.get("from", "")
     extra_context = f"该图片来自邮件「{subject}」，发件人 {from_name}。"
+    img_filename = image.get("filename", "")
 
-    result = parse_wechat_image(save_path, db, extra_context=extra_context)
+    task_id = async_runner.create_task(db, "parse_inbox_attachment")
 
-    if not result["parsed_rows"]:
-        return ApiResponse(
-            code=200,
-            data=result,
-            message=f"未能从邮件附件图片中提取费率。{'; '.join(result.get('warnings', []))}",
-        )
+    def work(task_db: Session) -> dict:
+        result = parse_wechat_image(save_path, task_db, extra_context=extra_context)
+        if not result["parsed_rows"]:
+            return {"batch_id": None, "no_rows": True,
+                    "message": f"未能从邮件附件图片中提取费率。{'; '.join(result.get('warnings', []))}"}
+        safe_subject = (subject[:30] or "inbox_image").replace("/", "_").replace("\\", "_")
+        result["file_name"] = f"📎 {safe_subject} - {img_filename}"
+        for row in result["parsed_rows"]:
+            row["source_file"] = result["file_name"]
+        _parse_cache[result["batch_id"]] = result
+        return {
+            "batch_id": result["batch_id"],
+            "file_name": result["file_name"],
+            "source_type": "inbox_attachment",
+            "carrier_code": result.get("carrier_code", ""),
+            "total_rows": result["total_rows"],
+            "preview_rows": _build_preview(result),
+            "warnings": result.get("warnings", []),
+            "sheets": [],
+            "email_meta": {"subject": subject, "from": from_name, "attachment": img_filename},
+        }
 
-    # 标记为「邮箱附件图片」便于前端区分；DB 行 source_type 仍然落 wechat_image
-    safe_subject = (subject[:30] or "inbox_image").replace("/", "_").replace("\\", "_")
-    result["file_name"] = f"📎 {safe_subject} - {image.get('filename', '')}"
-    for row in result["parsed_rows"]:
-        row["source_file"] = result["file_name"]
-
-    _parse_cache[result["batch_id"]] = result
-
-    preview_rows = _build_preview(result)
-
-    return ApiResponse(data={
-        "batch_id": result["batch_id"],
-        "file_name": result["file_name"],
-        "source_type": "inbox_attachment",  # 仅前端展示，DB 实际写入仍是 wechat_image
-        "carrier_code": result.get("carrier_code", ""),
-        "total_rows": result["total_rows"],
-        "preview_rows": preview_rows,
-        "warnings": result.get("warnings", []),
-        "sheets": [],
-        "email_meta": {
-            "subject": subject,
-            "from": from_name,
-            "attachment": image.get("filename", ""),
-        },
-    })
+    async_runner.submit(task_id, work)
+    return ApiResponse(data={"task_id": task_id})
 
 
 @router.post("/upload-msg-file")
@@ -420,6 +366,24 @@ def api_confirm_import(
     _parse_cache.pop(batch_id, None)
 
     return ApiResponse(data=result)
+
+
+def _email_text_response(result: dict) -> dict:
+    """parse-email-text 成功响应体（= 原 ApiResponse.data）。"""
+    if not result["parsed_rows"]:
+        return {"batch_id": None, "no_rows": True,
+                "message": f"未能提取到费率数据。{'; '.join(result.get('warnings', []))}"}
+    _parse_cache[result["batch_id"]] = result
+    return {
+        "batch_id": result["batch_id"],
+        "file_name": "email_text_input",
+        "source_type": "email_text",
+        "carrier_code": result.get("carrier_code", ""),
+        "total_rows": result["total_rows"],
+        "preview_rows": _build_preview(result),
+        "warnings": result.get("warnings", []),
+        "sheets": [],
+    }
 
 
 def _build_preview(result: dict) -> list[dict]:

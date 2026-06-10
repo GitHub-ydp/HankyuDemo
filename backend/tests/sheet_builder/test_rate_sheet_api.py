@@ -2,8 +2,12 @@
 
 parser mock，不打真实 AI；db 用 None override（mock parser 不读 db）。
 """
+import time
+
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from app.api.deps import get_db
 from app.main import app
@@ -20,7 +24,27 @@ def client():
     app.dependency_overrides.pop(get_db, None)
 
 
-def test_rate_sheet_end_to_end(client, monkeypatch):
+def test_rate_sheet_end_to_end(tmp_path, monkeypatch):
+    from app.models.base import Base
+    import app.models as _models  # noqa: F401
+    import app.services.async_runner as ar
+
+    eng = create_engine(
+        f"sqlite:///{tmp_path / 'rs_e2e.db'}", connect_args={"check_same_thread": False}
+    )
+    Base.metadata.create_all(eng)
+    TestSession = sessionmaker(bind=eng)
+    monkeypatch.setattr(ar, "SessionLocal", TestSession)
+
+    def _db():
+        d = TestSession()
+        try:
+            yield d
+        finally:
+            d.close()
+
+    app.dependency_overrides[get_db] = _db
+
     fake = {
         "parsed_rows": [
             {
@@ -35,35 +59,49 @@ def test_rate_sheet_end_to_end(client, monkeypatch):
     }
     monkeypatch.setattr(rate_parser, "detect_and_parse", lambda p, db: fake)
 
-    # 1) 建会话
-    r = client.post("/api/v1/rate-sheet/session", data={"template_type": "sea"})
-    assert r.status_code == 200
-    body = r.json()
-    assert body["code"] == 0
-    session_id = body["data"]["session_id"]
-    assert body["data"]["template_type"] == "sea"
+    try:
+        client = TestClient(app)
 
-    # 2) 上传文件（mock parser）
-    r = client.post(
-        f"/api/v1/rate-sheet/{session_id}/files",
-        files=[("files", ("kmtc.xlsx", b"fake-bytes", "application/vnd.ms-excel"))],
-    )
-    assert r.status_code == 200
-    data = r.json()["data"]
-    assert data["files"][0]["status"] == "parsed"
-    assert data["summary"]["total_rows"] == 1
+        # 1) 建会话
+        r = client.post("/api/v1/rate-sheet/session", data={"template_type": "sea"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["code"] == 0
+        session_id = body["data"]["session_id"]
+        assert body["data"]["template_type"] == "sea"
 
-    # 3) 预览
-    r = client.get(f"/api/v1/rate-sheet/{session_id}/preview")
-    rows = r.json()["data"]["rows"]
-    assert rows[0]["destination"] == "BUSAN"
-    assert rows[0]["freight_20"] == 130
+        # 2) 上传文件（mock parser）—— 异步化后立即返回 task_id，task 在后台线程执行
+        r = client.post(
+            f"/api/v1/rate-sheet/{session_id}/files",
+            files=[("files", ("kmtc.xlsx", b"fake-bytes", "application/vnd.ms-excel"))],
+        )
+        assert r.status_code == 200
+        data = r.json()["data"]
+        assert data["task_id"]
 
-    # 4) 下载填好的模板（xlsx = zip，magic PK）
-    r = client.get(f"/api/v1/rate-sheet/{session_id}/download")
-    assert r.status_code == 200
-    assert r.content[:2] == b"PK"
-    assert len(r.content) > 2000
+        # 等后台 task 完成（同进程 ThreadPoolExecutor，轮询 /tasks/{id}）
+        task_id = data["task_id"]
+        tr = None
+        for _ in range(30):
+            tr = client.get(f"/api/v1/tasks/{task_id}")
+            if tr.json()["data"]["status"] in ("succeeded", "failed"):
+                break
+            time.sleep(0.1)
+        assert tr is not None and tr.json()["data"]["status"] == "succeeded"
+
+        # 3) 预览
+        r = client.get(f"/api/v1/rate-sheet/{session_id}/preview")
+        rows = r.json()["data"]["rows"]
+        assert rows[0]["destination"] == "BUSAN"
+        assert rows[0]["freight_20"] == 130
+
+        # 4) 下载填好的模板（xlsx = zip，magic PK）
+        r = client.get(f"/api/v1/rate-sheet/{session_id}/download")
+        assert r.status_code == 200
+        assert r.content[:2] == b"PK"
+        assert len(r.content) > 2000
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 
 def test_create_session_bad_type(client):

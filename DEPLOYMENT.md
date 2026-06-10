@@ -23,6 +23,7 @@
 | `489e65b` upload_dir 绝对化 + reset 语义 | uvicorn 不在 backend/ 启动也能写 `uploads/`；reset 提示文案如实 | 上传一份 Excel，能看到草稿批次；点右上角清空按钮，提示文案是「临时 X / 字典 Y」 |
 | `89bf7fa` reset 真清 + 自动重灌字典 | 清空后立即 reseed 34 船司 / 140 港口 | 清空后再上传 NGB / 海运 Excel，行数不应再全部 `CARRIER_NOT_FOUND` |
 | `3433c5b` 运价导入页 UI 收口 | 删 disclaimer / 重排底部按钮 / 隐邮件入口 | 进入「运价导入」页，没有 disclaimer，只剩 Excel + 聊天截图两个 tab |
+| 本次 perf 根治 | nginx proxy_read_timeout → 60s（AI 异步化后请求都短；Phase1 过渡曾设 300） | 改 nginx site config 后 `sudo nginx -t && sudo systemctl reload nginx` |
 
 **前两次踩过：本地修了，服务器上 git pull 后没重启 / 没 build，"功能不好使"就是这么来的。**
 
@@ -84,7 +85,7 @@ python3.10 -m venv .venv
 ```bash
 cp backend/.env.example backend/.env
 # 然后编辑 backend/.env，最少要填：
-# - DATABASE_URL（SQLite 留默认即可；走 PG 改成 postgresql://...）
+# - DATABASE_URL（SQLite 留默认即可；走 PG 改成 postgresql+psycopg2://...）
 # - VLLM_BASE_URL / VLLM_API_KEY / VLLM_MODEL（AI Provider）
 # - EMAIL_ADDRESS / EMAIL_PASSWORD（邮件 Demo）
 # - UPLOAD_DIR=/var/lib/hankyu/uploads     # ★ 强烈建议写绝对路径，原因见 §5
@@ -102,12 +103,19 @@ sudo chmod -R u+rwX /var/lib/hankyu/uploads
 
 ### 2.4 初始化数据库 + 灌字典
 
+> **注意**：核心表（carriers/ports/freight_rates/lanes 等）由 `create_all` 建，不在 alembic 迁移链里。
+> 初始化必须用 `create_all + alembic stamp head`，直接 `alembic upgrade head` 会因 FK 依赖缺失在 PG 上失败。
+
 ```bash
 cd /opt/hankyu/backend
-../.venv/bin/python -m alembic upgrade head
+# 1. create_all 建全部表（SQLAlchemy 按 FK 依赖自动排序，PG 安全）
+DATABASE_URL=<见.env> ../.venv/bin/python -c "from app.core.database import init_db; init_db()"
+# 2. alembic stamp head：标记版本为最新，避免日后 upgrade 重复建表/报错
+DATABASE_URL=<见.env> ../.venv/bin/python -m alembic stamp head
 cd /opt/hankyu
-.venv/bin/python scripts/seed_data.py
-# 期望日志：carriers seed: 34 inserted / ports seed: 140 inserted
+# 3. 灌字典
+DATABASE_URL=<见.env> .venv/bin/python scripts/seed_data.py
+# 期望日志：船司: 新增 38 条 / 港口: 新增 183 条（或含"已存在"行）
 ```
 
 ### 2.5 前端 build
@@ -178,7 +186,11 @@ server {
     proxy_set_header   X-Real-IP $remote_addr;
     proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header   X-Forwarded-Proto $scheme;
-    proxy_read_timeout 120s;        # AI 兜底解析可能跑 30~90s
+    # 异步化(Phase3)后所有请求都短（提交+轮询），回到常规 60s。
+    # 例外：① rate-sheet 大 JSON preview/download 仍可能久；
+    #       ② rate-batches/upload 罕见 AI fallback（Excel 不被识别时）可能 >60s。
+    # 这两个路径如遇 504，可对其单独 location 放宽 proxy_read_timeout（如 300s）。
+    proxy_read_timeout 60s;
   }
 }
 
@@ -217,6 +229,9 @@ git diff HEAD@{1} HEAD -- backend/requirements.txt
 ```
 
 ### 3.2 数据库迁移变了？
+
+> 此处 `alembic upgrade head` 适用于**已完成初始化的 PG**（表已存在）只需执行增量列变更的场景。
+> 全新 PG 初始化请见 §2.4 / §3.7（必须先 `create_all + stamp`，不能直接 `upgrade`）。
 
 ```bash
 git diff HEAD@{1} HEAD -- backend/alembic/versions/
@@ -287,6 +302,29 @@ curl -s 'http://127.0.0.1:8000/api/v1/freight-rates/stats' \
 - [ ] 「运价导入」页：上传一份 Excel → 进度条会推进到「上传完成」→ 下方批次列表有新批次 → 点开能看预览 → 点「采用」入库成功
 - [ ] 「船司/供应商」页：清空后页面空 / 导入后只显命中
 - [ ] 「投标包自动填表」端到端能跑通
+
+### 3.7 SQLite → PostgreSQL 迁移（一次性，停机窗口）
+
+> 决策：**不迁历史数据**。字典重 seed，客户把在用的运价重导一遍（已与业务确认）。
+
+1. 备份现有 SQLite：`cp backend/hankyu_hanshin.db backend/hankyu_hanshin.db.bak.$(date +%Y%m%d-%H%M%S)`
+2. 起 PG 并建库（见 §6.2），或复用 docker-compose 的 postgres。
+3. 改 `backend/.env`：`DATABASE_URL=postgresql+psycopg2://hankyu:<pwd>@localhost:5432/hankyu_hanshin`
+4. 初始化 PG + 灌字典：
+   > 核心表由 `create_all` 建、alembic 仅管增量列变更，故初始化用 `create_all + stamp` 而非 `upgrade`。
+   ```bash
+   cd backend
+   # create_all 建全部表（SQLAlchemy 按 FK 依赖自动排序，PG 不报 FK 缺失）
+   DATABASE_URL=<见.env> ../.venv/bin/python -c "from app.core.database import init_db; init_db()"
+   # alembic stamp head：标记版本为最新，避免日后 upgrade 重复建表/报错
+   DATABASE_URL=<见.env> ../.venv/bin/python -m alembic stamp head
+   cd ..
+   DATABASE_URL=<见.env> .venv/bin/python scripts/seed_data.py   # 期望 38 船司 / 183 港口
+   ```
+5. 重启后端：`sudo systemctl restart hankyu-backend`
+6. 烟雾测试（§3.6）：health / carriers≥34 / 导一份运价端到端。
+7. 通知客户：历史运价不保留，请重新导入在用运价。
+8. 回滚：把 `.env` 的 `DATABASE_URL` 改回 SQLite 行并重启即可（SQLite 文件未动）。
 
 ---
 
@@ -372,8 +410,8 @@ diff <(grep -oE '^[A-Z_]+=' backend/.env.example | sort -u) \
 ### 6.2 PostgreSQL（推荐 prod）
 
 ```bash
-# .env
-DATABASE_URL=postgresql://hankyu:<password>@localhost:5432/hankyu_hanshin
+# .env（driver 必须写 postgresql+psycopg2，不能省略 +psycopg2）
+DATABASE_URL=postgresql+psycopg2://hankyu:<password>@localhost:5432/hankyu_hanshin
 ```
 
 ```bash
@@ -384,6 +422,8 @@ sudo -u postgres psql -c "GRANT ALL ON DATABASE hankyu_hanshin TO hankyu;"
 ```
 
 切换 DB 后必须重新 `seed_data.py`，不然字典是空的。
+
+生产从 SQLite 切 PG 后必须按 §3.7 的迁移 runbook 执行（备份→切 URL→alembic+seed→客户重导运价）。
 
 ---
 

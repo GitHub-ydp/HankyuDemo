@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     ai_image_compress: bool = True
     ai_image_max_edge_px: int = 1280
     ai_image_jpeg_quality: int = 85          # 0~95
+    # AI 后台执行器并发上限（兼限流）：同时打到单 GPU 的 AI 任务数，超出排队。
+    # 默认 3，匹配单 GPU 并发能力；env 可覆盖 AI_MAX_CONCURRENCY。
+    ai_max_concurrency: int = 3
 
     # vLLM (OpenAI-compatible)
     vllm_base_url: str = "http://43.133.197.65:8000/v1"
