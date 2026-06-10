@@ -49,6 +49,28 @@ def test_download_into_template_fills_other_ports(client):
     assert "BUSAN" in a
 
 
+def test_large_rows_field_over_1mb_accepted(client):
+    """整本合约的上万行运价作为单个 multipart 字段提交（>1MB）应被受理。
+
+    Starlette 默认单字段上限 1MB（max_part_size），上万行 rows JSON 会超限被框架
+    以 HTTP 400 "Part exceeded maximum size of 1024KB." 拒收。回归此场景。
+    """
+    sid = _new_sea_session(client)
+    rows = [{"destination": "BUSAN", "carrier": "EAS",
+             "container_20gp": 160, "container_40hq": 320,
+             "remark": "padding " * 8} for _ in range(8000)]
+    payload = json.dumps(rows)
+    assert len(payload.encode("utf-8")) > 1024 * 1024  # 确认确实超 1MB
+    r = client.post(
+        f"/api/v1/rate-sheet/{sid}/download-into-template",
+        data={"rows": payload},
+        files={"template": ("tpl.xlsx", FIXTURE.read_bytes(),
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert r.status_code == 200
+    assert r.content[:2] == b"PK"
+
+
 def test_unknown_session_returns_404(client):
     r = client.post(
         "/api/v1/rate-sheet/nope/download-into-template",

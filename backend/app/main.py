@@ -6,12 +6,20 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.formparsers import MultiPartParser
 from starlette.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.database import init_db
 
 logger = logging.getLogger("app.error")
+
+# 「指定数据下载」把整本服务合约的上万行运价当作单个 multipart 表单字段提交，
+# Starlette 默认单字段上限 1MB（max_part_size）会拒收并返回 HTTP 400
+# "Part exceeded maximum size of 1024KB."。放宽到 32MB。
+# 仅影响内存中累积的「数据字段」；上传的文件 part（模板/PDF 等）走 SpooledTemporaryFile
+# spool 到磁盘、不受 max_part_size 约束，故大文件上传的内存行为不变。
+MultiPartParser.max_part_size = 32 * 1024 * 1024
 
 
 class ServerErrorCorsMiddleware:
