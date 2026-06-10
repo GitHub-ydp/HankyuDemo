@@ -3,6 +3,8 @@
 全挂 get_current_admin（仅 ADMIN_EMAILS 名单可访问）。
 操作记录合并读 import_batches（文件导入/做表）+ upload_logs（AI confirm）。
 """
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -21,6 +23,15 @@ def _enum_val(x) -> str:
     return str(getattr(x, "value", x) or "")
 
 
+def _iso_utc(dt: datetime | None) -> str | None:
+    """库内时间统一按 UTC 序列化（SQLite 读出是 naive UTC，补上时区标记前端才能正确换算）。"""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat()
+
+
 @router.get("/users", response_model=ApiResponse)
 def list_users(db: Session = Depends(get_db), _: User = Depends(get_current_admin)):
     users = db.query(User).order_by(User.created_at.desc()).all()
@@ -30,8 +41,8 @@ def list_users(db: Session = Depends(get_db), _: User = Depends(get_current_admi
             "name": u.name,
             "is_admin": is_admin_email(u.email),
             "is_active": u.is_active,
-            "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
-            "created_at": u.created_at.isoformat() if u.created_at else None,
+            "last_login_at": _iso_utc(u.last_login_at),
+            "created_at": _iso_utc(u.created_at),
         }
         for u in users
     ]
@@ -53,7 +64,7 @@ def list_login_events(
     total = q.count()
     rows = q.order_by(LoginEvent.created_at.desc()).offset(offset).limit(limit).all()
     items = [
-        {"email": r.email, "ip": r.ip, "time": r.created_at.isoformat() if r.created_at else None}
+        {"email": r.email, "ip": r.ip, "time": _iso_utc(r.created_at)}
         for r in rows
     ]
     return ApiResponse(data={"items": items, "total": total})
@@ -78,7 +89,7 @@ def list_operations(
             {
                 "source": "import",
                 "operator": b.imported_by,
-                "time": b.imported_at.isoformat() if b.imported_at else None,
+                "time": _iso_utc(b.imported_at),
                 "file": b.source_file,
                 "file_type": _enum_val(b.file_type),
                 "status": _enum_val(b.status),
@@ -95,7 +106,7 @@ def list_operations(
             {
                 "source": "ai_confirm",
                 "operator": u.uploaded_by,
-                "time": u.created_at.isoformat() if u.created_at else None,
+                "time": _iso_utc(u.created_at),
                 "file": u.file_name,
                 "file_type": u.file_type,
                 "status": _enum_val(u.status),

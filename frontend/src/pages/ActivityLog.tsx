@@ -19,7 +19,9 @@ interface OpRow {
   parsed: number | null; imported: number | null;
 }
 
-const fmt = (s: string | null) => (s ? new Date(s).toLocaleString() : '-');
+// 客户在上海，活动日志时间固定按中国上海时区显示（后端返回 UTC ISO 串）
+const fmt = (s: string | null) =>
+  s ? new Date(s).toLocaleString(undefined, { timeZone: 'Asia/Shanghai', hour12: false }) : '-';
 
 export default function ActivityLog() {
   const { t } = useTranslation();

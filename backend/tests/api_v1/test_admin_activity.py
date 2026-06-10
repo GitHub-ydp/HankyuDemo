@@ -41,6 +41,40 @@ def test_admin_login_events(client, monkeypatch):
     assert data["items"][0]["email"] == "boss@x.com"
 
 
+def _assert_utc_iso(s: str):
+    # 时间串必须带 UTC 时区标记，前端才能正确换算到 Asia/Shanghai 显示
+    assert s.endswith("+00:00") or s.endswith("Z"), f"时间串缺时区标记: {s}"
+
+
+def test_activity_times_are_utc_aware(client, monkeypatch):
+    monkeypatch.setattr(settings, "admin_emails", "boss@x.com")
+    register(client, "boss@x.com")
+    headers = login_headers(client, "boss@x.com")
+    from app.api.deps import get_db
+    from app.main import app
+    from app.models.upload_log import UploadLog, UploadStatus
+    gen = app.dependency_overrides[get_db]()
+    db = next(gen)
+    db.add(UploadLog(batch_id="b2", file_name="t.xlsx", file_type="xlsx",
+                     source_type="excel", records_parsed=1, records_imported=1,
+                     status=UploadStatus.completed, uploaded_by="boss@x.com"))
+    db.commit()
+
+    users = client.get("/api/v1/admin/users", headers=headers).json()["data"]["items"]
+    boss = next(r for r in users if r["email"] == "boss@x.com")
+    _assert_utc_iso(boss["last_login_at"])
+    _assert_utc_iso(boss["created_at"])
+
+    logins = client.get("/api/v1/admin/login-events", headers=headers).json()["data"]["items"]
+    assert logins
+    _assert_utc_iso(logins[0]["time"])
+
+    ops = client.get("/api/v1/admin/operations", headers=headers).json()["data"]["items"]
+    assert ops
+    for it in ops:
+        _assert_utc_iso(it["time"])
+
+
 def test_admin_operations_merges_two_tables(client, monkeypatch):
     monkeypatch.setattr(settings, "admin_emails", "boss@x.com")
     register(client, "boss@x.com")
