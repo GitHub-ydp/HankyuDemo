@@ -30,6 +30,11 @@ from app.services.step1_rates.sheet_builder.template_registry import (
 
 router = APIRouter(prefix="/rate-sheet", tags=["rate-sheet"])
 
+# 做表上传限制(2026-06-10 需求)：空运/海运一体生效，单次最多 4 个文件、合计 ≤ 3MB。
+# 前端选文件时同样校验，这里兜底防绕过。
+MAX_UPLOAD_FILES = 4
+MAX_UPLOAD_TOTAL_BYTES = 3 * 1024 * 1024
+
 
 @router.post("/session")
 def create_rate_sheet_session(template_type: str = Form(...)):
@@ -57,15 +62,34 @@ async def upload_rate_sheet_files(
     except KeyError:
         return ApiResponse(code=404, message="会话不存在或已过期，请重新创建")
 
+    if len(files) > MAX_UPLOAD_FILES:
+        return ApiResponse(
+            code=400,
+            message=f"最多上传 {MAX_UPLOAD_FILES} 个文件（本次选择了 {len(files)} 个）",
+        )
+    # 先读全部内容核总大小，超限整批拒绝、不落盘
+    contents: list[tuple[str, bytes]] = []
+    total_bytes = 0
+    for upload in files:
+        content = await upload.read()
+        total_bytes += len(content)
+        contents.append((upload.filename or "file", content))
+    if total_bytes > MAX_UPLOAD_TOTAL_BYTES:
+        return ApiResponse(
+            code=400,
+            message=(
+                f"文件总大小不能超过 3MB"
+                f"（本次合计 {total_bytes / 1024 / 1024:.1f}MB）"
+            ),
+        )
+
     os.makedirs(settings.upload_dir, exist_ok=True)
     # UploadFile 请求结束即失效：先把所有文件落盘，记录 (原名, 落盘路径)
     saved: list[tuple[str, str]] = []
-    for upload in files:
-        original_name = upload.filename or "file"
+    for original_name, content in contents:
         safe_name = original_name.replace("/", "_").replace("\\", "_")
         save_name = f"ratesheet_{uuid.uuid4().hex[:8]}_{safe_name}"
         save_path = os.path.join(settings.upload_dir, save_name)
-        content = await upload.read()
         with open(save_path, "wb") as fh:
             fh.write(content)
         saved.append((original_name, save_path))
