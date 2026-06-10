@@ -72,10 +72,6 @@ interface ApiLike {
   data?: unknown;
 }
 
-// 单个文件解析超过这个行数即视为「超大输入」（典型为整本服务合约），
-// 顶部给非阻断提示：做表为精选周运价表设计，合约建议走运价导入入库。
-const LARGE_INPUT_THRESHOLD = 2000;
-
 // 可编辑单元格：本地状态承接每次按键，仅在 onBlur 提交回父级 editedRows。
 // 关键性能点——上万行时，受控 Input 每敲一键都 setState 父组件→antd 整表(12000+行)
 // 重渲染(实测 ~150ms/键)，造成「打字到处卡」。改成单元格自管本地态后，敲键只重渲染
@@ -224,11 +220,6 @@ export default function RateSheetBuilder() {
   const keptReview = rows.filter(
     (r) => selectedSet.has(r._rid as number) && r.needs_review,
   ).length;
-
-  // 超大输入（疑似服务合约）：取行数最多且超阈值的那个文件用于提示文案。
-  const largeFile = fileResults
-    .filter((f) => f.row_count > LARGE_INPUT_THRESHOLD)
-    .sort((a, b) => b.row_count - a.row_count)[0];
 
   // 勾选保留 + 行内编辑后的最终行（下载与入库共用）
   const buildFinalRows = () =>
@@ -684,30 +675,6 @@ export default function RateSheetBuilder() {
         <div className="card-body">
           {summary || rows.length > 0 ? (
             <>
-              {largeFile && (
-                <div
-                  style={{
-                    marginBottom: 16,
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 10,
-                    padding: '10px 14px',
-                    background: '#fff7e6',
-                    border: '1px solid #ffd591',
-                    borderRadius: 8,
-                    color: '#ad6800',
-                    lineHeight: 1.6,
-                  }}
-                >
-                  <Icon name="review" size={16} />
-                  <span>
-                    {t('rateSheet.largeInputWarn', {
-                      file: largeFile.name,
-                      count: largeFile.row_count.toLocaleString(),
-                    })}
-                  </span>
-                </div>
-              )}
               <div
                 className="kpi-grid"
                 style={{ gridTemplateColumns: 'repeat(2, minmax(150px, 220px))', marginBottom: 18 }}
