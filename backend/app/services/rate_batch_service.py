@@ -32,7 +32,10 @@ AI_FALLBACK_SOURCE_TYPE = "excel_ai_fallback"
 
 
 class NoRatesFoundError(ValueError):
-    """Raised when AI fallback cannot extract any rate rows from the Excel."""
+    """上传文件里抓不到任何运价行时抛出（适配器命中却 0 行 / AI 兜底 0 行）。
+
+    必须显式报错(API 422 NO_RATES_IN_FILE)，禁止静默建空 draft——
+    否则用户上传「成功」→ activate=empty_batch → 数据全丢且无感知。"""
 
 
 @dataclass(slots=True)
@@ -160,6 +163,16 @@ def create_draft_batch_from_upload(
     except Exception:
         saved_path.unlink(missing_ok=True)
         raise
+
+    # 适配器命中但解析 0 行：显式报错，禁止静默建空 draft(P0-1)。
+    # AI 兜底路径 0 行已在 _try_ai_fallback_on_excel 内部抛错，到这里 records 必非空。
+    if not getattr(parse_result, "records", None):
+        saved_path.unlink(missing_ok=True)
+        parse_warnings = "；".join(getattr(parse_result, "warnings", None) or [])
+        raise NoRatesFoundError(
+            f"未识别到任何运价行(0 行)，文件格式可能不受支持: {file_name}"
+            + (f"（{parse_warnings}）" if parse_warnings else "")
+        )
 
     draft = _build_draft_batch(
         parse_result=parse_result,

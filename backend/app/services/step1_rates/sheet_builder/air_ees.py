@@ -77,6 +77,12 @@ def _is_header_row(row: list[Any]) -> bool:
     return has_dest and has_p100
 
 
+def is_ees_header_row(row: list[Any]) -> bool:
+    """供导入侧适配器(AirTierAdapter.detect)复用的 EES 中文档位表头判定：
+    目的港/港口列 + 100KG 档位列同行出现。"""
+    return _is_header_row(list(row))
+
+
 def _is_dest_label(c: str | None) -> bool:
     return bool(c) and ("目的港" in c or "港口" in c)
 

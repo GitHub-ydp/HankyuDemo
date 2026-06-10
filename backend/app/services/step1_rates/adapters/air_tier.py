@@ -1,6 +1,9 @@
 """Step1 空运重量档(air_tier)导入适配器。
 
-解析「做表」生成的档位表（程序生成的统一格式，见表头契约），回流入 AirTierRate。
+两种来料都入 AirTierRate：
+1. 「做表」生成的档位表（英文契约表头 Origin/Destination/Service/{kg}KG）；
+2. 客户原始 EES 风格中文档位表（目的港/航班/比重/≧45/100/500/1000KG，
+   复用做表侧 air_ees.parse_ees——合并单元格前向填充/区域多港/议价排除等规则一致）。
 按 sheet 表头内容识别（不靠文件名——档位文件名常含 'air' 会被 AirAdapter 抢）。
 """
 from __future__ import annotations
@@ -18,9 +21,15 @@ from app.services.step1_rates.entities import (
     ParsedRateRecord,
     Step1FileType,
 )
+from app.services.step1_rates.sheet_builder.air_ees import (
+    is_ees_header_row,
+    parse_ees,
+)
 
 _TIER_HEADER_RE = re.compile(r"^(\d+)\s*KG$", re.IGNORECASE)
 _EXCEL_EXTS = {".xlsx", ".xlsm", ".xls"}
+# EES 表头(目的港/≧100KG)通常在 sheet 前 10 行内(上方是公告/生效说明)，扫 40 行留足余量
+_EES_HEADER_SCAN_ROWS = 40
 
 
 class AirTierAdapter:
@@ -43,6 +52,8 @@ class AirTierAdapter:
             for ws in wb.worksheets:
                 if self._tier_sheet_headers(ws) is not None:
                     return True
+                if self._has_ees_header(ws):
+                    return True
         finally:
             wb.close()
         return False
@@ -59,12 +70,17 @@ class AirTierAdapter:
                     continue
                 matched = True
                 records.extend(self._parse_sheet(ws, headers))
-            if not matched:
-                warnings.append(
-                    "未找到符合档位表表头契约的 sheet(Origin/Destination/Service/{kg}KG…)"
-                )
         finally:
             wb.close()
+        if not matched:
+            # 英文契约未命中 → 试 EES 中文档位表(目的港/航班/比重/≧45…KG)
+            records, ees_warnings, matched = self._parse_ees(path)
+            warnings.extend(ees_warnings)
+        if not matched:
+            warnings.append(
+                "未找到符合档位表表头契约的 sheet"
+                "(Origin/Destination/Service/{kg}KG 或 目的港/≧100KG…)"
+            )
         return ParsedRateBatch(
             file_type=Step1FileType.air_tier,
             source_file=path.name,
@@ -72,6 +88,49 @@ class AirTierAdapter:
             warnings=warnings,
             adapter_key=self.key,
         )
+
+    @staticmethod
+    def _has_ees_header(ws) -> bool:
+        for row in ws.iter_rows(
+            min_row=1, max_row=_EES_HEADER_SCAN_ROWS, values_only=True
+        ):
+            if is_ees_header_row(list(row)):
+                return True
+        return False
+
+    def _parse_ees(
+        self, path: Path
+    ) -> tuple[list[ParsedRateRecord], list[str], bool]:
+        """EES 中文档位表 → ParsedRateRecord 列表。返回 (records, warnings, matched)。
+
+        matched 以「解析出行」为准：EES 表头判定在 parse_ees 内部完成，
+        没有任何航线行说明该文件并非 EES 档位表。
+        """
+        result = parse_ees(str(path))
+        rows: list[dict[str, Any]] = result.get("parsed_rows") or []
+        if not rows:
+            return [], [], False
+        records = [
+            ParsedRateRecord(
+                record_kind="air_tier",
+                # EES 为上海起运，起运港留空由 mapper 默认 PVG（与做表口径一致）
+                origin_port_name=None,
+                destination_port_name=row.get("destination_port_name"),
+                service_desc=row.get("service_desc"),
+                currency="CNY",  # EES 全表人民币含油价
+                valid_from=row.get("effective_week_start"),
+                valid_to=None,
+                remarks=row.get("remarks"),
+                source_type="excel",
+                extras={
+                    "tier_prices": row.get("tier_prices") or {},
+                    "carrier": row.get("carrier"),
+                    "row_index": idx,
+                },
+            )
+            for idx, row in enumerate(rows, start=1)
+        ]
+        return records, list(result.get("warnings") or []), True
 
     def _tier_sheet_headers(self, ws) -> dict[str, Any] | None:
         """读第 1 行表头；命中返回 {"named": {表头小写→列下标}, "tiers": [(kg, 列下标)]}，否则 None。"""
