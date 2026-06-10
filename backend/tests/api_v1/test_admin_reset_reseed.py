@@ -15,10 +15,24 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
 from app.api.deps import get_db
+from app.core.config import settings
 from app.main import app
 from app.models import Base, Carrier, CarrierType, Port
 from app.models.air_tier_rate import AirTierRate
 from app.models.import_batch import ImportBatch, ImportBatchFileType
+from tests.api_v1._auth_helpers import login_headers, register
+
+ADMIN_EMAIL = "admin@x.com"
+
+
+def _admin_headers(client, monkeypatch):
+    """注册并登录一个管理员（邮箱∈ADMIN_EMAILS），返回 Bearer 头。
+
+    reset-rates 现在要求管理员鉴权，测试需带 token 调用。
+    """
+    monkeypatch.setattr(settings, "admin_emails", ADMIN_EMAIL)
+    register(client, ADMIN_EMAIL)
+    return login_headers(client, ADMIN_EMAIL)
 
 
 @pytest.fixture
@@ -67,13 +81,25 @@ def _seed_fake_dict(client: TestClient):
     return port_count_before, carrier_count_before
 
 
-def test_reset_clears_dict_and_reseeds(client_with_isolated_db):
+def test_reset_requires_admin(client_with_isolated_db, monkeypatch):
+    """reset-rates 仅管理员可调用：无 token→401，非管理员→403。"""
+    client = client_with_isolated_db
+    assert client.post("/api/v1/admin/reset-rates").status_code == 401
+
+    monkeypatch.setattr(settings, "admin_emails", ADMIN_EMAIL)
+    register(client, "user@x.com")
+    headers = login_headers(client, "user@x.com")
+    assert client.post("/api/v1/admin/reset-rates", headers=headers).status_code == 403
+
+
+def test_reset_clears_dict_and_reseeds(client_with_isolated_db, monkeypatch):
     client = client_with_isolated_db
     port_before, carrier_before = _seed_fake_dict(client)
     assert port_before >= 1
     assert carrier_before >= 1
 
-    r = client.post("/api/v1/admin/reset-rates")
+    headers = _admin_headers(client, monkeypatch)
+    r = client.post("/api/v1/admin/reset-rates", headers=headers)
     assert r.status_code == 200
     body = r.json()
     data = body["data"]
@@ -112,10 +138,11 @@ def test_reset_clears_dict_and_reseeds(client_with_isolated_db):
             pass
 
 
-def test_reset_on_empty_db_still_reseeds(client_with_isolated_db):
+def test_reset_on_empty_db_still_reseeds(client_with_isolated_db, monkeypatch):
     """空库直接 reset 也能正常重灌（无破坏性）。"""
     client = client_with_isolated_db
-    r = client.post("/api/v1/admin/reset-rates")
+    headers = _admin_headers(client, monkeypatch)
+    r = client.post("/api/v1/admin/reset-rates", headers=headers)
     assert r.status_code == 200
     data = r.json()["data"]
     assert data["carriers_deleted"] == 0
@@ -156,7 +183,7 @@ def client_with_fk_db(tmp_path) -> Iterator[TestClient]:
     app.dependency_overrides.pop(get_db, None)
 
 
-def test_reset_clears_air_tier_rates_with_fk_on(client_with_fk_db):
+def test_reset_clears_air_tier_rates_with_fk_on(client_with_fk_db, monkeypatch):
     """回归：库里有 air_tier_rates(FK->import_batches) 时 reset 不能因 FK 报 500。
 
     air_tier_rates 是 Air EES 多档表，reset_rates 早期删除清单漏了它；
@@ -188,7 +215,8 @@ def test_reset_clears_air_tier_rates_with_fk_on(client_with_fk_db):
         except StopIteration:
             pass
 
-    r = client.post("/api/v1/admin/reset-rates")
+    headers = _admin_headers(client, monkeypatch)
+    r = client.post("/api/v1/admin/reset-rates", headers=headers)
     assert r.status_code == 200, r.text  # 当前 bug 下这里会是 500
 
     # air_tier_rates 与 import_batches 都被清掉

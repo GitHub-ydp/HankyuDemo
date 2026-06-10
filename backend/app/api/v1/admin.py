@@ -19,8 +19,9 @@ from pathlib import Path
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_current_admin, get_db
 from app.models import Carrier, FreightRate, Port, UploadLog
+from app.models.user import User
 from app.models.air_freight_rate import AirFreightRate
 from app.models.air_surcharge import AirSurcharge
 from app.models.air_tier_rate import AirTierRate
@@ -43,8 +44,8 @@ def _load_seed_module():
 
 
 @router.post("/reset-rates")
-def reset_rates(db: Session = Depends(get_db)):
-    """一键清空 Step1/Step2 所有业务数据 + 内存（演示按钮）。"""
+def reset_rates(db: Session = Depends(get_db), _: User = Depends(get_current_admin)):
+    """一键清空 Step1/Step2 所有业务数据 + 内存（演示按钮）。仅管理员可调用。"""
     # 统计清理前数量
     air_freight_count = db.query(AirFreightRate).count()
     air_surcharge_count = db.query(AirSurcharge).count()
