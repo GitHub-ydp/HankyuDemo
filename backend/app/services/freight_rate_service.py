@@ -2,7 +2,7 @@
 from datetime import date
 from typing import Any
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import JSON, String, and_, cast, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import (
@@ -94,6 +94,40 @@ def get_rates(
         .all()
     )
     return items, total
+
+
+# 运价总览判重口径(邓老师 2026-06-10)：除运价编号(id)与批次/来源文件等元数据列外，
+# 业务字段全部相同 → 视为重复，列表只保留 id 最大(最新导入)的一条。
+_DEDUP_METADATA_COLS = {
+    "id",
+    "batch_id",
+    "upload_batch_id",
+    "source_file",
+    "created_at",
+    "updated_at",
+}
+
+
+def _dedup_keep_latest(q, model):
+    """对已带筛选条件的 query 按业务列去重，返回收窄后的同源 query。
+
+    用窗口函数在筛选范围内分组(业务列全同为一组)，每组保留 id 最大的一行；
+    去重发生在 count/分页之前，total 与页内容一致。JSON 列(如 tier_prices)
+    无通用等值比较，cast 成文本参与分组。
+    """
+    partition = []
+    for col in model.__table__.columns:
+        if col.name in _DEDUP_METADATA_COLS:
+            continue
+        partition.append(cast(col, String) if isinstance(col.type, JSON) else col)
+    rn = (
+        func.row_number()
+        .over(partition_by=partition, order_by=model.id.desc())
+        .label("rn")
+    )
+    sub = q.with_entities(model.id.label("id"), rn).subquery()
+    keep_ids = select(sub.c.id).where(sub.c.rn == 1).scalar_subquery()
+    return q.filter(model.id.in_(keep_ids))
 
 
 def list_rates_by_type(
@@ -228,6 +262,7 @@ def _list_ocean_like(
             or_(Carrier.name_en.ilike(like), Carrier.name_cn.ilike(like), Carrier.code.ilike(like))
         )
 
+    q = _dedup_keep_latest(q, FreightRate)
     total = q.count()
     items = (
         q.options(
@@ -265,6 +300,7 @@ def _list_air_weekly(
     if airline_code:
         q = q.filter(AirFreightRate.airline_code == airline_code)
 
+    q = _dedup_keep_latest(q, AirFreightRate)
     total = q.count()
     items = (
         q.order_by(AirFreightRate.effective_week_start.desc().nullslast(), AirFreightRate.id.desc())
@@ -293,6 +329,7 @@ def _list_air_tier(
     if airline_code:
         q = q.filter(AirTierRate.carrier == airline_code)
 
+    q = _dedup_keep_latest(q, AirTierRate)
     total = q.count()
     items = (
         q.order_by(
@@ -317,6 +354,7 @@ def _list_air_surcharge(
     q = db.query(AirSurcharge)
     if airline_code:
         q = q.filter(AirSurcharge.airline_code == airline_code)
+    q = _dedup_keep_latest(q, AirSurcharge)
     total = q.count()
     items = (
         q.order_by(AirSurcharge.effective_date.desc().nullslast(), AirSurcharge.id.desc())
@@ -340,6 +378,7 @@ def _list_lcl(
         q = q.filter(LclRate.origin_port_id == origin_port_id)
     if destination_port_id:
         q = q.filter(LclRate.destination_port_id == destination_port_id)
+    q = _dedup_keep_latest(q, LclRate)
     total = q.count()
     items = (
         q.options(joinedload(LclRate.origin_port), joinedload(LclRate.destination_port))
@@ -682,13 +721,16 @@ def delete_rate(db: Session, rate_id: int) -> bool:
 def get_rate_stats(db: Session) -> dict:
     """费率统计信息（海运 FreightRate + 空运 AirFreightRate 合并）。"""
     # 海运 FreightRate 侧（Ocean / Ocean-NGB / 旧导入链路）
-    ocean_total = db.query(FreightRate).count()
-    ocean_active = (
-        db.query(FreightRate).filter(FreightRate.status == RateStatus.active).count()
-    )
-    ocean_draft = (
-        db.query(FreightRate).filter(FreightRate.status == RateStatus.draft).count()
-    )
+    # 与 RateList 同口径去重(业务字段全同只计一次)，Dashboard 总数 = 各 tab 之和
+    ocean_total = _dedup_keep_latest(db.query(FreightRate), FreightRate).count()
+    ocean_active = _dedup_keep_latest(
+        db.query(FreightRate).filter(FreightRate.status == RateStatus.active),
+        FreightRate,
+    ).count()
+    ocean_draft = _dedup_keep_latest(
+        db.query(FreightRate).filter(FreightRate.status == RateStatus.draft),
+        FreightRate,
+    ).count()
     ocean_carriers = db.query(func.count(func.distinct(FreightRate.carrier_id))).scalar() or 0
     ocean_routes = (
         db.query(FreightRate.origin_port_id, FreightRate.destination_port_id)
@@ -696,8 +738,8 @@ def get_rate_stats(db: Session) -> dict:
         .count()
     )
 
-    # 空运 AirFreightRate 侧 — 与 _list_air_weekly 口径一致：统计全部已导入行
-    air_total = db.query(AirFreightRate).count()
+    # 空运 AirFreightRate 侧 — 与 _list_air_weekly 口径一致：统计全部已导入行(去重)
+    air_total = _dedup_keep_latest(db.query(AirFreightRate), AirFreightRate).count()
     air_carriers = (
         db.query(func.count(func.distinct(AirFreightRate.airline_code))).scalar()
         or 0
@@ -709,16 +751,18 @@ def get_rate_stats(db: Session) -> dict:
     )
 
     # 空运附加费 / 拼箱（5 tab 合计口径，Dashboard 与 RateList 5 tab 之和对齐）
-    air_surcharge_total = db.query(AirSurcharge).count()
-    lcl_total = db.query(LclRate).count()
+    air_surcharge_total = _dedup_keep_latest(
+        db.query(AirSurcharge), AirSurcharge
+    ).count()
+    lcl_total = _dedup_keep_latest(db.query(LclRate), LclRate).count()
 
     # 空运重量档（做表→入库 air_tier）— 只数 active 批，与 query_air_tier 口径一致
-    air_tier_total = (
+    air_tier_total = _dedup_keep_latest(
         db.query(AirTierRate)
         .join(ImportBatch, AirTierRate.batch_id == ImportBatch.batch_id)
-        .filter(ImportBatch.status == ImportBatchStatus.active)
-        .count()
-    )
+        .filter(ImportBatch.status == ImportBatchStatus.active),
+        AirTierRate,
+    ).count()
     air_tier_routes = (
         db.query(AirTierRate.origin, AirTierRate.destination)
         .join(ImportBatch, AirTierRate.batch_id == ImportBatch.batch_id)
