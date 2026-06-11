@@ -734,9 +734,10 @@ class OceanAdapter:
                 layout["freight"] = index
             elif cell.startswith("lss+cic") or cell == "lss":
                 layout["charge_1"] = index
-            elif cell == "baf":
+            elif cell == "baf" or cell.startswith("baf "):
+                # JP sheet 上海段表头带币种后缀("BAF\n(USD)"→"baf usd")，全等匹配会漏列
                 layout["charge_2"] = index
-            elif cell == "ebs" or cell == "cic":
+            elif cell == "ebs" or cell.startswith("ebs ") or cell == "cic":
                 layout["charge_3"] = index
             elif cell == "caf" or "yas/caf" in cell or cell == "yas caf":
                 layout["charge_4"] = index

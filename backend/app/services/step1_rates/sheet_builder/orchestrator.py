@@ -23,6 +23,14 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.services import rate_parser
+from app.services.step1_rates import service as step1_service
+from app.services.step1_rates.adapters import (
+    KmtcAdapter,
+    NvoFakAdapter,
+    OceanAdapter,
+    OceanNgbAdapter,
+)
+from app.services.step1_rates.registry import RateAdapterRegistry
 from app.services.step1_rates.sheet_builder import air_extractor, air_ai_extractor, ocean_ai_extractor
 from app.services.step1_rates.sheet_builder.template_registry import get_template_config
 
@@ -55,6 +63,55 @@ class SheetSession:
 
 
 _sessions: dict[str, SheetSession] = {}
+
+# Sea Excel 专用 step1 注册表：只放海运四类，不含 air 适配器
+# (air_weekly/air_tier 会内容嗅探，可能误吞 sea 会话里的任意 Excel)
+_SEA_EXCEL_REGISTRY = RateAdapterRegistry(
+    adapters=[KmtcAdapter(), NvoFakAdapter(), OceanAdapter(), OceanNgbAdapter()]
+)
+
+# Sea 模板是箱型列布局，只收 FCL 行；LCL 行(lcl/ocean_ngb_lcl)不适配
+_SEA_FCL_KINDS = frozenset({"fcl", "ocean_ngb_fcl"})
+
+
+def _parse_sea_excel(file_path: str, db: Session | None) -> dict[str, Any]:
+    """做表(Sea) Excel 统一先走导入侧 step1 海运适配器(与导入页同一套解析)。
+
+    修 P1-2：旧 rate_parser.detect_and_parse 只认 KMTC/NVO FAK 两种格式，
+    真实『Sea Net Rate』工作簿抽 0 行；同一文件走导入页能出 110+ 行。
+    无适配器命中或适配器解析失败 → 回落旧解析器(保住内容嗅探与既有报错口径)。
+    """
+    try:
+        legacy = step1_service.parse_rate_file_to_legacy(
+            file_path, db, registry=_SEA_EXCEL_REGISTRY
+        )
+    except LookupError:
+        # 没有海运适配器命中 → 旧解析器内容嗅探(kmtc/高丽/NVO 无关键字文件名)
+        return rate_parser.detect_and_parse(file_path, db)
+    except Exception as exc:  # noqa: BLE001 — 适配器失败回落，不让做表整批崩
+        fallback = rate_parser.detect_and_parse(file_path, db)
+        warnings = list(fallback.get("warnings") or [])
+        warnings.append(f"step1 适配器解析失败({exc})，已回落旧解析器")
+        fallback["warnings"] = warnings
+        return fallback
+
+    rows = legacy.get("parsed_rows") or []
+    fcl_rows = [r for r in rows if (r.get("record_kind") or "fcl") in _SEA_FCL_KINDS]
+    dropped = len(rows) - len(fcl_rows)
+    warnings = list(legacy.get("warnings") or [])
+    if dropped:
+        warnings.append(
+            f"{dropped} 行 LCL 运价不适配 Sea 模板(箱型列布局)已跳过；LCL 入库请走导入页"
+        )
+    legacy["parsed_rows"] = fcl_rows
+    legacy["records"] = fcl_rows
+    legacy["warnings"] = warnings
+    if not fcl_rows and not legacy.get("error"):
+        legacy["error"] = "未识别到 FCL 运价行(0行)；请检查文件格式，或改走导入页"
+    # OCEAN_STEP1 是 ocean adapter 的内部代号，不当船司兜底展示
+    if legacy.get("carrier_code") == "OCEAN_STEP1":
+        legacy["carrier_code"] = ""
+    return legacy
 
 
 def create_session(template_type: str) -> SheetSession:
@@ -93,10 +150,10 @@ def add_file(
     try:
         if ext in _EXCEL_EXTS:
             if session.template_type == "air":
-                # Air 走专用抽取器(复用 AirAdapter 的每日价解析)；Sea 走结构化 Excel 解析。
+                # Air 走专用抽取器(复用 AirAdapter 的每日价解析)；Sea 走 step1 海运适配器。
                 parsed = air_extractor.extract_air_rates(file_path, db)
             else:
-                parsed = rate_parser.detect_and_parse(file_path, db)
+                parsed = _parse_sea_excel(file_path, db)
             source_type = "excel"
         elif ext in _PDF_EXTS:
             from app.services.rate_parser_pdf import detect_and_parse_pdf
@@ -198,8 +255,13 @@ def _normalize_sea(row: dict[str, Any], carrier_fallback: str) -> dict[str, Any]
         # 兼容前端现有 sea 预览列
         "freight_20": c20,
         "freight_40": c40gp or c40hq,
-        "lss_cic": row.get("lss_20") or row.get("lss_40"),
-        "baf": row.get("baf_20") or row.get("baf_40"),
+        "lss_cic": row.get("lss_cic") or row.get("lss_20") or row.get("lss_40"),
+        "baf": row.get("baf") or row.get("baf_20") or row.get("baf_40"),
+        # ocean adapter 行带这些键(模板有对应列)；kmtc/nvo/AI 行无 → None 不影响
+        "ebs": row.get("ebs"),
+        "yas_caf": row.get("yas_caf"),
+        "sailing": row.get("sailing_day"),
+        "booking": row.get("booking_charge"),
         "transit": row.get("transit_days"),
         "remark": row.get("remark") or row.get("remarks"),
         "source_file": row.get("source_file"),
