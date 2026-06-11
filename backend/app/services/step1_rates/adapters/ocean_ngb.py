@@ -341,6 +341,32 @@ class OceanNgbAdapter:
 
         remarks = self._extract_text_keep_newline(row[self._COL_REMARKS - 1])
 
+        # FCL 附加费 → entity 数值字段（修「附加费整列丢弃」：原先只进 extras，
+        # to_freight_rate_from_ngb 无从取值，freight_rates 附加费列全 null）
+        baf = baf_20 = baf_40 = None
+        yas_caf = thc = doc = None
+        lss_20 = lss_40 = isps = None
+        if mode == self._FCL_MODE:
+            # FAF/BAF：'240/TEU' 或纯数值；/TEU 计价按 20'=v、40'=2v（1×40' = 2 TEU）
+            faf_value, faf_per_teu = self._surcharge_amount(row[self._COL_FAF_VALUE - 1])
+            baf = baf_20 = faf_value
+            if faf_value is not None:
+                baf_40 = faf_value * 2 if faf_per_teu else faf_value
+            # YAS/CAF：数值通常落在 W 列（'30/TEU'），X 列多为 'PLUS' 字样
+            yas_value, _ = self._surcharge_amount(row[self._COL_YAS_VALUE - 1])
+            if yas_value is None:
+                yas_value, _ = self._surcharge_amount(row[self._COL_YAS_CCY - 1])
+            yas_caf = yas_value
+            # THC/ISPS 单值列取 40' 口径，与 ocean adapter 合并 40 行后的存量行为一致；
+            # 20' 原值仍在 extras["thc_20"] / extras["isps_raw"]
+            thc = self._to_decimal_or_none(row[self._COL_THC_40 - 1])
+            doc = self._to_decimal_or_none(row[self._COL_DOC - 1])
+            lss_value, lss_per_teu = self._surcharge_amount(row[self._COL_LSF - 1])
+            lss_20 = lss_value
+            if lss_value is not None:
+                lss_40 = lss_value * 2 if lss_per_teu else lss_value
+            isps = self._isps_amount(row[self._COL_ISPS - 1])
+
         # extras（通用）
         extras: dict[str, Any] = {
             "sheet_name": sheet_name,
@@ -384,6 +410,15 @@ class OceanNgbAdapter:
             container_20gp=container_20gp,
             container_40gp=container_40gp,
             container_40hq=container_40hq,
+            baf=baf,
+            baf_20=baf_20,
+            baf_40=baf_40,
+            yas_caf=yas_caf,
+            thc=thc,
+            doc=doc,
+            lss_20=lss_20,
+            lss_40=lss_40,
+            isps=isps,
             freight_per_cbm=freight_per_cbm,
             freight_per_ton=freight_per_ton,
             currency=currency or self._DEFAULT_CURRENCY,
@@ -550,6 +585,42 @@ class OceanNgbAdapter:
             "batch range fallback to min(from) / max(to)"
         )
         return min(froms), max(tos), warning
+
+    _AMOUNT_RE = re.compile(r"(\d+(?:\.\d+)?)")
+    _ISPS_40_RE = re.compile(r"(\d+(?:\.\d+)?)\s*/\s*40")
+
+    def _surcharge_amount(self, value: Any) -> tuple[Decimal | None, bool]:
+        """从附加费单元格提取数值与是否 /TEU 计价。
+
+        支持纯数值（240、0）与文本（'240/TEU'、'USD145/TEU'）；取不出数值返回 (None, False)。
+        """
+        direct = self._to_decimal_or_none(value)
+        if direct is not None:
+            return direct, False
+        if not isinstance(value, str):
+            return None, False
+        text = value.strip()
+        if not text:
+            return None, False
+        match = self._AMOUNT_RE.search(text)
+        if match is None:
+            return None, False
+        return Decimal(match.group(1)), "/TEU" in text.upper()
+
+    def _isps_amount(self, value: Any) -> Decimal | None:
+        """ISPS 列形如 "CNY20/20'\\nCNY30/40'"，单值列取 40' 档；单一数值则直取。"""
+        direct = self._to_decimal_or_none(value)
+        if direct is not None:
+            return direct
+        if not isinstance(value, str):
+            return None
+        match_40 = self._ISPS_40_RE.search(value)
+        if match_40 is not None:
+            return Decimal(match_40.group(1))
+        amounts = self._AMOUNT_RE.findall(value)
+        if len(amounts) == 1:
+            return Decimal(amounts[0])
+        return None
 
     def _to_decimal_or_none(self, value: Any) -> Decimal | None:
         if value is None:

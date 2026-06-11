@@ -23,6 +23,7 @@ from app.models import (
 )
 from app.services.rate_parser import PORT_ALIAS_MAP
 from app.services.rate_parser import _resolve_port as _rp_resolve_port
+from app.services.rate_parser import _resolve_port_exact_full_name
 from app.services.step1_rates.entities import ParsedRateRecord
 from app.services.step1_rates.port_normalizer import canonicalize
 
@@ -212,6 +213,19 @@ def to_freight_rate_from_ngb(
         container_40gp=record.container_40gp,
         container_40hq=record.container_40hq,
         container_45=None,
+        baf_20=record.baf_20,
+        baf_40=record.baf_40,
+        lss_20=record.lss_20,
+        lss_40=record.lss_40,
+        lss_cic=record.lss_cic,
+        baf=record.baf,
+        ebs=record.ebs,
+        yas_caf=record.yas_caf,
+        booking_charge=record.booking_charge,
+        thc=record.thc,
+        doc=record.doc,
+        isps=record.isps,
+        equipment_mgmt=record.equipment_mgmt,
         currency=record.currency or "USD",
         valid_from=record.valid_from,
         valid_to=record.valid_to,
@@ -337,6 +351,11 @@ def _resolve_port(db: Session, name_raw: str | None) -> Port | None:
         port = db.query(Port).filter(Port.un_locode == name).first()
         if port is not None:
             return port
+    # 全名归一精确匹配优先于去括号/模糊（修轮渡 "Ferry (TAG to SHIMONOSEKI)"
+    # 被剥成 "Ferry" 后 ilike 先撞上 "Ferry (OSA/KOB)" 的错归）
+    exact_hit = _resolve_port_exact_full_name(name, db)
+    if exact_hit is not None:
+        return exact_hit
     # 别名直查：TANJUNG PRIOK→IDJKT(Jakarta)、INCHEON→KRINC 等拼写/港区名变体
     alias_key = re.sub(r"[（(].*?[）)]", "", name).strip().lower()
     if alias_key in PORT_ALIAS_MAP:

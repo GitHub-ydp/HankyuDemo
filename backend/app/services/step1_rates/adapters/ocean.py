@@ -58,6 +58,17 @@ class OceanAdapter:
         )
         records.extend(jp_records)
         warnings.extend(jp_warnings)
+
+        # JP sheet 尾部内嵌的 "LCL NORMAL RATE" 区块（修 11 行国内 LCL 漏采：
+        # 该区块列布局与独立 LCL sheet 不同，原 FCL 扫描因无箱型列整体跳过）
+        inline_lcl_records, inline_lcl_warnings = self._parse_inline_lcl_blocks(
+            workbook[self._JP_SHEET],
+            db,
+            source_file=path.name,
+        )
+        records.extend(inline_lcl_records)
+        warnings.extend(inline_lcl_warnings)
+        jp_meta["total_rows"] += len(inline_lcl_records)
         sheet_summaries.append(jp_meta)
 
         other_records, other_meta, other_warnings = self._parse_fcl_sheet(
@@ -346,6 +357,101 @@ class OceanAdapter:
             "effective_to": effective_to,
         }
         return records, meta, warnings
+
+    def _parse_inline_lcl_blocks(
+        self,
+        worksheet,
+        db: Session | None,
+        *,
+        source_file: str,
+    ) -> tuple[list[ParsedRateRecord], list[str]]:
+        """采集 FCL sheet 内嵌的 "LCL NORMAL RATE" 区块。
+
+        区块结构（与独立 LCL sheet 列布局不同）：
+        标题行 "LCL NORMAL RATE" → "From: <起运港>" → 表头行
+        To(A) | Ocean Freight (CBM/TON)(B) | Surcharges(C) | Sailing Day(E) |
+        Via(G) | Transit Time(I) | RMKS(K) → 数据行（B 列为数值，按 RT 计价）。
+        """
+        effective_from, effective_to = self._read_effective_range(worksheet)
+        records: list[ParsedRateRecord] = []
+        warnings: list[str] = []
+
+        in_block = False
+        header_found = False
+        origin_name: str | None = None
+        origin_port: dict[str, Any] = {"id": None, "name": None}
+        currency = "USD"
+
+        for row_index in range(1, worksheet.max_row + 1):
+            row = [worksheet.cell(row=row_index, column=column).value for column in range(1, 12)]
+            first = self._normalize_text(row[0])
+            if first and first.upper().startswith("LCL NORMAL RATE"):
+                in_block = True
+                header_found = False
+                origin_name = None
+                continue
+            if not in_block:
+                continue
+            if first and first.lower().startswith("from:"):
+                origin_name = first.split(":", 1)[1].strip() or None
+                origin_port = self._resolve_port_ref(origin_name, db)
+                currency_text = self._normalize_text(row[1]) or ""
+                if ":" in currency_text:
+                    currency = currency_text.split(":", 1)[1].strip().upper() or "USD"
+                continue
+            if first and first.lower() == "to":
+                freight_header = self._normalize_text(row[1]) or ""
+                header_found = "ocean freight" in freight_header.lower()
+                continue
+            if not header_found or not first:
+                continue
+
+            freight = _safe_decimal(row[1])
+            if freight is None:
+                # 区块内的注释/空价行（如 Remark），跳过但留痕
+                raw_freight = self._normalize_text(row[1])
+                if raw_freight:
+                    warnings.append(
+                        f"{worksheet.title} row {row_index}: inline LCL freight "
+                        f"'{raw_freight}' is non-numeric, row skipped."
+                    )
+                continue
+
+            destination_port = self._resolve_port_ref(first, db)
+            surcharge_text = self._normalize_text(row[2])
+            rmks = self._normalize_text(row[10])
+            remark_parts = [part for part in (rmks, surcharge_text and f"Surcharges: {surcharge_text}") if part]
+            records.append(
+                ParsedRateRecord(
+                    record_kind="lcl",
+                    carrier_name="LCL",
+                    origin_port_id=origin_port["id"],
+                    origin_port_name=origin_port["name"] or origin_name,
+                    destination_port_id=destination_port["id"],
+                    destination_port_name=destination_port["name"] or first,
+                    freight_per_cbm=freight,
+                    freight_per_ton=freight,
+                    currency=currency,
+                    valid_from=effective_from,
+                    valid_to=effective_to,
+                    sailing_day=self._normalize_text(row[4]),
+                    via=self._normalize_text(row[6]),
+                    transit_time_text=self._normalize_text(row[8]),
+                    remarks=" | ".join(remark_parts) or None,
+                    source_type="excel",
+                    source_file=source_file,
+                    extras={
+                        "sheet_name": worksheet.title,
+                        "row_index": row_index,
+                        "block": "inline_lcl",
+                        "origin_name": origin_name,
+                        "freight_raw": str(row[1]),
+                        "surcharges_raw": surcharge_text,
+                    },
+                )
+            )
+
+        return records, warnings
 
     def _build_fcl_row_payload(
         self,

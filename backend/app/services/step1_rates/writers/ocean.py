@@ -51,6 +51,10 @@ class OceanWriter:
             ws = workbook[sheet_name]
 
             if record_kind == "lcl":
+                if record.get("block") == "inline_lcl":
+                    # FCL sheet 内嵌 LCL 区块：列布局与独立 LCL sheet 不同且 RMKS
+                    # 列带合并格；模板原值即源值，跳过回填保持模板无损
+                    continue
                 self._write_lcl_row(ws, row_index, record)
             elif record_kind == "fcl":
                 self._write_fcl_row(ws, row_index, record)

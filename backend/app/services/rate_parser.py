@@ -145,6 +145,8 @@ PORT_ALIAS_MAP: dict[str, str] = {
     "tampa": "USTPA",
     "crandall": "USCRA",
     "greer": "USGRR",
+    # 轮渡伪港（对应 seed_data.py 的 JPFEROSK / JPFERTAG，勿与真实港混淆）
+    "ferry shimonoseki": "JPFERTAG",
 }
 
 # NVO FAK 中的 Origin code → UN/LOCODE
@@ -164,6 +166,30 @@ _TERMINAL_SUFFIXES = [
 _TERMINAL_CONNECTORS = ["-", " - ", "–"]
 
 
+def _resolve_port_exact_full_name(name: str, db: Session) -> Port | None:
+    """全名归一精确匹配：空白折叠忽略大小写比对 name_en；
+    再退一步把空格/括号/斜杠/点/连字符全部剥掉后比对（"Ferry OSA/KOB" ↔ "Ferry (OSA/KOB)"）。
+    精确等值不存在「子串先撞别港」问题，可安全置于模糊匹配之前。
+    """
+    from sqlalchemy import func
+
+    norm_full = re.sub(r"\s+", " ", name).strip()
+    if not norm_full:
+        return None
+    port = db.query(Port).filter(func.lower(Port.name_en) == norm_full.lower()).first()
+    if port:
+        return port
+    alnum = re.sub(r"[^a-z0-9]", "", norm_full.lower())
+    if len(alnum) >= 6:
+        folded = Port.name_en
+        for ch in (" ", "(", ")", "/", "-", "."):
+            folded = func.replace(folded, ch, "")
+        port = db.query(Port).filter(func.lower(folded) == alnum).first()
+        if port:
+            return port
+    return None
+
+
 def _resolve_port(name_raw: str, db: Session) -> Port | None:
     """将港口名/代码解析为 Port 对象，4 级策略"""
     if not name_raw or not name_raw.strip():
@@ -176,6 +202,13 @@ def _resolve_port(name_raw: str, db: Session) -> Port | None:
         port = db.query(Port).filter(Port.un_locode == name).first()
         if port:
             return port
+
+    # 1.5 全名归一精确匹配 — 必须在去括号等破坏性清洗之前。
+    #     修 "Ferry (TAG to SHIMONOSEKI)" 被剥成 "Ferry" 后 ilike 先撞上
+    #     "Ferry (OSA/KOB)" 的错归（下关轮渡价被当大阪/神户价展示）。
+    exact_hit = _resolve_port_exact_full_name(name, db)
+    if exact_hit:
+        return exact_hit
 
     # 2. 去除 "City, STATE" 后缀（如 "Mobile, AL" → "Mobile"）
     name_no_state = re.sub(r",\s*[A-Z]{2}$", "", name).strip()
