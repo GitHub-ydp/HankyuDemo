@@ -42,7 +42,29 @@ class OceanAdapter:
         if file_type_hint == self.file_type:
             return True
         normalized_name = path.name.lower()
-        return "ocean" in normalized_name and "ngb" not in normalized_name
+        if "ngb" in normalized_name:
+            return False
+        if "ocean" in normalized_name:
+            return True
+        # 文件名兜不住时按内容识别：做表「指定数据下载」产物命名 <模板名>_filled.xlsx
+        # 不含 ocean，但海运模板的 sheet 名是稳定特征（用户改名/整理后仍在）。
+        return self._detect_by_sheet_names(path)
+
+    def _detect_by_sheet_names(self, path: Path) -> bool:
+        if path.suffix.lower() not in {".xlsx", ".xlsm"}:
+            return False
+        try:
+            workbook = load_workbook(path, read_only=True)
+        except Exception:
+            return False
+        try:
+            sheet_names = set(workbook.sheetnames)
+        finally:
+            workbook.close()
+        return any(
+            name in sheet_names
+            for name in (self._JP_SHEET, self._OTHER_FCL_SHEET, self._LCL_SHEET)
+        )
 
     def parse(self, path: Path, db: Session | None = None) -> ParsedRateBatch:
         workbook = load_workbook(path, data_only=True)
@@ -50,45 +72,57 @@ class OceanAdapter:
         records: list[ParsedRateRecord] = []
         sheet_summaries: list[dict[str, Any]] = []
 
-        jp_records, jp_meta, jp_warnings = self._parse_fcl_sheet(
-            workbook[self._JP_SHEET],
-            db,
-            surcharge_mode="jp",
-            source_file=path.name,
-        )
-        records.extend(jp_records)
-        warnings.extend(jp_warnings)
+        # 三张表按存在与否各自解析：指定数据下载回填的是用户模板，
+        # 用户整理后可能只保留其中一两张（最常见只剩 OTHER PORTS）。
+        present = set(workbook.sheetnames)
+        if not present & {self._JP_SHEET, self._OTHER_FCL_SHEET, self._LCL_SHEET}:
+            raise ValueError(
+                f"未找到海运工作表（{self._JP_SHEET} / {self._OTHER_FCL_SHEET} / "
+                f"{self._LCL_SHEET}），无法按海运模板解析: {path.name}"
+            )
 
-        # JP sheet 尾部内嵌的 "LCL NORMAL RATE" 区块（修 11 行国内 LCL 漏采：
-        # 该区块列布局与独立 LCL sheet 不同，原 FCL 扫描因无箱型列整体跳过）
-        inline_lcl_records, inline_lcl_warnings = self._parse_inline_lcl_blocks(
-            workbook[self._JP_SHEET],
-            db,
-            source_file=path.name,
-        )
-        records.extend(inline_lcl_records)
-        warnings.extend(inline_lcl_warnings)
-        jp_meta["total_rows"] += len(inline_lcl_records)
-        sheet_summaries.append(jp_meta)
+        if self._JP_SHEET in present:
+            jp_records, jp_meta, jp_warnings = self._parse_fcl_sheet(
+                workbook[self._JP_SHEET],
+                db,
+                surcharge_mode="jp",
+                source_file=path.name,
+            )
+            records.extend(jp_records)
+            warnings.extend(jp_warnings)
 
-        other_records, other_meta, other_warnings = self._parse_fcl_sheet(
-            workbook[self._OTHER_FCL_SHEET],
-            db,
-            surcharge_mode="other",
-            source_file=path.name,
-        )
-        records.extend(other_records)
-        warnings.extend(other_warnings)
-        sheet_summaries.append(other_meta)
+            # JP sheet 尾部内嵌的 "LCL NORMAL RATE" 区块（修 11 行国内 LCL 漏采：
+            # 该区块列布局与独立 LCL sheet 不同，原 FCL 扫描因无箱型列整体跳过）
+            inline_lcl_records, inline_lcl_warnings = self._parse_inline_lcl_blocks(
+                workbook[self._JP_SHEET],
+                db,
+                source_file=path.name,
+            )
+            records.extend(inline_lcl_records)
+            warnings.extend(inline_lcl_warnings)
+            jp_meta["total_rows"] += len(inline_lcl_records)
+            sheet_summaries.append(jp_meta)
 
-        lcl_records, lcl_meta, lcl_warnings = self._parse_lcl_sheet(
-            workbook[self._LCL_SHEET],
-            db,
-            source_file=path.name,
-        )
-        records.extend(lcl_records)
-        warnings.extend(lcl_warnings)
-        sheet_summaries.append(lcl_meta)
+        if self._OTHER_FCL_SHEET in present:
+            other_records, other_meta, other_warnings = self._parse_fcl_sheet(
+                workbook[self._OTHER_FCL_SHEET],
+                db,
+                surcharge_mode="other",
+                source_file=path.name,
+            )
+            records.extend(other_records)
+            warnings.extend(other_warnings)
+            sheet_summaries.append(other_meta)
+
+        if self._LCL_SHEET in present:
+            lcl_records, lcl_meta, lcl_warnings = self._parse_lcl_sheet(
+                workbook[self._LCL_SHEET],
+                db,
+                source_file=path.name,
+            )
+            records.extend(lcl_records)
+            warnings.extend(lcl_warnings)
+            sheet_summaries.append(lcl_meta)
 
         effective_ranges = {
             (
