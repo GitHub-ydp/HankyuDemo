@@ -180,6 +180,24 @@ def test_alias_and_multiname_matching():
     assert ("CHICAGO (via LAX)", "Z") in cells and cells[("CHICAGO (via LAX)", "Z")] == 900
 
 
+def test_unlocode_destination_matches_template_english_port():
+    # KMTC 适配器把目的港解析成 UN/LOCODE(BUSAN/釜山→KRPUS、INCHON→KRINC、HONGKONG→HKHKG)，
+    # 而客户模板用英文港名(BUSAN/INCHON/HONG KONG)。回填须把 locode 行匹配到英文港名上，
+    # 否则 90 行一个都对不上、价格全空(客户 2026-06-17 反馈的现象)。
+    rows = [
+        {"destination": "KRPUS", "carrier": "KMTC", "container_20gp": 130, "container_40hq": 260},
+        {"destination": "KRINC", "carrier": "KMTC", "container_20gp": 160, "container_40hq": 320},
+        {"destination": "HKHKG", "carrier": "KMTC", "container_20gp": 250, "container_40hq": 500},
+    ]
+    ws = _refill(rows)[SHEET]
+    cells = {(ws.cell(r, 1).value, ws.cell(r, 2).value): ws.cell(r, 4).value
+             for r in range(9, ws.max_row + 1)}
+    # locode 行须落到模板英文港名上，且价格(20FT)正确填入
+    assert cells.get(("BUSAN", "KMTC")) == 130
+    assert cells.get(("INCHON", "KMTC")) == 160
+    assert cells.get(("HONG KONG", "KMTC")) == 250
+
+
 def test_unlisted_port_is_filtered_out():
     rows = [{"destination": "DALIAN", "carrier": "EAS", "container_20gp": 999},
             {"destination": "BUSAN", "carrier": "EAS", "container_20gp": 160}]

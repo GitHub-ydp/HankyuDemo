@@ -14,6 +14,7 @@ from typing import Any
 
 from openpyxl import load_workbook
 
+from app.services.rate_parser import PORT_ALIAS_MAP
 from app.services.step1_rates.port_normalizer import canonicalize
 from app.services.step1_rates.writers.base import safe_set, save_workbook_to_bytes
 
@@ -114,12 +115,30 @@ def _group_rows_by_port(rows: list[dict[str, Any]]) -> dict[str, list[dict[str, 
     return out
 
 
+def _resolve_locode(part: str) -> str | None:
+    """英文港名 → UN/LOCODE（经 rate_parser 的别名表，与 KMTC 适配器同一口径）。
+
+    KMTC 适配器把目的港存成 locode（BUSAN/釜山→KRPUS、HONGKONG→HKHKG），而客户模板用
+    英文港名（BUSAN / HONG KONG）。模板侧也过同一张 PORT_ALIAS_MAP 解析出 locode 作候选，
+    两边就落到同一 locode 上、可匹配。别名表键为小写、既有带空格也有去空格变体，故两种都试。
+    """
+    s = str(part or "").strip().lower()
+    if not s:
+        return None
+    for key in (re.sub(r"\s+", " ", s), re.sub(r"[^a-z0-9]", "", s)):
+        loc = PORT_ALIAS_MAP.get(key)
+        if loc:
+            return loc
+    return None
+
+
 def _port_candidates(name: str) -> list[str]:
     """模板港名 → 候选 canonical 有序列表：去括号、按 / 与换行拆名，提升命中率。
 
-    保序（whole → 各 part）且去重，使下游匹配顺序确定、不受进程 hash 随机化影响。
+    保序（whole → 各 part → locode）且去重，使下游匹配顺序确定、不受进程 hash 随机化影响。
     例：'MADRAS / CHENNAI'→[MADRASCHENNAI,MADRAS,CHENNAI]；
         'CHICAGO (via LAX)'→[CHICAGO]；'LONG BEACH\\nLOS ANGELES'→[LONGBEACHLOSANGELES,LONGBEACH,LOSANGELES]
+    末尾再追加由英文港名解析出的 UN/LOCODE（兼容 KMTC 行的 destination 是 locode 的情况）。
     """
     base = re.sub(r"\([^)]*\)", " ", str(name or ""))
     cands: list[str] = []
@@ -130,6 +149,10 @@ def _port_candidates(name: str) -> list[str]:
         cp = canonicalize(part)
         if cp:
             cands.append(cp)
+    for part in (base, *_SPLIT_RE.split(base)):
+        loc = _resolve_locode(part)
+        if loc:
+            cands.append(loc)  # locode 已是大写 alnum，与 by_port 键（canonicalize 后）同形
     return list(dict.fromkeys(cands))
 
 
