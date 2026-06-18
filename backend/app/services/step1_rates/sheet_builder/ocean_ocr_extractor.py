@@ -120,3 +120,25 @@ def _detect_grid_header(
                 cells.append((col, b["xc"]))
             return idx, _cols_to_bands(cells)
     return None
+
+
+def _norm_price(text: str) -> float | None:
+    """金额文本 → float。去 $ ¥ 逗号空格;修 OCR 把 $ 误读成的前导 S(S1000);取首个数字。"""
+    t = text.strip().replace(",", "").replace(" ", "").lstrip("$¥￥")
+    t = re.sub(r"^[Ss](?=\d)", "", t)
+    m = re.search(r"\d+(?:\.\d+)?", t)
+    if not m:
+        return None
+    try:
+        v = float(m.group())
+    except ValueError:
+        return None
+    return v if v > 0 else None
+
+
+def _assign(xc: float, bands: dict[str, tuple[float, float]]) -> str | None:
+    """token 的 x 中心落到哪个列区间。"""
+    for col, (left, right) in bands.items():
+        if left <= xc < right:
+            return col
+    return None

@@ -58,3 +58,21 @@ def test_detect_grid_header_none_on_freetext():
         _blk("Karachi USD2650/2750 巴生中转", 400, 70),
     ]))
     assert ocr._detect_grid_header(rows) is None
+
+
+import pytest
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("$275", 275.0), ("$1,000", 1000.0), ("S1000", 1000.0),   # $ 误读成 S
+    ("￥900", 900.0), ("6150", 6150.0), ("-", None), ("", None),
+    ("0", None), ("咨询", None),
+])
+def test_norm_price(text, expected):
+    assert ocr._norm_price(text) == expected
+
+
+def test_assign_token_to_column():
+    bands = {"destination": (0, 100), "carrier": (100, 200), "c20": (200, 300)}
+    assert ocr._assign(150, bands) == "carrier"
+    assert ocr._assign(250, bands) == "c20"
