@@ -236,3 +236,32 @@ def _rows_from_ocr(
             "source_type": "ocean_image",
         })
     return out, warnings
+
+
+def _empty(source_file: str, msg: str) -> dict[str, Any]:
+    return {
+        "parsed_rows": [], "total_rows": 0, "error": msg,
+        "source_type": "ocean_image", "file_name": source_file,
+    }
+
+
+def parse_ocean_grid(image_path: str, db: Session | None = None) -> dict[str, Any]:
+    """规整网格海运截图 → 行。未检测到表头/0行/引擎异常 → 带 error 的空结果(交路由回落 VLM)。"""
+    source_file = os.path.basename(image_path)
+    try:
+        engine = _get_engine()
+        result, _elapse = engine(image_path)
+    except Exception as e:  # noqa: BLE001 — 引擎缺失/异常不抛,回落 VLM
+        return _empty(source_file, f"OCR 引擎不可用: {e}")
+    rows_clustered = _cluster_rows(_blocks_from_result(result))
+    header = _detect_grid_header(rows_clustered)
+    if header is None:
+        return _empty(source_file, "未检测到规整表头(非网格表)")
+    header_idx, bands = header
+    rows, warnings = _rows_from_ocr(rows_clustered, header_idx, bands, source_file)
+    if not rows:
+        return _empty(source_file, "检测到表头但未抽出有效运价行")
+    return {
+        "parsed_rows": rows, "total_rows": len(rows),
+        "warnings": warnings, "source_type": "ocean_image", "file_name": source_file,
+    }

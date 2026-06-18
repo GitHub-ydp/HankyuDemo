@@ -108,3 +108,35 @@ def test_rows_from_ocr_extracts_correct_fields():
     assert r0["valid_from"] == "2026-06-15" and r0["valid_to"] == "2026-06-30"
     assert r0["currency"] == "USD" and r0["surcharges"] == []
     assert rows[1]["carrier"] == "MSC" and rows[1]["container_20gp"] == 4720.0
+
+
+class _FakeEngine:
+    def __init__(self, result):
+        self._result = result
+    def __call__(self, _path):
+        return self._result, 0.0
+
+
+def test_parse_ocean_grid_happy(monkeypatch):
+    monkeypatch.setattr(ocr, "_get_engine", lambda: _FakeEngine(_grid_with_two_rows()))
+    res = ocr.parse_ocean_grid("x.png")
+    assert res["total_rows"] == 2
+    assert "error" not in res
+    assert res["parsed_rows"][0]["destination"] == "PIRAEUS"
+    assert res["source_type"] == "ocean_image" and res["file_name"] == "x.png"
+
+
+def test_parse_ocean_grid_freetext_returns_error(monkeypatch):
+    freetext = [_blk("南星船公司上海港出东南亚价格含LSS", 400, 30),
+                _blk("Karachi USD2650/2750", 400, 70)]
+    monkeypatch.setattr(ocr, "_get_engine", lambda: _FakeEngine(freetext))
+    res = ocr.parse_ocean_grid("y.png")
+    assert res["parsed_rows"] == [] and "error" in res
+
+
+def test_parse_ocean_grid_engine_error_returns_error(monkeypatch):
+    def _boom():
+        raise RuntimeError("no model")
+    monkeypatch.setattr(ocr, "_get_engine", _boom)
+    res = ocr.parse_ocean_grid("z.png")
+    assert res["parsed_rows"] == [] and "error" in res
