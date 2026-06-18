@@ -76,3 +76,35 @@ def test_assign_token_to_column():
     bands = {"destination": (0, 100), "carrier": (100, 200), "c20": (200, 300)}
     assert ocr._assign(150, bands) == "carrier"
     assert ocr._assign(250, bands) == "c20"
+
+
+def _grid_with_two_rows():
+    blocks = list(_header_row())  # y=30
+    # 第1行 y≈90:目的港/船司/三价/两段日期(上下两行) + 水印数字
+    blocks += [
+        _blk("PIRAEUS", 200, 90), _blk("ONE", 500, 90),
+        _blk("$4000", 700, 90), _blk("$6150", 800, 90), _blk("$6150", 900, 90),
+        _blk("2026-06-15", 1300, 84), _blk("2026-06-30", 1300, 98),
+        _blk("4432", 650, 90),  # 水印,落在 c20/船司之间,应被列绑定丢弃或不入价
+    ]
+    # 第2行 y≈160
+    blocks += [
+        _blk("PIRAEUS", 200, 160), _blk("MSC", 500, 160),
+        _blk("$4720", 700, 160), _blk("$6640", 800, 160), _blk("$6640", 900, 160),
+        _blk("2026-06-15", 1300, 154), _blk("2026-06-30", 1300, 168),
+    ]
+    return blocks
+
+
+def test_rows_from_ocr_extracts_correct_fields():
+    rows_clustered = ocr._cluster_rows(ocr._blocks_from_result(_grid_with_two_rows()))
+    idx, bands = ocr._detect_grid_header(rows_clustered)
+    rows, _warns = ocr._rows_from_ocr(rows_clustered, idx, bands, "x.png")
+    assert len(rows) == 2
+    r0 = rows[0]
+    assert r0["destination"] == "PIRAEUS"
+    assert r0["carrier"] == "ONE"
+    assert (r0["container_20gp"], r0["container_40gp"], r0["container_40hq"]) == (4000.0, 6150.0, 6150.0)
+    assert r0["valid_from"] == "2026-06-15" and r0["valid_to"] == "2026-06-30"
+    assert r0["currency"] == "USD" and r0["surcharges"] == []
+    assert rows[1]["carrier"] == "MSC" and rows[1]["container_20gp"] == 4720.0

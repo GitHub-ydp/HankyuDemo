@@ -142,3 +142,97 @@ def _assign(xc: float, bands: dict[str, tuple[float, float]]) -> str | None:
         if left <= xc < right:
             return col
     return None
+
+
+_CURRENCY_PREFIX = re.compile(r"^[$¥￥Ss]\s*\d")
+
+
+def _looks_priced(text: str) -> bool:
+    """原文带货币标记($ ¥ ￥ 或 OCR 把 $ 误读的前导 S),用来从水印纯数字里挑出真价。"""
+    return bool(_CURRENCY_PREFIX.match(text.strip()))
+
+
+def _first_price(
+    blocks_in_col: list[dict[str, Any]] | None,
+    band: tuple[float, float] | None = None,
+) -> float | None:
+    """从某价列的候选块里挑价:优先带货币标记的;其次离列中心最近(挡水印纯数字)。"""
+    cands = [(b, _norm_price(b["text"])) for b in (blocks_in_col or [])]
+    cands = [(b, p) for b, p in cands if p is not None]
+    if not cands:
+        return None
+    marked = [bp for bp in cands if _looks_priced(bp[0]["text"])]
+    pool = marked or cands
+    if band and band[0] != float("-inf") and band[1] != float("inf"):
+        center = (band[0] + band[1]) / 2.0
+        pool.sort(key=lambda bp: abs(bp[0]["xc"] - center))
+    else:
+        pool.sort(key=lambda bp: bp[0]["xl"])
+    return pool[0][1]
+
+
+def _join_col(blocks_in_col: list[dict[str, Any]] | None) -> str:
+    return " ".join(
+        t["text"] for t in sorted(blocks_in_col or [], key=lambda d: (d["yc"], d["xl"]))
+    ).strip()
+
+
+def _rows_from_ocr(
+    rows: list[list[dict[str, Any]]],
+    header_idx: int,
+    bands: dict[str, tuple[float, float]],
+    source_file: str,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """表头之下每行 → 按列 X 绑 token → 归一为 ocean 行 dict(与 ocean_ai_extractor 同构)。"""
+    out: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    for row in rows[header_idx + 1:]:
+        binned: dict[str, list[dict[str, Any]]] = {}
+        for b in row:
+            col = _assign(b["xc"], bands)
+            if col:
+                binned.setdefault(col, []).append(b)
+        dest = _join_col(binned.get("destination"))
+        if not dest:
+            continue
+        c20 = _first_price(binned.get("c20"), bands.get("c20"))
+        c40gp = _first_price(binned.get("c40gp"), bands.get("c40gp"))
+        c40hq = _first_price(binned.get("c40hq"), bands.get("c40hq"))
+        c45 = _first_price(binned.get("c45"), bands.get("c45"))
+        if not any((c20, c40gp, c40hq, c45)):
+            continue  # 无价行(分隔/空行)跳过
+        carrier = None
+        if binned.get("carrier"):
+            carrier = sorted(binned["carrier"], key=lambda d: d["xl"])[0]["text"].strip() or None
+        dates = sorted({
+            m.group()
+            for b in binned.get("valid", [])
+            for m in [_DATE_RE.search(b["text"])]
+            if m
+        })
+        valid_from = dates[0] if dates else None
+        valid_to = dates[-1] if len(dates) >= 2 else (dates[0] if dates else None)
+        origin = _join_col(binned.get("origin")) or "NINGBO"
+        needs_review = (not carrier) or (not valid_to) or (not (c20 and c40gp))
+        out.append({
+            "origin": origin,
+            "destination": dest,
+            "carrier": carrier,
+            "vessel_voyage": None,
+            "via": None,
+            "is_direct": True,
+            "container_20gp": c20,
+            "container_40gp": c40gp,
+            "container_40hq": c40hq,
+            "container_45": c45,
+            "currency": "USD",
+            "valid_from": valid_from,
+            "valid_to": valid_to,
+            "transit_days": None,
+            "surcharges": [],
+            "remark": None,
+            "needs_review": needs_review,
+            "source_file": source_file,
+            "source_type": "ocean_image",
+        })
+    return out, warnings
