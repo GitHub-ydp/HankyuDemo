@@ -19,6 +19,7 @@ Service/+100KG)，套进 air_blank.xlsx 周表(价铺满 day1-7)。关掉 strict
 """
 from __future__ import annotations
 
+from copy import copy
 from datetime import date, timedelta
 from io import BytesIO
 from typing import Any
@@ -263,7 +264,14 @@ def _fill_sea(workbook, sheet_cfg: SheetFillConfig, rows: list[dict[str, Any]]) 
             safe_set(ws.cell(r, col["via"]), row.get("via"))
             transit_cell = ws.cell(r, col["transit"])
             safe_set(transit_cell, row.get("transit"))
-            transit_cell.number_format = "General"
+            # 模板 Transit Time 列按行做了纵向合并、且偶数行藏着美元/时间数字格式。解除合并后
+            # 仅设 number_format='General' 在存盘时会被合并样式覆盖(openpyxl 已知坑)，导致天数
+            # 渲染成「$6」。用 style='Normal' 彻底重置该格样式(=General)，再从同行运费列(始终
+            # 带表格边框)补回边框，确保 transit 显示纯数字「6」且不丢表格线。
+            if transit_cell.value is not None:
+                kept_border = copy(ws.cell(r, col["freight"]).border)
+                transit_cell.style = "Normal"
+                transit_cell.border = kept_border
             safe_set(ws.cell(r, col["booking"]), row.get("booking"))
             safe_set(ws.cell(r, col["rmks"]), row.get("remark"))
             for _, col_key, field_name in _SEA_META_COLS:

@@ -214,3 +214,23 @@ def test_strict_air_template_passes_through_weekly_rows():
     assert ws.cell(2, 9).value == 20.0   # day7=I 列
     assert ws.cell(3, 3).value == 11     # 周表行原样
     assert ws.cell(3, 9).value == 12
+
+
+def test_fill_sea_transit_renders_plain_number_not_currency():
+    # 模板 Transit Time 列(K)按行纵向合并、偶数行藏美元/时间格式,以前数字会渲染成 "$6"。
+    rows = [
+        {"destination": "PIRAEUS", "carrier": "ONE",
+         "container_20gp": 4000, "container_40gp": 6150, "container_40hq": 6150,
+         "transit": 49},
+        {"destination": "HCM", "carrier": "JJ",
+         "container_20gp": 275, "container_40gp": 500, "container_40hq": 500,
+         "transit": 6},
+    ]
+    content, _ = fill_template("sea", rows)
+    ws = _reload(content)["JP N RATE FCL & LCL"]
+    for r in range(9, 15):  # 两条各展开 20FT/40GP/40HQ = r9..r14
+        cell = ws.cell(r, 11)  # Transit Time = K
+        assert cell.value in (49, 6), f"K{r} 值异常 {cell.value!r}"
+        assert "$" not in cell.number_format, f"K{r} 透出货币格式 {cell.number_format!r}"
+        assert cell.number_format == "General", f"K{r} 非 General: {cell.number_format!r}"
+        assert cell.border.bottom.style is not None, f"K{r} 丢了表格边框"
