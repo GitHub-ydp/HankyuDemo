@@ -31,7 +31,12 @@ from app.services.step1_rates.adapters import (
     OceanNgbAdapter,
 )
 from app.services.step1_rates.registry import RateAdapterRegistry
-from app.services.step1_rates.sheet_builder import air_extractor, air_ai_extractor, ocean_ai_extractor
+from app.services.step1_rates.sheet_builder import (
+    air_extractor,
+    air_ai_extractor,
+    ocean_ai_extractor,
+    ocean_ocr_extractor,
+)
 from app.services.step1_rates.sheet_builder.template_registry import get_template_config
 
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
@@ -164,7 +169,10 @@ def add_file(
                 parsed = air_ai_extractor.parse_air_image(file_path, db)
                 source_type = "air_image"
             else:
-                parsed = ocean_ai_extractor.parse_ocean_image(file_path, db)
+                # 规整网格表先走本地 OCR(快/确定/不幻觉);未命中表头或 0 行 → 回落 VLM。
+                parsed = ocean_ocr_extractor.parse_ocean_grid(file_path, db)
+                if not parsed.get("parsed_rows"):
+                    parsed = ocean_ai_extractor.parse_ocean_image(file_path, db)
                 source_type = "ocean_image"
         else:  # 文本
             with open(file_path, encoding="utf-8", errors="ignore") as fh:
