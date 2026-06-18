@@ -454,7 +454,7 @@ def test_rows_from_ocr_extracts_correct_fields():
     assert rows[1]["carrier"] == "MSC" and rows[1]["container_20gp"] == 4720.0
 ```
 
-注意：水印 `4432` 的 X(650) 处于 `c20`(xc≈700) 左侧、船司(xc≈500) 右侧的某个 `_xN`(航线列) band 内 → 不进 carrier/价列；即便落到某价列，`_first_price` 取该列首个能解析且 >0 的数，价列里真值 `$4000` 仍优先（同列水印数与真值不同列，X 已分开）。该测试断言价格正确即验证了隔离。
+注意（关键设计点）：水印 `4432`(xc=650) 恰好落在 `c20` band `(650,750)` 内（航线列 xc=600 与 20'GP 列 xc=700 的中点=650），且左于真值 `$4000`(xl=628 < 678)。所以**不能用"取该列最左 token"挑价**——会抓到水印。正确做法见下方 `_first_price`：**优先取原文带货币标记($/¥/OCR 误读的前导 S)的 token，再按"离列中心最近"兜底**。真价有 `$` 且居中、水印纯数字且偏移，据此把水印排除。该测试断言价格 == 4000 即验证了"水印即便落进价列也被排除"，是有意保留的硬测试。
 
 - [ ] **Step 2: 跑测试看失败**
 
@@ -466,12 +466,31 @@ Expected: FAIL（`AttributeError: _rows_from_ocr`）。
 追加：
 
 ```python
-def _first_price(blocks_in_col: list[dict[str, Any]] | None) -> float | None:
-    for b in sorted(blocks_in_col or [], key=lambda d: d["xl"]):
-        p = _norm_price(b["text"])
-        if p is not None:
-            return p
-    return None
+_CURRENCY_PREFIX = re.compile(r"^[$¥￥Ss]\s*\d")
+
+
+def _looks_priced(text: str) -> bool:
+    """原文带货币标记($ ¥ ￥ 或 OCR 把 $ 误读的前导 S),用来从水印纯数字里挑出真价。"""
+    return bool(_CURRENCY_PREFIX.match(text.strip()))
+
+
+def _first_price(
+    blocks_in_col: list[dict[str, Any]] | None,
+    band: tuple[float, float] | None = None,
+) -> float | None:
+    """从某价列的候选块里挑价:优先带货币标记的;其次离列中心最近(挡水印纯数字)。"""
+    cands = [(b, _norm_price(b["text"])) for b in (blocks_in_col or [])]
+    cands = [(b, p) for b, p in cands if p is not None]
+    if not cands:
+        return None
+    marked = [bp for bp in cands if _looks_priced(bp[0]["text"])]
+    pool = marked or cands
+    if band and band[0] != float("-inf") and band[1] != float("inf"):
+        center = (band[0] + band[1]) / 2.0
+        pool.sort(key=lambda bp: abs(bp[0]["xc"] - center))
+    else:
+        pool.sort(key=lambda bp: bp[0]["xl"])
+    return pool[0][1]
 
 
 def _join_col(blocks_in_col: list[dict[str, Any]] | None) -> str:
@@ -498,10 +517,10 @@ def _rows_from_ocr(
         dest = _join_col(binned.get("destination"))
         if not dest:
             continue
-        c20 = _first_price(binned.get("c20"))
-        c40gp = _first_price(binned.get("c40gp"))
-        c40hq = _first_price(binned.get("c40hq"))
-        c45 = _first_price(binned.get("c45"))
+        c20 = _first_price(binned.get("c20"), bands.get("c20"))
+        c40gp = _first_price(binned.get("c40gp"), bands.get("c40gp"))
+        c40hq = _first_price(binned.get("c40hq"), bands.get("c40hq"))
+        c45 = _first_price(binned.get("c45"), bands.get("c45"))
         if not any((c20, c40gp, c40hq, c45)):
             continue  # 无价行(分隔/空行)跳过
         carrier = None
