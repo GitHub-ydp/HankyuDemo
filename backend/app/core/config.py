@@ -52,8 +52,11 @@ class Settings(BaseSettings):
     ai_timeout_seconds: int = 90
     ai_auto_no_think: bool = True            # vLLM/Qwen 族：user text 自动补 /no_think
     ai_max_tokens_default: int = 512
-    ai_max_tokens_extract_json: int = 1024
-    ai_max_tokens_cap: int = 1536            # 死守 2048 - 512 prompt buffer
+    # 抽取类 JSON 默认放到 4096：密图(海运6+行/空运多档)的 JSON 输出常 ~1000+ token，
+    # 旧默认 1024/cap 1536 会把超过的整张图截断成 0 行(漏行 bug 根因)。
+    # 4096 同时是当前 gemma4 单槽上限(16384 context / -np 4)与 .env.example/admin 上限。
+    ai_max_tokens_extract_json: int = 4096
+    ai_max_tokens_cap: int = 4096            # 与抽取默认对齐，避免 4096 被 cap 反向夹小
     ai_image_compress: bool = True
     ai_image_max_edge_px: int = 1280
     ai_image_jpeg_quality: int = 85          # 0~95
