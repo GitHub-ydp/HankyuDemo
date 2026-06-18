@@ -140,3 +140,42 @@ def test_parse_ocean_grid_engine_error_returns_error(monkeypatch):
     monkeypatch.setattr(ocr, "_get_engine", _boom)
     res = ocr.parse_ocean_grid("z.png")
     assert res["parsed_rows"] == [] and "error" in res
+
+
+def test_iso_dates_normalizes_separators():
+    assert ocr._iso_dates("2026/06/15") == ["2026-06-15"]
+    assert ocr._iso_dates("有效期 2026.6.5") == ["2026-06-05"]
+    assert ocr._iso_dates("2026-06-15") == ["2026-06-15"]
+
+
+def test_single_validity_date_sets_valid_to_none_and_flags_review():
+    # 只抽到一个有效期日期(另一日期被行切分丢)→ valid_to=None + needs_review,不静默复制 valid_from
+    blocks = list(_header_row())
+    blocks += [
+        _blk("PIRAEUS", 200, 90), _blk("ONE", 500, 90),
+        _blk("$4000", 700, 90), _blk("$6150", 800, 90), _blk("$6150", 900, 90),
+        _blk("2026-06-15", 1300, 90),
+    ]
+    rc = ocr._cluster_rows(ocr._blocks_from_result(blocks))
+    idx, bands = ocr._detect_grid_header(rc)
+    rows, _ = ocr._rows_from_ocr(rc, idx, bands, "x.png")
+    assert len(rows) == 1
+    assert rows[0]["valid_from"] == "2026-06-15"
+    assert rows[0]["valid_to"] is None
+    assert rows[0]["needs_review"] is True
+
+
+def test_ambiguous_price_column_flags_review():
+    # c20 列里同时有水印 4432 和真价 $4000 → 仍取对 4000,但因列内多候选数字标 needs_review
+    blocks = list(_header_row())
+    blocks += [
+        _blk("PIRAEUS", 200, 90), _blk("ONE", 500, 90),
+        _blk("4432", 660, 90), _blk("$4000", 720, 90),
+        _blk("$6150", 800, 90), _blk("$6150", 900, 90),
+        _blk("2026-06-15", 1300, 84), _blk("2026-06-30", 1300, 98),
+    ]
+    rc = ocr._cluster_rows(ocr._blocks_from_result(blocks))
+    idx, bands = ocr._detect_grid_header(rc)
+    rows, _ = ocr._rows_from_ocr(rc, idx, bands, "x.png")
+    assert rows[0]["container_20gp"] == 4000.0
+    assert rows[0]["needs_review"] is True

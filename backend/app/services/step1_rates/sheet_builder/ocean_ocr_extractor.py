@@ -12,7 +12,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 _PRICE_COLS = ("c20", "c40gp", "c40hq", "c45")
-_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+_DATE_RE = re.compile(r"(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})")
 
 _engine = None
 
@@ -171,6 +171,25 @@ def _first_price(
     return pool[0][1]
 
 
+def _iso_dates(text: str) -> list[str]:
+    """抽出文本里的日期并规范成 ISO YYYY-MM-DD(容错 - / . 分隔与单位数月日)。"""
+    out: list[str] = []
+    for m in _DATE_RE.finditer(text):
+        y, mo, d = m.group(1), int(m.group(2)), int(m.group(3))
+        out.append(f"{y}-{mo:02d}-{d:02d}")
+    return out
+
+
+def _distinct_prices(blocks_in_col: list[dict[str, Any]] | None) -> set[float]:
+    """某价列里能解析出的不同价格值集合(用于判该列是否多候选/有歧义)。"""
+    vals: set[float] = set()
+    for b in (blocks_in_col or []):
+        p = _norm_price(b["text"])
+        if p is not None:
+            vals.add(p)
+    return vals
+
+
 def _join_col(blocks_in_col: list[dict[str, Any]] | None) -> str:
     return " ".join(
         t["text"] for t in sorted(blocks_in_col or [], key=lambda d: (d["yc"], d["xl"]))
@@ -205,15 +224,13 @@ def _rows_from_ocr(
         if binned.get("carrier"):
             carrier = sorted(binned["carrier"], key=lambda d: d["xl"])[0]["text"].strip() or None
         dates = sorted({
-            m.group()
-            for b in binned.get("valid", [])
-            for m in [_DATE_RE.search(b["text"])]
-            if m
+            iso for b in binned.get("valid", []) for iso in _iso_dates(b["text"])
         })
         valid_from = dates[0] if dates else None
-        valid_to = dates[-1] if len(dates) >= 2 else (dates[0] if dates else None)
+        valid_to = dates[-1] if len(dates) >= 2 else None
         origin = _join_col(binned.get("origin")) or "NINGBO"
-        needs_review = (not carrier) or (not valid_to) or (not (c20 and c40gp))
+        price_ambiguous = any(len(_distinct_prices(binned.get(c))) >= 2 for c in _PRICE_COLS)
+        needs_review = (not carrier) or (not valid_to) or (not (c20 and c40gp)) or price_ambiguous
         out.append({
             "origin": origin,
             "destination": dest,
