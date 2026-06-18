@@ -41,3 +41,24 @@ def _blocks_from_result(result: Any) -> list[dict[str, Any]]:
             "xl": min(xs), "xr": max(xs), "h": max(ys) - min(ys),
         })
     return blocks
+
+
+def _cluster_rows(blocks: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    """按 Y 把块聚成行：相邻块 Y 间隔 > 中位字高×0.8 视为新行（POC 验证过的口径）。"""
+    if not blocks:
+        return []
+    ordered = sorted(blocks, key=lambda b: b["yc"])
+    heights = sorted(b["h"] for b in ordered)
+    med_h = heights[len(heights) // 2] or 20
+    rows: list[list[dict[str, Any]]] = []
+    cur: list[dict[str, Any]] = []
+    last_y: float | None = None
+    for b in ordered:
+        if last_y is not None and b["yc"] - last_y > med_h * 0.8:
+            rows.append(cur)
+            cur = []
+        cur.append(b)
+        last_y = b["yc"]
+    if cur:
+        rows.append(cur)
+    return rows
