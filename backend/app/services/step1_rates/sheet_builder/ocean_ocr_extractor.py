@@ -13,6 +13,9 @@ from sqlalchemy.orm import Session
 
 _PRICE_COLS = ("c20", "c40gp", "c40hq", "c45")
 _DATE_RE = re.compile(r"(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})")
+# 航程天数 token(如「49天」「6 天」):订舱网格里夹在起运港→目的港之间,OCR 易落进
+# 目的港/起运港列,会污染港名。识别出来→剔出港名 + 收进 transit_days。
+_TRANSIT_RE = re.compile(r"^(\d+)\s*天$")
 
 _engine = None
 
@@ -191,9 +194,20 @@ def _distinct_prices(blocks_in_col: list[dict[str, Any]] | None) -> set[float]:
 
 
 def _join_col(blocks_in_col: list[dict[str, Any]] | None) -> str:
+    """拼港名列文本;剔掉夹进来的航程天数 token(「X天」非港名一部分)。"""
     return " ".join(
         t["text"] for t in sorted(blocks_in_col or [], key=lambda d: (d["yc"], d["xl"]))
+        if not _TRANSIT_RE.match(t["text"].strip())
     ).strip()
+
+
+def _transit_days(blocks: list[dict[str, Any]] | None) -> int | None:
+    """从给定块里找航程天数「X天」→ int;无则 None。"""
+    for b in (blocks or []):
+        m = _TRANSIT_RE.match(b["text"].strip())
+        if m:
+            return int(m.group(1))
+    return None
 
 
 def _rows_from_ocr(
@@ -229,6 +243,7 @@ def _rows_from_ocr(
         valid_from = dates[0] if dates else None
         valid_to = dates[-1] if len(dates) >= 2 else None
         origin = _join_col(binned.get("origin")) or "NINGBO"
+        transit_days = _transit_days((binned.get("destination") or []) + (binned.get("origin") or []))
         price_ambiguous = any(len(_distinct_prices(binned.get(c))) >= 2 for c in _PRICE_COLS)
         needs_review = (not carrier) or (not valid_to) or (not (c20 and c40gp)) or price_ambiguous
         out.append({
@@ -245,7 +260,7 @@ def _rows_from_ocr(
             "currency": "USD",
             "valid_from": valid_from,
             "valid_to": valid_to,
-            "transit_days": None,
+            "transit_days": transit_days,
             "surcharges": [],
             "remark": None,
             "needs_review": needs_review,

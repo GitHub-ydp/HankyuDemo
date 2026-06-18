@@ -179,3 +179,20 @@ def test_ambiguous_price_column_flags_review():
     rows, _ = ocr._rows_from_ocr(rc, idx, bands, "x.png")
     assert rows[0]["container_20gp"] == 4000.0
     assert rows[0]["needs_review"] is True
+
+
+def test_transit_days_token_excluded_from_destination():
+    # "X天"(航程天数)落在目的港列时,不能混进 destination,应解析进 transit_days
+    blocks = list(_header_row())
+    blocks += [
+        _blk("NINGBO", 100, 90), _blk("49天", 170, 90), _blk("PIRAEUS", 230, 90),
+        _blk("ONE", 500, 90),
+        _blk("$4000", 700, 90), _blk("$6150", 800, 90), _blk("$6150", 900, 90),
+        _blk("2026-06-15", 1300, 84), _blk("2026-06-30", 1300, 98),
+    ]
+    rc = ocr._cluster_rows(ocr._blocks_from_result(blocks))
+    idx, bands = ocr._detect_grid_header(rc)
+    rows, _ = ocr._rows_from_ocr(rc, idx, bands, "x.png")
+    assert len(rows) == 1
+    assert rows[0]["destination"] == "PIRAEUS"
+    assert rows[0]["transit_days"] == 49
