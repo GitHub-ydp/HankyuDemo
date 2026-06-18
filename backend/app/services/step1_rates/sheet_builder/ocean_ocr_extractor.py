@@ -62,3 +62,61 @@ def _cluster_rows(blocks: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
     if cur:
         rows.append(cur)
     return rows
+
+
+def _classify_header(text: str) -> str | None:
+    """单个表头单元 → 规范列名；认不出返回 None。OCR 轻微变形做容错。"""
+    if "起运港" in text or "起運港" in text:
+        return "origin"
+    if "目的港" in text or "目的" in text:
+        return "destination"
+    if "船司" in text:
+        return "carrier"
+    if "有效期" in text:
+        return "valid"
+    t = text.upper().replace(" ", "").replace("'", "").replace("’", "")
+    if "45" in t and "HQ" in t:
+        return "c45"
+    if "40" in t and "HQ" in t:
+        return "c40hq"
+    if "40" in t and "GP" in t:
+        return "c40gp"
+    if "20" in t and "GP" in t:
+        return "c20"
+    return None
+
+
+def _cols_to_bands(cells: list[tuple[str, float]]) -> dict[str, tuple[float, float]]:
+    """(列名, x中心) 列表 → 每列 X 区间(相邻中心取中点;首尾开放)。"""
+    cells = sorted(cells, key=lambda c: c[1])
+    bands: dict[str, tuple[float, float]] = {}
+    for i, (col, xc) in enumerate(cells):
+        left = float("-inf") if i == 0 else (cells[i - 1][1] + xc) / 2.0
+        right = float("inf") if i == len(cells) - 1 else (xc + cells[i + 1][1]) / 2.0
+        bands[col] = (left, right)
+    return bands
+
+
+def _detect_grid_header(
+    rows: list[list[dict[str, Any]]]
+) -> tuple[int, dict[str, tuple[float, float]]] | None:
+    """找表头行(≥4 已知列 + 含目的港 + ≥1 价格列)。返回 (行号, 列X区间)。
+
+    用整行所有单元(未知列给占位名 _xN)切 band,使中间列(舱位/船期/历史等)各占自己的带,
+    不污染目标列。未命中返回 None(交路由回落 VLM)。
+    """
+    for idx, row in enumerate(rows):
+        ordered = sorted(row, key=lambda d: d["xc"])
+        known = [_classify_header(b["text"]) for b in ordered]
+        known_set = {k for k in known if k}
+        if len(known_set) >= 4 and "destination" in known_set and (known_set & set(_PRICE_COLS)):
+            cells: list[tuple[str, float]] = []
+            used: set[str] = set()
+            for i, b in enumerate(ordered):
+                col = known[i]
+                if not col or col in used:
+                    col = f"_x{i}"
+                used.add(col)
+                cells.append((col, b["xc"]))
+            return idx, _cols_to_bands(cells)
+    return None
